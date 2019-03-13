@@ -610,7 +610,7 @@ NUMBER=args.number
 SEQ_LENGTH=100000
 TYPES=["intron-intron", "exon-exon", "exon-intron"]#, "5'UTR", "3'UTR"]
 TRANS_PERC=0.2
-TRUTH=agrs.truth
+TRUTH=args.truth
 
 if TRUTH.lower()=="true":
     TRUTH=True
