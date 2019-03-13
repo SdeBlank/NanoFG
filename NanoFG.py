@@ -17,7 +17,7 @@ def parse_vcf(vcf):
     with open(VCF, "r") as vcf:
         VCF_READER=pyvcf.Reader(vcf)
         #print("ID" + "\t" + "Fusion_type" + "\t" + "5'_gene" + "\t" + "3'_gene" + "\t" + "5'_CDS_length" + "\t" + "3'_CDS_length")
-        print("\t".join(["ID","Fusion_type","5'_gene","3'_gene","5'_CDS length","3'_CDS length"]))
+        print("\t".join(["ID","Fusion_type","5'_gene","3'_gene","5'_CDS length","3'_CDS length", "5' Original_CDS_length", "3' Original_CDS_length"]))
         for record in VCF_READER:
             # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
@@ -78,12 +78,14 @@ def overlap_annotation(CHROM, POS):
 
                     for transcript in gene_info["Transcript"]:
                         if transcript["is_canonical"]==1:
+                            LENGTH_CDS=0
                             CDS=False
                             INFO["Transcript_id"]=transcript["id"]
                             INFO["Biotype"]=transcript["biotype"]
                             INFO["Transcript_start"]=transcript["start"]
                             INFO["Transcript_end"]=transcript["end"]
                             INFO["Total_exons"]=len(transcript["Exon"])
+                            INFO["Original_CDS_length"]=transcript["Translation"]["length"]*3
                             if INFO["Strand"]==1:
                                 INFO["CDS_start"]=transcript["Translation"]["start"]
                                 INFO["CDS_end"]=transcript["Translation"]["end"]
@@ -142,6 +144,7 @@ def overlap_annotation(CHROM, POS):
                                     EXON_INFO["End_phase"]=-1
                                     EXON_INFO["CDS_length"]=0
                                 PHASE=EXON_INFO["End_phase"]
+                                LENGTH_CDS+=EXON_INFO["CDS_length"]
                                 INFO["Exons"].append(EXON_INFO)
 
                                 ### INTRONS
@@ -154,6 +157,9 @@ def overlap_annotation(CHROM, POS):
                                     INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
                                     INTRON_INFO["CDS"]=CDS
                                     INFO["Exons"].append(INTRON_INFO)
+                            print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
+                            if LENGTH_CDS-3!=transcript["Translation"]["length"]*3:                             # REMOVE when not needed anymore
+                                print("EXONS DONT ADD UP")
                     if INFO["Biotype"]=="protein_coding":
                         HITS.append(INFO)
     return HITS
@@ -168,6 +174,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_start"])
+                BND_INFO["Type"]=None
             elif POS<gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
             elif POS>gene["CDS_start"] and POS<gene["CDS_end"]:
@@ -180,6 +187,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
+                BND_INFO["Type"]=None
             elif POS>gene["CDS_end"]:
                 BND_INFO["Breakpoint_location"]="3'UTR"
         else:
@@ -187,6 +195,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript end"]=abs(POS-gene["Transcript_start"])
+                BND_INFO["Type"]=None
             elif POS<gene["CDS_end"]:
                 BND_INFO["Breakpoint_location"]="3'UTR"
             elif POS>gene["CDS_end"] and POS<gene["CDS_start"]:
@@ -199,6 +208,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
+                BND_INFO["Type"]=None
             elif POS>gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
 
@@ -221,13 +231,15 @@ def breakend_annotation(CHROM, POS, orientation, Info):
 
                     if BND_INFO["Type"]=="exon":
                         BND_INFO["Rank"]=sequence["Rank"]
+                        BND_INFO["Exon_start_phase"]=sequence["Start_phase"]
+                        BND_INFO["Exon_end_phase"]=sequence["End_phase"]
 
                         # if sequence["Contains_start_CDS"]==True:
                         #     BND_INFO["Phase"]=(abs(INFO["CDS_start"]-POS)+sequence["Start_phase"])%3
                         # else:
                         #     BND_INFO["Phase"]=(abs(sequence["Start"]-POS)+sequence["Start_phase"])%3
                         if BND_INFO["Breakpoint_location"]=="5'UTR" or BND_INFO["Breakpoint_location"]=="3'UTR":
-                            BND_INFO["Phase"]=-1
+                            BND_INFO["Phase"]=-1                                                                    # Perhaps change to non-integer so it crashes if due to some reason calculation happens with this
                         else:
                             if orientation:
                                 if sequence["Contains_end_CDS"]==True:
@@ -280,95 +292,163 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
     for annotation1 in Breakend1:
         for annotation2 in Breakend2:
             if annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"]:
-                # if annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]:
-                #     print("\n")
-                #     print(Record.CHROM, annotation1["Breakpoint_location"], annotation2["Breakpoint_location"])
-                #     print(Record.POS, annotation1["Transcript_start"], annotation1["Transcript_end"])
-                #     print(Record.ALT[0].pos, annotation2["Transcript_start"], annotation2["Transcript_end"])
-                #     print(annotation1["Gene_name"], annotation2["Gene_name"])
+
                 if annotation1["Order"]=="5'":
                     FIVE_PRIME_GENE=annotation1
-                    THREE_PRIMER_GENE=annotation2
+                    THREE_PRIME_GENE=annotation2
                 else:
                     FIVE_PRIME_GENE=annotation2
-                    THREE_PRIMER_GENE=annotation1
+                    THREE_PRIME_GENE=annotation1
 
                 if Orientation1 and Orientation2:
                     if (annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
-                        if annotation1["Breakpoint_location"]=="CDS"  and annotation1["Type"]==annotation2["Type"]:
+                        if annotation1["Breakpoint_location"]=="CDS" and annotation1["Type"]==annotation2["Type"]:
                             if annotation1["Phase"]==annotation2["Phase"]:
-                                FUSION_TYPE="Fusion protein"
+                                if annotation1["Type"]=="exon":
+                                    FUSION_TYPE="exon-exon"
+                                else:
+                                    FUSION_TYPE="intron-intron"
                             elif annotation1["Type"]=="exon":
-                                FUSION_TYPE="Fusion protein (OUT OF PHASE)"
+                                FUSION_TYPE="exon-exon (OUT OF PHASE)"
                             else:
                                 continue
-                        elif annotation1["Breakpoint_location"]=="5'UTR":
+                        elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
+                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
+                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation1["Breakpoint_location"]=="5'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="Promoter fusion"
                         elif annotation1["Breakpoint_location"]=="3'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIMER_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIMER_GENE["CDS_length"])]))
+                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
+                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
                         # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
                         # print(annotation1)
                         # print(annotation2)
 
                 elif Orientation1 and not Orientation2:
                     if (annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
-                        if annotation1["Breakpoint_location"]=="CDS"  and annotation1["Type"]==annotation2["Type"]:
+                        if annotation1["Breakpoint_location"]=="CDS" and annotation1["Type"]==annotation2["Type"]:
                             if annotation1["Phase"]==annotation2["Phase"]:
-                                FUSION_TYPE="Fusion protein"
+                                if annotation1["Type"]=="exon":
+                                    FUSION_TYPE="exon-exon"
+                                else:
+                                    FUSION_TYPE="intron-intron"
                             elif annotation1["Type"]=="exon":
-                                FUSION_TYPE="Fusion protein (OUT OF PHASE)"
+                                FUSION_TYPE="exon-exon (OUT OF PHASE)"
                             else:
                                 continue
-                        elif annotation1["Breakpoint_location"]=="5'UTR":
+                        elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
+                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
+                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation1["Breakpoint_location"]=="5'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="Promoter fusion"
                         elif annotation1["Breakpoint_location"]=="3'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIMER_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIMER_GENE["CDS_length"])]))
+                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
+                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
                         # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
                         # print(annotation1)
                         # print(annotation2)
 
                 if not Orientation1 and Orientation2:
                     if (annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
-                        if annotation1["Breakpoint_location"]=="CDS"  and annotation1["Type"]==annotation2["Type"]:
+                        if annotation1["Breakpoint_location"]=="CDS" and annotation1["Type"]==annotation2["Type"]:
                             if annotation1["Phase"]==annotation2["Phase"]:
-                                FUSION_TYPE="Fusion protein"
+                                if annotation1["Type"]=="exon":
+                                    FUSION_TYPE="exon-exon"
+                                else:
+                                    FUSION_TYPE="intron-intron"
                             elif annotation1["Type"]=="exon":
-                                FUSION_TYPE="Fusion protein (OUT OF PHASE)"
+                                FUSION_TYPE="exon-exon (OUT OF PHASE)"
                             else:
                                 continue
-                        elif annotation1["Breakpoint_location"]=="5'UTR":
+
+                        elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
+                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
+                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation1["Breakpoint_location"]=="5'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="Promoter fusion"
                         elif annotation1["Breakpoint_location"]=="3'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIMER_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIMER_GENE["CDS_length"])]))
+                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
+                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
                         # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
                         # print(annotation1)
                         # print(annotation2)
 
                 if not Orientation1 and not Orientation2:
                     if (annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
-                        if annotation1["Breakpoint_location"]=="CDS"  and annotation1["Type"]==annotation2["Type"]:
+                        if annotation1["Breakpoint_location"]=="CDS" and annotation1["Type"]==annotation2["Type"]:
                             if annotation1["Phase"]==annotation2["Phase"]:
-                                FUSION_TYPE="Fusion protein"
+                                if annotation1["Type"]=="exon":
+                                    FUSION_TYPE="exon-exon"
+                                else:
+                                    FUSION_TYPE="intron-intron"
                             elif annotation1["Type"]=="exon":
-                                FUSION_TYPE="Fusion protein (OUT OF PHASE)"
+                                FUSION_TYPE="exon-exon (OUT OF PHASE)"
                             else:
                                 continue
-                        elif annotation1["Breakpoint_location"]=="5'UTR":
+                        elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
+                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
+                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                FUSION_TYPE="exon-intron"
+                            else:
+                                continue
+                        elif annotation1["Breakpoint_location"]=="5'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="Promoter fusion"
                         elif annotation1["Breakpoint_location"]=="3'UTR" and annotation1["Type"]==annotation2["Type"]:
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIMER_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIMER_GENE["CDS_length"])]))
+                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
+                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
                         # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
                         # print(annotation1)
                         # print(annotation2)
