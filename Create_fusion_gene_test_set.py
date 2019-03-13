@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-o', '--output', type=str, help='Output with breakpoint sequences', required=True)
 parser.add_argument('-n', '--number', type=int, help='Number of fusion genes', required=True)
+parser.add_argument('-t', '--truth', type=str, help='Return "True" or "False" simulated fusion genes', required=True)
 
 args = parser.parse_args()
 VCF=args.output
@@ -609,7 +610,14 @@ NUMBER=args.number
 SEQ_LENGTH=100000
 TYPES=["intron-intron", "exon-exon", "exon-intron"]#, "5'UTR", "3'UTR"]
 TRANS_PERC=0.2
-TRUTH=True
+TRUTH=agrs.truth
+
+if TRUTH.lower()=="true":
+    TRUTH=True
+elif TRUTH.lower()=="false":
+    TRUTH=False
+else:
+    sys.exit("-t can only be 'True' or 'False'")
 
 for type in TYPES:
     for x in range(NUMBER):
@@ -642,7 +650,9 @@ for type in TYPES:
             # print(GENE2[0:6])
             # print(GENE2[6])
             # print(SEQ1, SEQ2, "\n")
-            output.write(FULL_SEQ + "\n")
+            for slice in range(0, len(FULL_SEQ), 60):
+                output.write(FULL_SEQ[slice:slice+60]+"\n")
+            #output.write(FULL_SEQ + "\n")
 
 
         #write if statement to check if every type of fusion gene is present at least once
