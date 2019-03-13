@@ -3,7 +3,7 @@ Third-generation fusion gene detection
 
 Types of fusion gene detection to implement:
 
-Exon-exon *Done*
+Exon-exon *Done*\n
 Exon-intron *Done*
 Intron-intron *Done*
 3' UTR fusion
