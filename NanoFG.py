@@ -8,16 +8,17 @@ import sys
 parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-v', '--vcf', type=str, help='input VCF', required=True)
-parser.add_argument('-o', '--output', type=str, help='Fusion gene output file', required=True)
+parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene output file (table)', required=True)
+parser.add_argument('-o', '--output_vcf', type=str, help='Annotated VCF output', required=True)
 
 args = parser.parse_args()
-VCF=args.vcf
 
-def parse_vcf(vcf):
+
+def parse_vcf(vcf, output):
     with open(VCF, "r") as vcf:
         VCF_READER=pyvcf.Reader(vcf)
-        #print("ID" + "\t" + "Fusion_type" + "\t" + "5'_gene" + "\t" + "3'_gene" + "\t" + "5'_CDS_length" + "\t" + "3'_CDS_length")
-        print("\t".join(["ID","Fusion_type","5'_gene","3'_gene","5'_CDS length","3'_CDS length", "5' Original_CDS_length", "3' Original_CDS_length"]))
+        with open(output, "w") as outfile:
+            outfile.write("\t".join(["ID","Fusion_type","5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
         for record in VCF_READER:
             # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
@@ -29,6 +30,7 @@ def parse_vcf(vcf):
             POS1_ORIENTATION=record.ALT[0].orientation
             POS2_ORIENTATION=record.ALT[0].remoteOrientation
 
+            #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=overlap_annotation(CHROM1, POS1)
             if not breakend1_annotation:
                 continue
@@ -36,17 +38,19 @@ def parse_vcf(vcf):
             if not breakend2_annotation:
                 continue
 
+            #Use requested information to calculate BND specific features
             breakend1_info=breakend_annotation(CHROM1, POS1, POS1_ORIENTATION, breakend1_annotation)
             breakend2_info=breakend_annotation(CHROM2, POS2, POS2_ORIENTATION, breakend2_annotation)
 
-            fusion_check(record, breakend1_info, breakend2_info, POS1_ORIENTATION, POS2_ORIENTATION)
+            #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
+            fusion_check(record, breakend1_info, breakend2_info, POS1_ORIENTATION, POS2_ORIENTATION, output)
 
 def overlap_annotation(CHROM, POS):
     ### Request genes, transcripts and exons
     SERVER="https://GRCh37.rest.ensembl.org/overlap/region/"
     SPECIES="human"
     HEADERS={"Content-Type" : "application/json"}
-    FEATURE="gene"
+    FEATURE="transcript"
     TRY=1
     while TRY <= 10:
         try:
@@ -58,119 +62,135 @@ def overlap_annotation(CHROM, POS):
             if TRY==10:
                 sys.exit("Error while requesting from ENSEMBL database after "+str(TRY)+" tries")
             TRY +=1
-    HITS=[]
 
+    UNIQUE_GENES=[]
+    UNIQUE_GENE_IDS=[]
     for hit in genes_data:
-        GENE_ID=hit["gene_id"]
-        if hit["biotype"]=="protein_coding":
-            if hit["description"]:
-                if "readthrough" not in hit["description"]:
-                    INFO={}
-                    SERVER="https://GRCh37.rest.ensembl.org/lookup/id/"
-                    request = requests.get(SERVER+str(GENE_ID)+"?expand=1"+FEATURE, headers=HEADERS)
-                    response = request.text
-                    gene_info=json.loads(response)
-                    INFO["Gene_id"]=gene_info["id"]
-                    INFO["Gene_name"]=gene_info["display_name"]
-                    INFO["Strand"]=gene_info["strand"]
-                    INFO["Gene_start"]=gene_info["start"]
-                    INFO["Gene_end"]=gene_info["end"]
+        if hit["Parent"] not in UNIQUE_GENE_IDS:
+            UNIQUE_GENES.append(hit)
+            UNIQUE_GENE_IDS.append(hit["Parent"])
 
-                    for transcript in gene_info["Transcript"]:
-                        if transcript["is_canonical"]==1:
-                            LENGTH_CDS=0
-                            CDS=False
-                            INFO["Transcript_id"]=transcript["id"]
-                            INFO["Biotype"]=transcript["biotype"]
-                            INFO["Transcript_start"]=transcript["start"]
-                            INFO["Transcript_end"]=transcript["end"]
-                            INFO["Total_exons"]=len(transcript["Exon"])
-                            INFO["Original_CDS_length"]=transcript["Translation"]["length"]*3
-                            if INFO["Strand"]==1:
-                                INFO["CDS_start"]=transcript["Translation"]["start"]
-                                INFO["CDS_end"]=transcript["Translation"]["end"]
+    HITS=[]
+    for hit in UNIQUE_GENES:
+        #print(hit)
+        GENE_ID=hit["Parent"]
+
+        SERVER="https://GRCh37.rest.ensembl.org/lookup/id/"
+        request = requests.get(SERVER+str(GENE_ID)+"?expand=1"+FEATURE, headers=HEADERS)
+        response = request.text
+        gene_info=json.loads(response)
+
+        if gene_info["biotype"]=="protein_coding":
+            INFO={}
+            INFO["CCDS_available"]=False
+            if "ccdsid" in hit:
+                INFO["CCDS_available"]=True
+
+            if "description" in gene_info:
+                if "readthrough" in gene_info["description"]:
+                    continue
+
+            INFO["Gene_id"]=gene_info["id"]
+            INFO["Gene_name"]=gene_info["display_name"]
+            INFO["Strand"]=gene_info["strand"]
+            INFO["Gene_start"]=gene_info["start"]
+            INFO["Gene_end"]=gene_info["end"]
+            INFO["Chromosome"]=CHROM
+
+            for transcript in gene_info["Transcript"]:
+                if transcript["is_canonical"]==1:
+                    LENGTH_CDS=0
+                    CDS=False
+                    INFO["Transcript_id"]=transcript["id"]
+                    INFO["Biotype"]=transcript["biotype"]
+                    INFO["Transcript_start"]=transcript["start"]
+                    INFO["Transcript_end"]=transcript["end"]
+                    INFO["Total_exons"]=len(transcript["Exon"])
+                    INFO["Original_CDS_length"]=(transcript["Translation"]["length"]*3)+3
+                    if INFO["Strand"]==1:
+                        INFO["CDS_start"]=transcript["Translation"]["start"]
+                        INFO["CDS_end"]=transcript["Translation"]["end"]
+                    else:
+                        INFO["CDS_start"]=transcript["Translation"]["end"]
+                        INFO["CDS_end"]=transcript["Translation"]["start"]
+                    INFO["Exons"]=[]
+
+                    ### EXONS
+                    for rank, exon in enumerate(transcript["Exon"]):
+                        EXON_INFO={}
+                        EXON_INFO["Rank"]=rank+1
+                        EXON_INFO["Type"]="exon"
+                        CHRON_START=exon["start"]
+                        CHRON_END=exon["end"]
+                        if INFO["Strand"]==1:
+                            EXON_INFO["Start"]=exon["start"]
+                            EXON_INFO["End"]=exon["end"]
+                        else:
+                            EXON_INFO["Start"]=exon["end"]
+                            EXON_INFO["End"]=exon["start"]
+                        EXON_INFO["Contains_start_CDS"]=False
+                        EXON_INFO["Contains_end_CDS"]=False
+
+                        if CDS:
+                            if INFO["CDS_end"]>=CHRON_START and INFO["CDS_end"]<=CHRON_END:
+                                EXON_INFO["Contains_end_CDS"]=True
+                                EXON_INFO["CDS"]=True
+                                EXON_INFO["Start_phase"]=PHASE
+                                #EXON_INFO["End_phase"]=-1
+                                EXON_INFO["End_phase"]=0
+                                EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-EXON_INFO["Start"])+1
+                                CDS=False
                             else:
-                                INFO["CDS_start"]=transcript["Translation"]["end"]
-                                INFO["CDS_end"]=transcript["Translation"]["start"]
-                            INFO["Exons"]=[]
+                                EXON_INFO["CDS"]=True
+                                EXON_INFO["Start_phase"]=PHASE
+                                EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-EXON_INFO["Start"])+1+PHASE)%3
+                                EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-EXON_INFO["Start"])+1
+                        elif INFO["CDS_start"]>=CHRON_START and INFO["CDS_start"]<=CHRON_END:
+                            EXON_INFO["Contains_start_CDS"]=True
+                            EXON_INFO["CDS"]=True
+                            #EXON_INFO["Start_phase"]=-1
+                            EXON_INFO["Start_phase"]=0
+                            if INFO["CDS_end"]>=CHRON_START and INFO["CDS_end"]<=CHRON_END:
+                                EXON_INFO["Contains_end_CDS"]=True
+                                EXON_INFO["End_phase"]=0
+                                EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-INFO["CDS_start"])+1
+                            else:
+                                EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-INFO["CDS_start"])+1)%3
+                                EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-INFO["CDS_start"])+1
+                            CDS=True
 
-                            ### EXONS
-                            for rank, exon in enumerate(transcript["Exon"]):
-                                EXON_INFO={}
-                                EXON_INFO["Rank"]=rank+1
-                                EXON_INFO["Type"]="exon"
-                                CHRON_START=exon["start"]
-                                CHRON_END=exon["end"]
-                                if INFO["Strand"]==1:
-                                    EXON_INFO["Start"]=exon["start"]
-                                    EXON_INFO["End"]=exon["end"]
-                                else:
-                                    EXON_INFO["Start"]=exon["end"]
-                                    EXON_INFO["End"]=exon["start"]
-                                EXON_INFO["Contains_start_CDS"]=False
-                                EXON_INFO["Contains_end_CDS"]=False
+                        else:
+                            EXON_INFO["CDS"]=False
+                            EXON_INFO["Start_phase"]=-1
+                            EXON_INFO["End_phase"]=-1
+                            EXON_INFO["CDS_length"]=0
+                        PHASE=EXON_INFO["End_phase"]
+                        LENGTH_CDS+=EXON_INFO["CDS_length"]
+                        INFO["Exons"].append(EXON_INFO)
 
-                                if CDS:
-                                    if INFO["CDS_end"]>=CHRON_START and INFO["CDS_end"]<=CHRON_END:
-                                        EXON_INFO["Contains_end_CDS"]=True
-                                        EXON_INFO["CDS"]=True
-                                        EXON_INFO["Start_phase"]=PHASE
-                                        #EXON_INFO["End_phase"]=-1
-                                        EXON_INFO["End_phase"]=0
-                                        EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-EXON_INFO["Start"])+1
-                                        CDS=False
-                                    else:
-                                        EXON_INFO["CDS"]=True
-                                        EXON_INFO["Start_phase"]=PHASE
-                                        EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-EXON_INFO["Start"])+1+PHASE)%3
-                                        EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-EXON_INFO["Start"])+1
-                                elif INFO["CDS_start"]>=CHRON_START and INFO["CDS_start"]<=CHRON_END:
-                                    EXON_INFO["Contains_start_CDS"]=True
-                                    EXON_INFO["CDS"]=True
-                                    #EXON_INFO["Start_phase"]=-1
-                                    EXON_INFO["Start_phase"]=0
-                                    if INFO["CDS_end"]>=CHRON_START and INFO["CDS_end"]<=CHRON_END:
-                                        EXON_INFO["Contains_end_CDS"]=True
-                                        EXON_INFO["End_phase"]=0
-                                        EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-INFO["CDS_start"])+1
-                                    else:
-                                        EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-INFO["CDS_start"])+1)%3
-                                        EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-INFO["CDS_start"])+1
-                                    CDS=True
-
-                                else:
-                                    EXON_INFO["CDS"]=False
-                                    EXON_INFO["Start_phase"]=-1
-                                    EXON_INFO["End_phase"]=-1
-                                    EXON_INFO["CDS_length"]=0
-                                PHASE=EXON_INFO["End_phase"]
-                                LENGTH_CDS+=EXON_INFO["CDS_length"]
-                                INFO["Exons"].append(EXON_INFO)
-
-                                ### INTRONS
-                                if rank<len(transcript["Exon"])-1:
-                                    INTRON_INFO={}
-                                    INTRON_INFO["Type"]="intron"
-                                    INTRON_INFO["Rank"]=rank+1
-                                    INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
-                                    INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
-                                    INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
-                                    INTRON_INFO["CDS"]=CDS
-                                    INFO["Exons"].append(INTRON_INFO)
-                            print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
-                            if LENGTH_CDS-3!=transcript["Translation"]["length"]*3:                             # REMOVE when not needed anymore
-                                print("EXONS DONT ADD UP")
-                    if INFO["Biotype"]=="protein_coding":
-                        HITS.append(INFO)
+                        ### INTRONS
+                        if rank<len(transcript["Exon"])-1:
+                            INTRON_INFO={}
+                            INTRON_INFO["Type"]="intron"
+                            INTRON_INFO["Rank"]=rank+1
+                            INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
+                            INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
+                            INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                            INTRON_INFO["CDS"]=CDS
+                            INFO["Exons"].append(INTRON_INFO)
+                    #print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
+                    if LENGTH_CDS-3!=transcript["Translation"]["length"]*3:
+                        print(INFO["Gene_id"] + "\t" + "EXONS DONT ADD UP")                             #If calculated CDS length doesn't resembl the nr of amino acids, most likely it has an incomplete 3' or 5',
+            if INFO["Biotype"]=="protein_coding":                                                       #as currently I am unable to request the given ENSEMBL flags. Bias towards incomplete but bases%3=0
+                HITS.append(INFO)
     return HITS
 
 def breakend_annotation(CHROM, POS, orientation, Info):
     HITS=[]
     for gene in Info:
-        BND_INFO={k:v for k,v in gene.items() if k!="Exons"}                                                        #!!!!! ADD INFO AS WELL.. NEED INFORMATION ABOUT SURROUNDING EXONS FOR EXON_INTRON FUSIONS
-        #BND_INFO={k:v for k,v in gene.items()}
-        # What if BND lands outside transcript but inside the gene (Possibly only promoter)
+        BND_INFO={k:v for k,v in gene.items()}
         if gene["Strand"]==1:
+            ORIENTATION=orientation
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_start"])
@@ -191,7 +211,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             elif POS>gene["CDS_end"]:
                 BND_INFO["Breakpoint_location"]="3'UTR"
         else:
-            orientation= not orientation
+            ORIENTATION= not orientation
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript end"]=abs(POS-gene["Transcript_start"])
@@ -212,7 +232,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             elif POS>gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
 
-        if orientation:
+        if ORIENTATION:
             BND_INFO["Order"]="3'"
         else:
             BND_INFO["Order"]="5'"
@@ -234,12 +254,12 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                         BND_INFO["Exon_start_phase"]=sequence["Start_phase"]
                         BND_INFO["Exon_end_phase"]=sequence["End_phase"]
 
-                        # if sequence["Contains_start_CDS"]==True:
-                        #     BND_INFO["Phase"]=(abs(INFO["CDS_start"]-POS)+sequence["Start_phase"])%3
-                        # else:
-                        #     BND_INFO["Phase"]=(abs(sequence["Start"]-POS)+sequence["Start_phase"])%3
                         if BND_INFO["Breakpoint_location"]=="5'UTR" or BND_INFO["Breakpoint_location"]=="3'UTR":
-                            BND_INFO["Phase"]=-1                                                                    # Perhaps change to non-integer so it crashes if due to some reason calculation happens with this
+                            BND_INFO["Phase"]=-1                                                               # Perhaps change to non-integer so it crashes if due to some reason calculation happens with this
+                            # if BND_INFO["Order"]=="5'":
+                            #     BND_INFO["CDS_length"]=BND_INFO["Original_CDS_length"]
+                            # elif BND_INFO["Order"]=="3'":
+                            #     BND_INFO["CDS_length"]=0
                         else:
                             if orientation:
                                 if sequence["Contains_end_CDS"]==True:
@@ -275,11 +295,11 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                         BND_INFO["Rank"]=sequence["Rank"]
                         BND_INFO["Phase"]=sequence["Phase"]
                         BND_INFO["CDS_length"]=0
-                        if orientation:
+                        if BND_INFO["Order"]=="3'":
                             for rank in range(idx, len(gene["Exons"])):
                                 if gene["Exons"][rank]["Type"]=="exon":
                                     BND_INFO["CDS_length"]+=gene["Exons"][rank]["CDS_length"]
-                        else:
+                        elif BND_INFO["Order"]=="5'":
                             for rank in range(0, idx):
                                 if gene["Exons"][rank]["Type"]=="exon":
                                     BND_INFO["CDS_length"]+=gene["Exons"][rank]["CDS_length"]
@@ -288,17 +308,29 @@ def breakend_annotation(CHROM, POS, orientation, Info):
         HITS.append(BND_INFO)
     return HITS
 
-def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
-    for annotation1 in Breakend1:
-        for annotation2 in Breakend2:
-            if annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"]:
+def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Output):
+    CHROM1=Record.CHROM
+    POS1=Record.POS
+    CHROM2=Record.ALT[0].chr
+    POS2=Record.ALT[0].pos
 
-                if annotation1["Order"]=="5'":
+    for annotation1 in Breakend1:
+        annotation1["BND"]=str(CHROM1)+":"+str(POS1)
+        for annotation2 in Breakend2:
+            annotation2["BND"]=str(CHROM2)+":"+str(POS2)
+            #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
+            if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
+            (POS1 > annotation1["Gene_start"] and POS1 < annotation1["Gene_end"] and POS2 > annotation1["Gene_start"] and POS2 < annotation1["Gene_end"] and
+            POS1 > annotation2["Gene_start"] and POS1 < annotation2["Gene_end"] and POS2 > annotation2["Gene_start"] and POS2 < annotation2["Gene_end"] and
+            annotation1["Strand"]==annotation2["Strand"])):
+                if annotation1["Order"]=="5'" and annotation2["Order"]=="3'":
                     FIVE_PRIME_GENE=annotation1
                     THREE_PRIME_GENE=annotation2
-                else:
+                elif annotation2["Order"]=="5'" and annotation1["Order"]=="3'":
                     FIVE_PRIME_GENE=annotation2
                     THREE_PRIME_GENE=annotation1
+                else:
+                    continue
 
                 if Orientation1 and Orientation2:
                     if (annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
@@ -313,16 +345,30 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             else:
                                 continue
                         elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
-                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                for rank in range(0, (annotation1["Rank"]*2)-2):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                            elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                for rank in range(0, (annotation2["Rank"]*2)-2):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                            elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -332,11 +378,6 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
-                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
-                        # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
-                        # print(annotation1)
-                        # print(annotation2)
 
                 elif Orientation1 and not Orientation2:
                     if (annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
@@ -351,16 +392,30 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             else:
                                 continue
                         elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
-                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                for rank in range(0, (annotation1["Rank"]*2)-2):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                            elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                for rank in range(0, (annotation2["Rank"]*2)-2):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                            elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -370,11 +425,6 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
-                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
-                        # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
-                        # print(annotation1)
-                        # print(annotation2)
 
                 if not Orientation1 and Orientation2:
                     if (annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
@@ -390,16 +440,30 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                                 continue
 
                         elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
-                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                for rank in range(0, (annotation1["Rank"]*2)-2):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                            elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                for rank in range(0, (annotation2["Rank"]*2)-2):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                            elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -409,11 +473,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
-                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
-                        # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
-                        # print(annotation1)
-                        # print(annotation2)
+
 
                 if not Orientation1 and not Orientation2:
                     if (annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]):
@@ -428,16 +488,30 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             else:
                                 continue
                         elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
-                            if annotation1["Strand"]==1 and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                                for rank in range(0, (annotation1["Rank"]*2)-2):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation1["Strand"]==-1 and annotation1["Exon_start_phase"]==annotation2["Phase"]:
+                            elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
+                                for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
+                                    if annotation1["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            if annotation2["Strand"]==1 and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                            annotation1["CDS_length"]=0
+                            if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                                for rank in range(0, (annotation2["Rank"]*2)-2):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
-                            elif annotation2["Strand"]==-1 and annotation2["Exon_start_phase"]==annotation1["Phase"]:
+                            elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
+                                for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
+                                    if annotation2["Exons"][rank]["Type"]=="exon":
+                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -447,13 +521,18 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2):
                             FUSION_TYPE="3'UTR fusion"
                         else:
                             continue
-                        print("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["Gene_name"], str(FIVE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["CDS_length"]),
-                        str(FIVE_PRIME_GENE["Original_CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])]))
-                        # print("#" + str(Record.ID) + "\t" + FUSION_TYPE + "\t" + annotation1["Order"] + " " + annotation1["Gene_name"] + " " + annotation2["Gene_name"] + " " + annotation2["Order"])
+                with open(Output, "a") as outfile:
+                    try:
+
+                        outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
+                        THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
                         # print(annotation1)
                         # print(annotation2)
-
-
+                    except:
+                        continue
 print("Start:", datetime.datetime.now())
-parse_vcf(VCF)
+VCF_IN=args.vcf
+VCF_OUT=args.output
+OUTPUT=args.fusion_output
+parse_vcf(VCF, OUTPUT)
 print("End:", datetime.datetime.now())
