@@ -85,9 +85,20 @@ if [ ! -d $OUTPUTDIR ]; then
     mkdir $OUTPUTDIR
 fi
 
+cat << EOF > $VCF_SPLIT_SH                  # ADD JOBS FOLDER ETC.
+#!/bin/bash
+
+#$ -N $VCF_SPLIT_JOBNAME
+#$ -cwd
+#$ -l h_vmem=$VCF_SPLIT_MEM
+#$ -l h_rt=$VCF_SPLIT_TIME
+#$ -e $VCF_SPLIT_ERR
+#$ -o $VCF_SPLIT_LOG
+
 HEADER=$(grep "^#" $VCF)
-AWK=$(grep -v "^\#" $VCF | awk -v HEADER="$HEADER" -v OUTPUTDIR="$OUTPUTDIR" -v LINES="$LINES" 'NR%LINES==1 { file = OUTPUTDIR"/" int(NR/LINES)+1 ".vcf"; print HEADER > file } { print > file }')
+AWK="grep -v \"^#\" $VCF | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$OUTPUTDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
 eval $AWK
+EOF
 
 NUMBER_OF_LINES_VCF_1=$(grep -v "^#" $VCF | wc -l | grep -oP "(^\d+)")
 NUMBER_OF_LINES_VCF_2=$(cat $OUTPUTDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")

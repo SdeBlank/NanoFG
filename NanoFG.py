@@ -9,16 +9,17 @@ parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-v', '--vcf', type=str, help='input VCF', required=True)
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene output file (table)', required=True)
-parser.add_argument('-o', '--output_vcf', type=str, help='Annotated VCF output', required=True)
+parser.add_argument('-o', '--output', type=str, help='Annotated VCF output', required=True)
 
 args = parser.parse_args()
 
 
 def parse_vcf(vcf, output):
-    with open(VCF, "r") as vcf:
+    with open(vcf, "r") as vcf:
         VCF_READER=pyvcf.Reader(vcf)
         with open(output, "w") as outfile:
             outfile.write("\t".join(["ID","Fusion_type","5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
+            # outfile.write("\t".join(["ID","Fusion_type","5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
         for record in VCF_READER:
             # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
@@ -523,9 +524,10 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             continue
                 with open(Output, "a") as outfile:
                     try:
-
                         outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
+                        #outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
+                        #THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
                         # print(annotation1)
                         # print(annotation2)
                     except:
@@ -534,5 +536,5 @@ print("Start:", datetime.datetime.now())
 VCF_IN=args.vcf
 VCF_OUT=args.output
 OUTPUT=args.fusion_output
-parse_vcf(VCF, OUTPUT)
+parse_vcf(VCF_IN, OUTPUT)
 print("End:", datetime.datetime.now())
