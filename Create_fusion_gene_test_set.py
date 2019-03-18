@@ -8,6 +8,7 @@ import re
 parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-o', '--output', type=str, help='Output with breakpoint sequences', required=True)
+parser.add_argument('-b', '--bed_output', type=str, help='Output bedfile to later compare VCF with', required=True)
 parser.add_argument('-n', '--number', type=int, help='Number of fusion genes', required=True)
 parser.add_argument('-t', '--truth', type=str, help='Return "True" or "False" simulated fusion genes', required=True)
 
@@ -606,6 +607,7 @@ for chr in CHROMOSOMES:
     CHR_LENGTHS[chr]=int(data['length'])
 
 OUTPUT=args.output
+BED=args.bed_output
 NUMBER=args.number
 SEQ_LENGTH=100000
 TYPES=["intron-intron", "exon-exon", "exon-intron"]#, "5'UTR", "3'UTR"]
@@ -643,16 +645,34 @@ for type in TYPES:
         else:
             strand2="-"
 
-        with open(OUTPUT, "a+") as output:
-            output.write(">"+type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4] + "\t" + str(GENE1[0]) + ":" + str(pos1) + "-" + str(GENE2[0]) + ":" + str(pos2) + "\t" + strand1 + strand2 + "\n")
+        with open(OUTPUT, "a+") as output, open(BED, "a+") as bed:
+            #output.write(">"+type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4] + "\t" + str(GENE1[0]) + ":" + str(pos1) + "-" + str(GENE2[0]) + ":" + str(pos2) + "\t" + strand1 + strand2 + "\n")
             # print(GENE1[0:6])
             # print(GENE1[6])
             # print(GENE2[0:6])
             # print(GENE2[6])
             # print(SEQ1, SEQ2, "\n")
+            if GENE1[6]["Type"]=="exon":
+                if GENE1[6]["Contains_start_CDS"]:
+                    bed.write(str(GENE1[0]) + "\t" + str(pos1) + "\t" + str(GENE2[0]) + "\t" + str(pos2) + "\t" + type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4]
+                    + "\t" + strand1 + strand2 + "\t" + "Contains_start_CDS" + "\n")
+                else:
+                    bed.write(str(GENE1[0]) + "\t" + str(pos1) + "\t" + str(GENE2[0]) + "\t" + str(pos2) + "\t" + type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4]
+                    + "\t" + strand1 + strand2 + "\n")
+            elif GENE2[6]["Type"]=="exon":
+                if GENE2[6]["Contains_start_CDS"]:
+                    bed.write(str(GENE1[0]) + "\t" + str(pos1) + "\t" + str(GENE2[0]) + "\t" + str(pos2) + "\t" + type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4]
+                    + "\t" + strand1 + strand2 + "\t" + "Contains_start_CDS" + "\n")
+                else:
+                    bed.write(str(GENE1[0]) + "\t" + str(pos1) + "\t" + str(GENE2[0]) + "\t" + str(pos2) + "\t" + type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4]
+                    + "\t" + strand1 + strand2 + "\n")
+            else:
+                bed.write(str(GENE1[0]) + "\t" + str(pos1) + "\t" + str(GENE2[0]) + "\t" + str(pos2) + "\t" + type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4]
+                + "\t" + strand1 + strand2 + "\n")
+
             for slice in range(0, len(FULL_SEQ), 60):
                 output.write(FULL_SEQ[slice:slice+60]+"\n")
-            #output.write(FULL_SEQ + "\n")
+            output.write(FULL_SEQ + "\n")
 
 
         #write if statement to check if every type of fusion gene is present at least once
