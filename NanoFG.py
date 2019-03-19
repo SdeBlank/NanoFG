@@ -51,13 +51,14 @@ class EnsemblRestClient(object):
         except requests.exceptions.HTTPError as e:
             print(request.text)
             # check if we are being rate limited by the server
-            if e.response.status_code == 429:
-                if 'Retry-After' in e.headers:
-                    retry = e.headers['Retry-After']
-                    time.sleep(float(retry))
-                    self.perform_rest_action(endpoint, hdrs, params)
-            else:
-                sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
+            sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
+            # if e.response.status_code == 429:
+            #     if 'Retry-After' in e.headers:
+            #         retry = e.headers['Retry-After']
+            #         time.sleep(float(retry))
+            #         self.perform_rest_action(endpoint, hdrs, params)
+            # else:
+            #     sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
         return data
 
 def parse_vcf(vcf, output):
