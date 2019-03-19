@@ -43,7 +43,7 @@ class EnsemblRestClient(object):
         try:
             response = requests.get(self.server + endpoint, headers=hdrs, params=parameters)
             response.raise_for_status()
-            response = request.text
+            response = response.text
             if response:
                 data = json.loads(response)
             self.req_count += 1
