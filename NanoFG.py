@@ -41,24 +41,22 @@ class EnsemblRestClient(object):
             self.req_count = 0
 
         try:
-            request = requests.get(self.server + endpoint, headers=hdrs, params=parameters)
-            request.raise_for_status()
+            response = requests.get(self.server + endpoint, headers=hdrs, params=parameters)
+            response.raise_for_status()
             response = request.text
             if response:
                 data = json.loads(response)
             self.req_count += 1
 
         except requests.exceptions.HTTPError as e:
-            print(request.text)
             # check if we are being rate limited by the server
-            sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
-            # if e.response.status_code == 429:
-            #     if 'Retry-After' in e.headers:
-            #         retry = e.headers['Retry-After']
-            #         time.sleep(float(retry))
-            #         self.perform_rest_action(endpoint, hdrs, params)
-            # else:
-            #     sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
+            if e.response.status_code == 429:
+                if 'Retry-After' in e.response.headers:
+                    retry = e.response.headers['Retry-After']
+                    time.sleep(float(retry))
+                    self.perform_rest_action(endpoint, hdrs, params)
+            else:
+                sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
         return data
 
 def parse_vcf(vcf, output):

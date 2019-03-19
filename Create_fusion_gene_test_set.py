@@ -624,10 +624,17 @@ else:
 for type in TYPES:
     for x in range(NUMBER):
         #print(str(x+1)+": Getting 2 random genes")
-        GENE1, GENE2 = select_random_fusion(TRANS_PERC, TRUTH, type, CHROMOSOMES, CHR_LENGTHS, SEQ_LENGTH)
-        #print(str(x+1)+": Getting fusion sequence")
-        SEQ1 = get_sequence(GENE1)
-        SEQ2 = get_sequence(GENE2)
+        TRY=1
+        N_IN_SEQUENCE=True
+        while N_IN_SEQUENCE==True:
+            GENE1, GENE2 = select_random_fusion(TRANS_PERC, TRUTH, type, CHROMOSOMES, CHR_LENGTHS, SEQ_LENGTH)
+            SEQ1 = get_sequence(GENE1)
+            SEQ2 = get_sequence(GENE2)
+            if "N" not in SEQ1 and "N" not in SEQ2:
+                N_IN_SEQUENCE=False
+            if TRY==10:
+                sys.exit("Region of N in the requested sequence")
+                TRY+=1
         pos1=GENE1[3]
         pos2=GENE2[2]
         if GENE1[1]!=GENE2[1]:
