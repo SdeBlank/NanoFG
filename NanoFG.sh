@@ -8,9 +8,9 @@ Required parameters:
 Optional parameters:
     -h|--help       Shows help
     -s|--script     Path to vcf_primer_filter.py [$SCRIPT]
-    -l|--LINES      Number of lines to put in each spit vcf file [$LINES]
+    -l|--LINES      Number of lines to put in each split vcf file [$LINES]
     -o|--output     VCF output file [$OUTPUT]
-    -sd|--split_directory Directory to place split vcfs in [./]
+    -vo|--vcf_output  VCF output file
     -e|--venv       Path to virtual environment[$VENV]
 "
 }
@@ -19,8 +19,6 @@ POSITIONAL=()
 
 SCRIPT="/home/cog/sdeblank/Documents/github/NanoFG/NanoFG.py"
 VENV="/data/sharc/venv/bin/activate"
-OUTPUT="/dev/stdout"
-OUTPUTDIR="./split_vcf"
 LINES=100
 
 
@@ -48,8 +46,8 @@ do
     shift # past argument
     shift # past value
     ;;
-    -sd|--split_directory)
-    OUTPUTDIR="$2"
+    -vo|--vcf_output)
+    VCF_OUTPUT="$2"
     shift # past argument
     shift # past value
     ;;
@@ -77,38 +75,60 @@ if [ -z $VCF ]; then
     exit
 fi
 
+if [ -z $OUTPUT ]; then
+    OUTPUT=./$(basename $VCF)
+    OUTPUT=${OUTPUT/.vcf/_FusionGenes.txt}
+    exit
+fi
+
+if [ -z $VCF_OUTPUT ]; then
+    VCF_OUTPUT=./$(basename $VCF)
+    VCF_OUTPUT=${VCF_OUTPUT/.vcf/_FusionGenes.vcf}
+    exit
+fi
+
+SPLITDIR="$(dirname $OUTPUT)/split_vcf"
+JOBDIR="$(dirname $OUTPUT)/jobs"
+
 echo `date`: Running on `uname -n`
 
 . $VENV
 
-if [ ! -d $OUTPUTDIR ]; then
-    mkdir $OUTPUTDIR
-fi
+if [ $LINES != None ]; then
+  if [ ! -d $SPLITDIR ]; then
+      mkdir $SPLITDIR
+  fi
 
-HEADER=$(grep "^#" $VCF)
-AWK=$(grep -v "^\#" $VCF | awk -v HEADER="$HEADER" -v OUTPUTDIR="$OUTPUTDIR" -v LINES="$LINES" 'NR%LINES==1 { file = OUTPUTDIR"/" int(NR/LINES)+1 ".vcf"; print HEADER > file } { print > file }')
-eval $AWK
+  if [ ! -d $JOBDIR ]; then
+      mkdir $JOBDIR
+  fi
 
-NUMBER_OF_LINES_VCF_1=$(grep -v "^#" $VCF | wc -l | grep -oP "(^\d+)")
-NUMBER_OF_LINES_VCF_2=$(cat $OUTPUTDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")
+  HEADER=$(grep "^#" $VCF)
+  AWK="grep -v \"^#\" $VCF | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$SPLITDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
+  eval $AWK
 
-if [ $NUMBER_OF_LINES_VCF_1 == $NUMBER_OF_LINES_VCF_2 ]; then
-  for SPLIT_VCF in $OUTPUTDIR/*.vcf; do
-    SPLIT_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.txt}
-    SPLIT_VCF_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.vcf}
-    qsub
-    python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
-  done
-fi
+  NUMBER_OF_LINES_VCF_1=$(grep -v "^#" $VCF | wc -l | grep -oP "(^\d+)")
+  NUMBER_OF_LINES_VCF_2=$(cat $SPLITDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")
 
-NUMBER_SPLIT_VCF=$(ls -l $OUTPUTDIR/* | grep -cv "FusionGenes" | grep -oP "(^\d+)")
-NUMBER_SPLIT_OUTPUT=$(ls -l $OUTPUTDIR/* | grep -c "FusionGenes.txt" | grep -oP "(^\d+)")
+  if [ $NUMBER_OF_LINES_VCF_1 == $NUMBER_OF_LINES_VCF_2 ]; then
+    for SPLIT_VCF in $SPLITDIR/*.vcf; do
+      SPLIT_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.txt}
+      SPLIT_VCF_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.vcf}
+      python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
+    done
+  fi
 
-if [ $NUMBER_SPLIT_VCF == $NUMBER_SPLIT_OUTPUT ]; then
-  head -n 1 $OUTPUTDIR/1_FusionGenes.txt > $OUTPUT
-  for fusion_output in $OUTPUTDIR/*FusionGenes.txt; do
-    tail -n +2 $fusion_output >> $OUTPUT
-  done
+  NUMBER_SPLIT_VCF=$(ls -l $SPLITDIR/* | grep -cv "FusionGenes" | grep -oP "(^\d+)")
+  NUMBER_SPLIT_OUTPUT=$(ls -l $SPLITDIR/* | grep -c "FusionGenes.txt" | grep -oP "(^\d+)")
+
+  if [ $NUMBER_SPLIT_VCF == $NUMBER_SPLIT_OUTPUT ]; then
+    head -n 1 $SPLITDIR/1_FusionGenes.txt > $OUTPUT
+    for fusion_output in $SPLITDIR/*FusionGenes.txt; do
+      tail -n +2 $fusion_output >> $OUTPUT
+    done
+  fi
+else
+  python $SCRIPT -v $VCF -fo $OUTPUT -o $VCF_OUTPUT
 fi
 
 echo `date`: Done
