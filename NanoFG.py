@@ -14,6 +14,50 @@ parser.add_argument('-o', '--output', type=str, help='Annotated VCF output', req
 
 args = parser.parse_args()
 
+class EnsemblRestClient(object):
+    def __init__(self, server='http://grch37.rest.ensembl.org', reqs_per_sec=15):
+        self.server = server
+        self.reqs_per_sec = reqs_per_sec
+        self.req_count = 0
+        self.last_req = 0
+
+    def perform_rest_action(self, endpoint, hdrs=None, parameters=None):
+        if hdrs is None:
+            hdrs = {}
+
+        if 'Content-Type' not in hdrs:
+            hdrs['Content-Type'] = 'application/json'
+
+        if parameters is None:
+            parameters = {}
+        data = None
+
+        # check if we need to rate limit ourselves
+        if self.req_count >= self.reqs_per_sec:
+            delta = time.time() - self.last_req
+            if delta < 1:
+                time.sleep(1 - delta)
+            self.last_req = time.time()
+            self.req_count = 0
+
+        try:
+            request = requests.get(self.server + endpoint, headers=hdrs, params=parameters)
+            request.raise_for_status()
+            response = request.text
+            if response:
+                data = json.loads(response)
+            self.req_count += 1
+
+        except requests.exceptions.HTTPError as e:
+            # check if we are being rate limited by the server
+            if e.response.status_code == 429:
+                if 'Retry-After' in e.headers:
+                    retry = e.headers['Retry-After']
+                    time.sleep(float(retry))
+                    self.perform_rest_action(endpoint, hdrs, params)
+            else:
+                sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
+        return data
 
 def parse_vcf(vcf, output):
     with open(vcf, "r") as vcf:
@@ -49,22 +93,11 @@ def parse_vcf(vcf, output):
 
 def overlap_annotation(CHROM, POS):
     ### Request genes, transcripts and exons
-    SERVER="https://GRCh37.rest.ensembl.org/overlap/region/"
-    SPECIES="human"
+    ENDPOINT="/overlap/region/human/"+str(CHROM)+":"+str(POS)+"-"+str(POS)
     HEADERS={"Content-Type" : "application/json"}
-    FEATURE="transcript"
-    TRY=1
-    while TRY <= 10:
-        try:
-            genes_request=requests.get(SERVER+SPECIES+"/"+str(CHROM)+":"+str(POS)+"-"+str(POS)+"?feature="+FEATURE, headers=HEADERS)
-            genes_response = genes_request.text
-            genes_data=json.loads(genes_response)
-            break
-        except:
-            if TRY==10:
-                sys.exit("Error while requesting from ENSEMBL database after "+str(TRY)+" tries")
-            time.sleep(0.5)
-            TRY +=1
+    PARAMS={"feature": "transcript"}
+
+    genes_data=EnsemblRestClient().perform_rest_action(ENDPOINT, HEADERS, PARAMS)
 
     UNIQUE_GENES=[]
     UNIQUE_GENE_IDS=[]
@@ -78,20 +111,10 @@ def overlap_annotation(CHROM, POS):
         #print(hit)
         GENE_ID=hit["Parent"]
 
-        SERVER="https://GRCh37.rest.ensembl.org/lookup/id/"
+        ENDPOINT="/lookup/id/"+str(GENE_ID)
+        PARAMS={"expand": "1"}
 
-        TRY=1
-        while TRY <= 10:
-            try:
-                request = requests.get(SERVER+str(GENE_ID)+"?expand=1"+FEATURE, headers=HEADERS)
-                response = request.text
-                gene_info=json.loads(response)
-            except:
-                if TRY==10:
-                    sys.exit("Error while requesting from ENSEMBL database after "+str(TRY)+" tries")
-                time.sleep(0.5)
-                TRY +=1
-
+        gene_info=EnsemblRestClient().perform_rest_action(ENDPOINT, HEADERS, PARAMS)
         if gene_info["biotype"]=="protein_coding":
             INFO={}
             INFO["CCDS_available"]=False
