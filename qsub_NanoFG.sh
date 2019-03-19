@@ -178,7 +178,7 @@ NUMBER_SPLIT_OUTPUT=\$(ls -l $SPLITDIR/* | grep -c "FusionGenes.txt" | grep -oP 
 if [ $NUMBER_SPLIT_VCF == $NUMBER_SPLIT_OUTPUT ]; then
   head -n 1 $SPLITDIR/1_FusionGenes.txt > $OUTPUT
   for fusion_output in $SPLITDIR/*FusionGenes.txt; do
-    tail -n +2 $fusion_output >> $OUTPUT
+    tail -n +2 \$fusion_output >> $OUTPUT
   done
 fi
 EOF
