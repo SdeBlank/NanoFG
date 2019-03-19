@@ -646,7 +646,7 @@ for type in TYPES:
             strand2="-"
 
         with open(OUTPUT, "a+") as output, open(BED, "a+") as bed:
-            #output.write(">"+type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4] + "\t" + str(GENE1[0]) + ":" + str(pos1) + "-" + str(GENE2[0]) + ":" + str(pos2) + "\t" + strand1 + strand2 + "\n")
+            output.write(">"+type+"_"+str(TRUTH)+"_"+str(x+1)+"\n")
             # print(GENE1[0:6])
             # print(GENE1[6])
             # print(GENE2[0:6])
@@ -672,7 +672,6 @@ for type in TYPES:
 
             for slice in range(0, len(FULL_SEQ), 60):
                 output.write(FULL_SEQ[slice:slice+60]+"\n")
-            output.write(FULL_SEQ + "\n")
 
 
         #write if statement to check if every type of fusion gene is present at least once
