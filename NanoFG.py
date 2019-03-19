@@ -50,11 +50,11 @@ class EnsemblRestClient(object):
 
         except requests.exceptions.HTTPError as e:
             # check if we are being rate limited by the server
-            if e.response.status_code == 429:
+            if int(e.response.status_code) == 429:
                 if 'Retry-After' in e.response.headers:
                     retry = e.response.headers['Retry-After']
                     time.sleep(float(retry))
-                    self.perform_rest_action(endpoint, hdrs, params)
+                    self.perform_rest_action(endpoint, hdrs, parameters)
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
         return data
