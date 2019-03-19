@@ -146,7 +146,7 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
 
   NANOFG_SPLIT_JOBNAMES=$NANOFG_SPLIT_JOBNAMES','$NANOFG_SPLIT_JOBNAME
 
-  qsub << EOF
+  qsub << EOF > NANOFG_SPLIT_JOB
 #!/bin/bash
 
 #$ -N $NANOFG_SPLIT_JOBNAME
@@ -161,7 +161,7 @@ python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
 EOF
 done
 
-qsub << EOF
+qsub << EOF > MERGE_OUTPUT_JOB
 #!/bin/bash
 
 #$ -N $MERGE_OUTPUT_JOBNAME
