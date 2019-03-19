@@ -3,7 +3,6 @@
 usage() {
 echo "
 Required parameters:
-    -v|--vcf		    Path to vcf file
     -sd|--split_directory
     -jd|--job_directory
     -ld|--directory
@@ -106,7 +105,6 @@ fi
 
 echo `date`: Running on `uname -n`
 
-. $VENV
 
 for SPLIT_VCF in $SPLITDIR/*.vcf; do
   SPLIT_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.txt}
@@ -130,12 +128,13 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
   #$ -o $NANOFG_SPLIT_LOG
   #$ -hold_jid $NANOFG_SPLIT_JOBNAMES
 
+  . $VENV
   python $SCRIPT -v \$SPLIT_VCF -fo \$SPLIT_OUTPUT -o \$SPLIT_VCF_OUTPUT
 EOF
   qsub $NANOFG_SPLIT_JOB
 done
 
-cat << EOF > $MERGE_OUTPUT_JOB
+MERGE_OUTPUT_JOB << EOF
 #!/bin/bash
 
 #$ -N $MERGE_OUTPUT_JOBNAME
