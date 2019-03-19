@@ -149,16 +149,16 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
   NANOFG_SPLIT_JOBNAMES=$NANOFG_SPLIT_JOBNAMES','$NANOFG_SPLIT_JOBNAME
 
   qsub << EOF
-  #!/bin/bash
+#!/bin/bash
 
-  #$ -N $NANOFG_SPLIT_JOBNAME
-  #$ -cwd
-  #$ -l h_vmem=$NANOFG_SPLIT_MEM
-  #$ -l h_rt=$NANOFG_SPLIT_TIME
-  #$ -e $NANOFG_SPLIT_ERR
-  #$ -o $NANOFG_SPLIT_LOG
+#$ -N $NANOFG_SPLIT_JOBNAME
+#$ -cwd
+#$ -l h_vmem=$NANOFG_SPLIT_MEM
+#$ -l h_rt=$NANOFG_SPLIT_TIME
+#$ -e $NANOFG_SPLIT_ERR
+#$ -o $NANOFG_SPLIT_LOG
 
-  python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
+python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
 EOF
 done
 
