@@ -135,7 +135,7 @@ if [ $NUMBER_OF_LINES_VCF_1 != $NUMBER_OF_LINES_VCF_2 ]; then
 fi
 
 for SPLIT_VCF in $SPLITDIR/*.vcf; do
-  SPLIT_OUTPUT=${SPLIT_OUTPUT/.vcf/_FusionGenes.txt}
+  SPLIT_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.txt}
   SPLIT_VCF_OUTPUT=${SPLIT_VCF/.vcf/_FusionGenes.vcf}
 
   NANOFG_SPLIT_JOBNAME=$(basename $SPLIT_VCF)
@@ -146,7 +146,7 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
 
   NANOFG_SPLIT_JOBNAMES=$NANOFG_SPLIT_JOBNAMES','$NANOFG_SPLIT_JOBNAME
 
-  qsub << EOF > NANOFG_SPLIT_JOB
+  qsub << EOF
 #!/bin/bash
 
 #$ -N $NANOFG_SPLIT_JOBNAME
@@ -161,7 +161,7 @@ python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
 EOF
 done
 
-qsub << EOF > MERGE_OUTPUT_JOB
+qsub << EOF
 #!/bin/bash
 
 #$ -N $MERGE_OUTPUT_JOBNAME
