@@ -77,9 +77,17 @@ def overlap_annotation(CHROM, POS):
         GENE_ID=hit["Parent"]
 
         SERVER="https://GRCh37.rest.ensembl.org/lookup/id/"
-        request = requests.get(SERVER+str(GENE_ID)+"?expand=1"+FEATURE, headers=HEADERS)
-        response = request.text
-        gene_info=json.loads(response)
+
+        TRY=1
+        while TRY <= 10:
+            try:
+                request = requests.get(SERVER+str(GENE_ID)+"?expand=1"+FEATURE, headers=HEADERS)
+                response = request.text
+                gene_info=json.loads(response)
+            except:
+                if TRY==10:
+                    sys.exit("Error while requesting from ENSEMBL database after "+str(TRY)+" tries")
+                TRY +=1
 
         if gene_info["biotype"]=="protein_coding":
             INFO={}
