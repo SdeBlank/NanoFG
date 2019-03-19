@@ -93,8 +93,6 @@ SPLITDIR="$(dirname $OUTPUT)/split_vcf"
 JOBDIR="$(dirname $OUTPUT)/jobs"
 LOGDIR="$(dirname $OUTPUT)/logs"
 
-. $VENV
-
 if [ ! -d $SPLITDIR ]; then
     mkdir $SPLITDIR
 fi
@@ -158,6 +156,7 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
 #$ -e $NANOFG_SPLIT_ERR
 #$ -o $NANOFG_SPLIT_LOG
 
+. $VENV
 python $SCRIPT -v $SPLIT_VCF -fo $SPLIT_OUTPUT -o $SPLIT_VCF_OUTPUT
 EOF
 done
