@@ -3,6 +3,7 @@ import json
 import vcf as pyvcf
 import argparse
 import datetime
+import time
 import sys
 
 parser = argparse.ArgumentParser()
@@ -62,6 +63,7 @@ def overlap_annotation(CHROM, POS):
         except:
             if TRY==10:
                 sys.exit("Error while requesting from ENSEMBL database after "+str(TRY)+" tries")
+            time.sleep(0.5)
             TRY +=1
 
     UNIQUE_GENES=[]
@@ -87,6 +89,7 @@ def overlap_annotation(CHROM, POS):
             except:
                 if TRY==10:
                     sys.exit("Error while requesting from ENSEMBL database after "+str(TRY)+" tries")
+                time.sleep(0.5)
                 TRY +=1
 
         if gene_info["biotype"]=="protein_coding":
