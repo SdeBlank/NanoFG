@@ -49,6 +49,7 @@ class EnsemblRestClient(object):
             self.req_count += 1
 
         except requests.exceptions.HTTPError as e:
+            print(request.text)
             # check if we are being rate limited by the server
             if e.response.status_code == 429:
                 if 'Retry-After' in e.headers:
