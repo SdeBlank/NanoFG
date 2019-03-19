@@ -148,7 +148,7 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
 
   NANOFG_SPLIT_JOBNAMES=$NANOFG_SPLIT_JOBNAMES','$NANOFG_SPLIT_JOBNAME
 
-  cat << EOF
+  qsub << EOF
   #!/bin/bash
 
   #$ -N $NANOFG_SPLIT_JOBNAME
@@ -162,7 +162,7 @@ for SPLIT_VCF in $SPLITDIR/*.vcf; do
 EOF
 done
 
-cat << EOF
+qsub << EOF
 #!/bin/bash
 
 #$ -N $MERGE_OUTPUT_JOBNAME
