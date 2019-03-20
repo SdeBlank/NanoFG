@@ -30,7 +30,7 @@ class EnsemblRestClient(object):
 
         if parameters is None:
             parameters = {}
-        data = None                             #### SAYS DATA=NONE
+        data = None
         x=0
         # check if we need to rate limit ourselves
         if self.req_count >= self.reqs_per_sec:
@@ -45,27 +45,20 @@ class EnsemblRestClient(object):
             response.raise_for_status()
             response = response.text
             if response:
-                data = json.loads(response)             ### IF IT IS NONETYPE, IT PROBABLY DOESNT LOAD JSON, BUT WHY NONETYPE
+                data = json.loads(response)
             self.req_count += 1
 
         except requests.exceptions.HTTPError as e:
             # check if we are being rate limited by the server
             if int(e.response.status_code) == 429:
                 if 'Retry-After' in e.response.headers:
-                    x=1
                     retry = e.response.headers['Retry-After']
                     time.sleep(float(retry))
-                    data=self.perform_rest_action(endpoint, hdrs, parameters)                ### DOES THIS RESET THE LOOP???? OR CONTINUE TO RETURN DATA=0
-                    x=2
+                    data=self.perform_rest_action(endpoint, hdrs, parameters)
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
-        if data is not None:
-            return data
-        else:
-            print(endpoint)
-            print(hdrs)
-            print(parameters)
-            print(x)
+        return data
+
 
 def parse_vcf(vcf, output):
     with open(vcf, "r") as vcf:
@@ -365,8 +358,6 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
     for annotation1 in Breakend1:
         annotation1["BND"]=str(CHROM1)+":"+str(POS1)
         for annotation2 in Breakend2:
-            print (annotation1)
-            print(annotation2)
             annotation2["BND"]=str(CHROM2)+":"+str(POS2)
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
