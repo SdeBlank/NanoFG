@@ -78,13 +78,11 @@ fi
 if [ -z $OUTPUT ]; then
     OUTPUT=./$(basename $VCF)
     OUTPUT=${OUTPUT/.vcf/_FusionGenes.txt}
-    exit
 fi
 
 if [ -z $VCF_OUTPUT ]; then
     VCF_OUTPUT=./$(basename $VCF)
     VCF_OUTPUT=${VCF_OUTPUT/.vcf/_FusionGenes.vcf}
-    exit
 fi
 
 SPLITDIR="$(dirname $OUTPUT)/split_vcf"
