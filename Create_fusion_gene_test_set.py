@@ -86,8 +86,12 @@ def select_exons(gene_info):
                     INTRON_INFO["Type"]="intron"
                     INTRON_INFO["Rank"]=rank+1
                     INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
-                    INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
-                    INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                    if gene_info["strand"]==1:
+                        INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
+                        INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                    else:
+                        INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]
+                        INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]
                     INTRON_INFO["CDS"]=CDS
                     INTRONS.append(INTRON_INFO)
     return EXONS, INTRONS
