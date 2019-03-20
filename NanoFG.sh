@@ -29,6 +29,7 @@ do
     case $key in
     -h|--help)
     usage
+    exit
     shift # past argument
     ;;
     -v|--vcf)

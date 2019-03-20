@@ -176,8 +176,8 @@ qsub << EOF
 NUMBER_SPLIT_VCF=\$(ls -l $SPLITDIR/* | grep -cv "FusionGenes" | grep -oP "(^\d+)")
 NUMBER_SPLIT_OUTPUT=\$(ls -l $SPLITDIR/* | grep -c "FusionGenes.txt" | grep -oP "(^\d+)")
 
-for LOGFILE in $LOGDIR/*.log; do
-  FINISHED=\$(tail -n 1 \$LOGFILE | grep End)
+for LOGFILE in $LOGDIR/NanoFG_*.log; do
+  FINISHED="\$(tail -n 1 \$LOGFILE | grep -o End)"
   if [ -z \$FINISHED ]; then
     echo "One or more of the NanoFG did not complete; Increase NANOFG_SPLIT_MEM or NANOFG_SPLIT_TIME"
     exit
