@@ -56,6 +56,7 @@ class EnsemblRestClient(object):
                     retry = e.response.headers['Retry-After']
                     time.sleep(float(retry))
                     self.perform_rest_action(endpoint, hdrs, parameters)                ### DOES THIS RESET THE LOOP???? OR CONTINUE TO RETURN DATA=0
+                    x=2
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
         if data is not None:
