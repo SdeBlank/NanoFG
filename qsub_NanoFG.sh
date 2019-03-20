@@ -29,7 +29,7 @@ NANOFG_MEM=5G
 NANOFG_TIME=0:5:0
 
 NANOFG_SPLIT_MEM=5G
-NANOFG_SPLIT_TIME=0:5:0
+NANOFG_SPLIT_TIME=0:15:0
 
 MERGE_OUTPUT_MEM=5G
 MERGE_OUTPUT_TIME=0:5:0
@@ -41,6 +41,7 @@ do
     case $key in
     -h|--help)
     usage
+    exit
     shift # past argument
     ;;
     -v|--vcf)
@@ -175,11 +176,22 @@ qsub << EOF
 NUMBER_SPLIT_VCF=\$(ls -l $SPLITDIR/* | grep -cv "FusionGenes" | grep -oP "(^\d+)")
 NUMBER_SPLIT_OUTPUT=\$(ls -l $SPLITDIR/* | grep -c "FusionGenes.txt" | grep -oP "(^\d+)")
 
+for LOGFILE in $LOGDIR/*.log; do
+  FINISHED=\$(tail -n 1 \$LOGFILE | grep End)
+  if [ -z \$FINISHED ]; then
+    echo "One or more of the NanoFG did not complete; Increase NANOFG_SPLIT_MEM or NANOFG_SPLIT_TIME"
+    exit
+  fi
+done
+
 if [ $NUMBER_SPLIT_VCF == $NUMBER_SPLIT_OUTPUT ]; then
   head -n 1 $SPLITDIR/1_FusionGenes.txt > $OUTPUT
   for fusion_output in $SPLITDIR/*FusionGenes.txt; do
     tail -n +2 \$fusion_output >> $OUTPUT
   done
+else
+  echo "Number of _FusionGenes.text files are not equal to the number of split vcfs"
+  exit
 fi
 EOF
 
