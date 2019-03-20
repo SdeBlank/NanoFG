@@ -30,7 +30,7 @@ class EnsemblRestClient(object):
 
         if parameters is None:
             parameters = {}
-        data = None
+        data = None                             #### SAYS DATA=NONE
 
         # check if we need to rate limit ourselves
         if self.req_count >= self.reqs_per_sec:
@@ -45,7 +45,7 @@ class EnsemblRestClient(object):
             response.raise_for_status()
             response = response.text
             if response:
-                data = json.loads(response)
+                data = json.loads(response)             ### IF IT IS NONETYPE, IT PROBABLY DOESNT LOAD JSON, BUT WHY NONETYPE
             self.req_count += 1
 
         except requests.exceptions.HTTPError as e:
@@ -54,7 +54,7 @@ class EnsemblRestClient(object):
                 if 'Retry-After' in e.response.headers:
                     retry = e.response.headers['Retry-After']
                     time.sleep(float(retry))
-                    self.perform_rest_action(endpoint, hdrs, parameters)
+                    self.perform_rest_action(endpoint, hdrs, parameters)                ### DOES THIS RESET THE LOOP???? OR CONTINUE TO RETURN DATA=0
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
         return data
@@ -384,26 +384,26 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
                                 for rank in range(0, (annotation1["Rank"]*2)-2):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
                                 for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            annotation1["CDS_length"]=0
+                            annotation2["CDS_length"]=0
                             if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
                                 for rank in range(0, (annotation2["Rank"]*2)-2):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
                                 for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -431,26 +431,26 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
                                 for rank in range(0, (annotation1["Rank"]*2)-2):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
                                 for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            annotation1["CDS_length"]=0
+                            annotation2["CDS_length"]=0
                             if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
                                 for rank in range(0, (annotation2["Rank"]*2)-2):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
                                 for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -479,26 +479,26 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
                                 for rank in range(0, (annotation1["Rank"]*2)-2):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
                                 for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            annotation1["CDS_length"]=0
+                            annotation2["CDS_length"]=0
                             if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
                                 for rank in range(0, (annotation2["Rank"]*2)-2):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
                                 for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -527,26 +527,26 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             if annotation1["Order"]=="5'" and annotation1["Exon_start_phase"]==annotation2["Phase"]:
                                 for rank in range(0, (annotation1["Rank"]*2)-2):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation1["Order"]=="3'" and annotation1["Exon_end_phase"]==annotation2["Phase"]:
                                 for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
+                                        annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
-                            annotation1["CDS_length"]=0
+                            annotation2["CDS_length"]=0
                             if annotation2["Order"]=="5'" and annotation2["Exon_start_phase"]==annotation1["Phase"]:
                                 for rank in range(0, (annotation2["Rank"]*2)-2):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             elif annotation2["Order"]=="3'" and annotation2["Exon_end_phase"]==annotation1["Phase"]:
                                 for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
-                                        BND_INFO["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
+                                        annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
                                 FUSION_TYPE="exon-intron"
                             else:
                                 continue
@@ -558,7 +558,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             continue
                 with open(Output, "a") as outfile:
                     try:
-                        outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
+                        outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
                         #outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         #THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
