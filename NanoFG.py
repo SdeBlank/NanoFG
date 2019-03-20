@@ -31,7 +31,7 @@ class EnsemblRestClient(object):
         if parameters is None:
             parameters = {}
         data = None                             #### SAYS DATA=NONE
-
+        x=0
         # check if we need to rate limit ourselves
         if self.req_count >= self.reqs_per_sec:
             delta = time.time() - self.last_req
@@ -52,12 +52,19 @@ class EnsemblRestClient(object):
             # check if we are being rate limited by the server
             if int(e.response.status_code) == 429:
                 if 'Retry-After' in e.response.headers:
+                    x=1
                     retry = e.response.headers['Retry-After']
                     time.sleep(float(retry))
                     self.perform_rest_action(endpoint, hdrs, parameters)                ### DOES THIS RESET THE LOOP???? OR CONTINUE TO RETURN DATA=0
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
-        return data
+        if data is not None:
+            return data
+        else:
+            print(endpoint)
+            print(hdrs)
+            print(parameters)
+            print(x)
 
 def parse_vcf(vcf, output):
     with open(vcf, "r") as vcf:
@@ -209,8 +216,14 @@ def overlap_annotation(CHROM, POS):
                             INTRON_INFO["Type"]="intron"
                             INTRON_INFO["Rank"]=rank+1
                             INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
-                            INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
-                            INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                            if INFO["Strand"]==1:
+                                INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
+                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                            else:
+                                INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]
+                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]
+                            # INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
+                            # INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
                             INTRON_INFO["CDS"]=CDS
                             INFO["Exons"].append(INTRON_INFO)
                     #print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
@@ -348,10 +361,11 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
     POS1=Record.POS
     CHROM2=Record.ALT[0].chr
     POS2=Record.ALT[0].pos
-
     for annotation1 in Breakend1:
         annotation1["BND"]=str(CHROM1)+":"+str(POS1)
         for annotation2 in Breakend2:
+            print (annotation1)
+            print(annotation2)
             annotation2["BND"]=str(CHROM2)+":"+str(POS2)
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
