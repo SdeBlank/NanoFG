@@ -124,7 +124,7 @@ MERGE_OUTPUT_LOG=$LOGDIR/$MERGE_OUTPUT_JOBNAME.log
 
 if [ -z $LINES ]; then
   NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-  LINES=$(expr $NUMBER_OF_SVS / 50 + 1)
+  LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
   if [ $LINES -lt 100 ]; then
     LINES=100
   fi
