@@ -20,6 +20,7 @@ class EnsemblRestClient(object):
         self.reqs_per_sec = reqs_per_sec
         self.req_count = 0
         self.last_req = 0
+        self.try = 0
 
     def perform_rest_action(self, endpoint, hdrs=None, parameters=None):
         if hdrs is None:
@@ -57,11 +58,13 @@ class EnsemblRestClient(object):
                     data=self.perform_rest_action(endpoint, hdrs, parameters)
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
-        if data is not None:
-            return data
-        else:
-            time.sleep(1)
-            data=self.perform_rest_action(endpoint, hdrs, parameters)
+        if data is None:
+            self.try += 1
+            if self.try <= 5:
+                time.sleep(1)
+                data=self.perform_rest_action(endpoint, hdrs, parameters)
+        return data
+
 
 
 def parse_vcf(vcf, output):
