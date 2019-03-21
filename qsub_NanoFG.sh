@@ -98,9 +98,9 @@ if [ ! -d $SPLITDIR ]; then
     mkdir $SPLITDIR
 fi
 
-if [ ! -d $JOBDIR ]; then
-    mkdir $JOBDIR
-fi
+# if [ ! -d $JOBDIR ]; then
+#     mkdir $JOBDIR
+# fi
 
 if [ ! -d $LOGDIR ]; then
     mkdir $LOGDIR
