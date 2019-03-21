@@ -49,15 +49,17 @@ class EnsemblRestClient(object):
                 data = json.loads(response)
             self.req_count += 1
 
-        except requests.exceptions.HTTPError as e:
+        except requests.exceptions.HTTPError as error:
             # check if we are being rate limited by the server
-            if int(e.response.status_code) == 429:
-                if 'Retry-After' in e.response.headers:
-                    retry = e.response.headers['Retry-After']
+            if int(error.response.status_code) == 429:
+                if 'Retry-After' in error.response.headers:
+                    retry = error.response.headers['Retry-After']
                     time.sleep(float(retry))
                     data=self.perform_rest_action(endpoint, hdrs, parameters)
             else:
-                sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
+                sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, error))
+        except requests.exceptions.ConnectionError as error:
+
         if data is None:
             self.repeat += 1
             if self.repeat <= 5:
@@ -71,11 +73,14 @@ class EnsemblRestClient(object):
 
 def parse_vcf(vcf, output):
     with open(vcf, "r") as vcf:
+        CCC=1
         VCF_READER=pyvcf.Reader(vcf)
         with open(output, "w") as outfile:
             outfile.write("\t".join(["ID","Fusion_type","5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
             # outfile.write("\t".join(["ID","Fusion_type","5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
         for record in VCF_READER:
+            print(CCC)
+            CCC+=1
             # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
                 continue
