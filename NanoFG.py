@@ -58,7 +58,10 @@ class EnsemblRestClient(object):
                     data=self.perform_rest_action(endpoint, hdrs, parameters)
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, error))
+
         except requests.exceptions.ConnectionError as error:
+            time.sleep(1)
+            data=self.perform_rest_action(endpoint, hdrs, parameters)
 
         if data is None:
             self.repeat += 1
