@@ -41,9 +41,9 @@ class EnsemblRestClient(object):
             self.req_count = 0
 
         try:
-            response = requests.get(self.server + endpoint, headers=hdrs, params=parameters)
-            response.raise_for_status()
-            response = response.text
+            request = requests.get(self.server + endpoint, headers=hdrs, params=parameters)
+            request.raise_for_status()
+            response = request.text
             if response:
                 data = json.loads(response)
             self.req_count += 1
@@ -57,7 +57,11 @@ class EnsemblRestClient(object):
                     data=self.perform_rest_action(endpoint, hdrs, parameters)
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(self.server+endpoint, e))
-        return data
+        if data is not None:
+            return data
+        else:
+            time.sleep(1)
+            data=self.perform_rest_action(endpoint, hdrs, parameters)
 
 
 def parse_vcf(vcf, output):
@@ -358,6 +362,8 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
     for annotation1 in Breakend1:
         annotation1["BND"]=str(CHROM1)+":"+str(POS1)
         for annotation2 in Breakend2:
+            print(annotation1)
+            print(annotation2)
             annotation2["BND"]=str(CHROM2)+":"+str(POS2)
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
