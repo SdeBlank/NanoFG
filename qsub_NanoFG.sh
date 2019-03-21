@@ -9,7 +9,7 @@ Optional parameters:
     -h|--help       Shows help
     -d|--NanoFG_directory Directory that contains NanoFG [$NANOFG_DIR]
     -s|--script     Path to vcf_primer_filter.py [$SCRIPT]
-    -l|--LINES      Number of lines to put in each spit vcf file [$LINES]
+    -l|--LINES      Number of lines to put in each spit vcf file [Devides vcf in 50 files]
     -o|--output     VCF output file [$OUTPUT]
     -e|--venv       Path to virtual environment[$VENV]
 "
@@ -20,7 +20,6 @@ POSITIONAL=()
 SCRIPT="/home/cog/sdeblank/Documents/github/NanoFG/NanoFG.py"
 VENV="/data/sharc/venv/bin/activate"
 NANOFG_DIR=$(dirname $SCRIPT)
-LINES=100
 
 SPLIT_VCF_MEM=5G
 SPLIT_VCF_TIME=0:5:0
@@ -122,6 +121,14 @@ MERGE_OUTPUT_JOBNAME=${VCF_NAME/.vcf/_merge_output}
 MERGE_OUTPUT_JOB=$JOBDIR/$MERGE_OUTPUT_JOBNAME.sh
 MERGE_OUTPUT_ERR=$LOGDIR/$MERGE_OUTPUT_JOBNAME.err
 MERGE_OUTPUT_LOG=$LOGDIR/$MERGE_OUTPUT_JOBNAME.log
+
+if [ -z $LINES ]; then
+  NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
+  LINES=$(expr $NUMBER_OF_SVS / 50 + 1)
+  if [ $LINES -lt 100 ]; then
+    LINES=100
+  fi
+fi
 
 HEADER=$(grep "^#" $VCF)
 AWK="grep -v \"^#\" $VCF | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$SPLITDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
