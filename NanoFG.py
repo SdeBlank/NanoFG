@@ -320,13 +320,15 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                             # elif BND_INFO["Order"]=="3'":
                             #     BND_INFO["CDS_length"]=0
                         else:
-                            if orientation:
+                            if ORIENTATION:
                                 if sequence["Contains_end_CDS"]==True:
+                                    print("1")
                                     #BND_INFO["Phase"]=(((abs(gene["CDS_end"]-POS)+1+(3-sequence["End_phase"]))%3)*2)%3
                                     BND_INFO["Phase"]=(abs(gene["CDS_start"]-POS)+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-gene["CDS_end"])+1
                                     #print (gene["Gene_id"], POS)
                                 else:
+                                    print("2")
                                     #BND_INFO["Phase"]=(((abs(sequence["End"]-POS)+1+(3-sequence["End_phase"]))%3)*2)%3
                                     BND_INFO["Phase"]=(abs(sequence["Start"]-POS)+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-sequence["End"])+1
@@ -339,6 +341,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                                         BND_INFO["CDS_length"]+=gene["Exons"][rank]["CDS_length"]
                             else:
                                 if sequence["Contains_start_CDS"]==True:
+                                    print("3")
                                     BND_INFO["Phase"]=(abs(POS-gene["CDS_start"])+1+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-gene["CDS_start"])+1
                                 else:
