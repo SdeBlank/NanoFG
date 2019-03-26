@@ -3,16 +3,18 @@
 # Create usage message
 usage(){
 echo "
-Optional parameters:
-
--h|--help                 Shows help
+Required parameters:
 -f|--fasta                Input fasta file [${FASTA}]
+
+Optional parameters:
+-h|--help                 Shows help
 -t|--threads              Number of threads [${THREADS}]
 -r|--refgenome            Reference genome [${REF}]
+-rd|--refdict             Reference genome .dict file [${REF_DICT}]
 -w|--wtdbg2_dir           Path to wtdbg2 directory [${WTDBG2_DIR}]
 -ws|--wtdbg2_settings     wtdbg2 settings [${WTDBG2_SETTINGS}]
--m|--minimap2             Path to minimap2 [${MINIMAP2}]
--ms|--minimap2_settings   minimap2 settings [${MINIMAP2_SETTINGS}]
+-l|--last_dir             Path to LAST directory [${LAST_DIR}]
+-ls|--last_settings       LAST settings [${LAST_SETTINGS}]
 -s|--sambamba             Path to sambamba|samtools [${SAMBAMBA}]
 "
 exit
@@ -22,13 +24,18 @@ POSITIONAL=()
 
 # DEFAULT SETTINGS
 THREADS=1
-REF=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.fa
+REF=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
+REF_DICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
 WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
 WTDBG2=${WTDBG2_DIR}/wtdbg2
 WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
 WTDBG2_SETTINGS='-x ont -g 3g'
-MINIMAP2=/hpc/cog_bioinf/kloosterman/tools/minimap2_v2.12/minimap2
-MINIMAP2_SETTINGS='-x map-ont'
+LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
+LASTAL=${LAST_DIR}/src/lastal
+LAST_SPLIT=${LAST_DIR}/src/last-split
+LAST_PARAMS=${LAST_DIR}/last_params
+LAST_SETTINGS="-Q 0 -p ${LAST_PARAMS}"
+MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
 SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
 
 while [[ $# -gt 0 ]]; do
@@ -96,14 +103,14 @@ PREFIX=${FASTA/.fasta/_wtdbg2}
 
 WTDBG2_COMMAND="${WTDBG2} ${WTDBG2_SETTINGS} -i ${FASTA} -t ${THREADS} -o ${PREFIX}"
 WTPOA_CNS_COMMAND="${WTPOA_CNS} -t ${THREADS} -i ${PREFIX}.ctg.lay.gz -o ${PREFIX}.ctg.fa"
-MINIMAP2_COMMAND="${MINIMAP2} ${MINIMAP2_SETTING} -t ${THREADS} -a ${REF} ${PREFIX}.ctg.fa | ${SAMBAMBA} view -S -f bam /dev/stdin > ${PREFIX}.ctg.map.bam"
-SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.map.bam"
+LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin > ${PREFIX}.ctg.last.bam"
+SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.bam"
 
 echo ${WTDBG2_COMMAND}
 eval ${WTDBG2_COMMAND}
 echo ${WTPOA_CNS_COMMAND}
 eval ${WTPOA_CNS_COMMAND}
-echo ${MINIMAP2_COMMAND}
-eval ${MINIMAP2_COMMAND}
+echo ${LAST_COMMAND}
+eval ${LAST_COMMAND}
 echo ${SAMBAMBA_INDEX_COMMAND}
 eval ${SAMBAMBA_INDEX_COMMAND}
