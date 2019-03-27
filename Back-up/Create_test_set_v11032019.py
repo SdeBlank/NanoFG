@@ -530,7 +530,7 @@ for chr in CHROMOSOMES:
 
     CHR_LENGTHS[chr]=int(data['length'])
 
-NUMBER=10
+NUMBER=50
 TYPES=["exon-exon"]#, "5'UTR", "3'UTR"]
 TRANS_PERC=0.2
 TRUTH=True

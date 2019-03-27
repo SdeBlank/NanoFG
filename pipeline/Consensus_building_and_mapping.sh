@@ -70,13 +70,14 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
-    -m|--minimap2)
-    MINIMAP2="$2"
+    -l|--last_dir)
+    LAST_DIR="$2"
     shift # past argument
     shift # past value
     ;;
-    -ms|--minimap2_settings)
-    MINIMAP2_SETTINGS="$2"
+    -ls|--last_settings)
+    LAST_SETTINGS="$2"
+    LAST_SETTINGS_OVERRIDE=True                 ##### FIND BETTER WAY???
     shift # past argument
     shift # past value
     ;;
@@ -99,12 +100,24 @@ if [ -z ${FASTA} ]; then
   usage
 fi
 
+LASTAL=${LAST_DIR}/src/lastal
+LAST_SPLIT=${LAST_DIR}/src/last-split
+LAST_PARAMS=${LAST_DIR}/last_params
+MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
+
+if [ -z $LAST_SETTINGS_OVERRIDE ];then
+  LAST_SETTINGS=$(echo $LAST_SETTINGS | sed -e "s/-p [^ ]\+/-p ${LAST_PARAMS}/")
+
+WTDBG2=${WTDBG2_DIR}/wtdbg2
+WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
+
 PREFIX=${FASTA/.fasta/_wtdbg2}
 
 WTDBG2_COMMAND="${WTDBG2} ${WTDBG2_SETTINGS} -i ${FASTA} -t ${THREADS} -o ${PREFIX}"
 WTPOA_CNS_COMMAND="${WTPOA_CNS} -t ${THREADS} -i ${PREFIX}.ctg.lay.gz -o ${PREFIX}.ctg.fa"
 LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin > ${PREFIX}.ctg.last.bam"
-SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.bam"
+SAMBAMBA_SORT_COMMAND="${SAMBAMBA} sort ${PREFIX}.ctg.last.bam -o ${PREFIX}.ctg.last.sorted.bam"
+SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.sorted.bam"
 
 echo ${WTDBG2_COMMAND}
 eval ${WTDBG2_COMMAND}

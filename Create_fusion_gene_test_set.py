@@ -15,85 +15,84 @@ parser.add_argument('-t', '--truth', type=str, help='Return "True" or "False" si
 args = parser.parse_args()
 VCF=args.output
 
-def select_exons(gene_info):
-    for transcript in gene_info["Transcript"]:
-        if transcript["is_canonical"]==1:
-            EXONS=[]
-            INTRONS=[]
-            CDS=False
+def select_exons(transcript):
+    if transcript["is_canonical"]==1:
+        EXONS=[]
+        INTRONS=[]
+        CDS=False
 
+        if transcript["strand"]==1:
+            CDS_start=transcript["Translation"]["start"]
+            CDS_end=transcript["Translation"]["end"]
+        else:
+            CDS_start=transcript["Translation"]["end"]
+            CDS_end=transcript["Translation"]["start"]
+
+        ### EXONS
+        for rank, exon in enumerate(transcript["Exon"]):
+            EXON_INFO={}
+            EXON_INFO["Type"]="exon"
+            EXON_INFO["Rank"]=rank+1
+            CHRON_START=exon["start"]
+            CHRON_END=exon["end"]
             if transcript["strand"]==1:
-                CDS_start=transcript["Translation"]["start"]
-                CDS_end=transcript["Translation"]["end"]
+                EXON_INFO["Start"]=exon["start"]
+                EXON_INFO["End"]=exon["end"]
             else:
-                CDS_start=transcript["Translation"]["end"]
-                CDS_end=transcript["Translation"]["start"]
+                EXON_INFO["Start"]=exon["end"]
+                EXON_INFO["End"]=exon["start"]
 
-            ### EXONS
-            for rank, exon in enumerate(transcript["Exon"]):
-                EXON_INFO={}
-                EXON_INFO["Type"]="exon"
-                EXON_INFO["Rank"]=rank+1
-                CHRON_START=exon["start"]
-                CHRON_END=exon["end"]
-                if gene_info["strand"]==1:
-                    EXON_INFO["Start"]=exon["start"]
-                    EXON_INFO["End"]=exon["end"]
-                else:
-                    EXON_INFO["Start"]=exon["end"]
-                    EXON_INFO["End"]=exon["start"]
+            EXON_INFO["Contains_start_CDS"]=False
+            EXON_INFO["Contains_end_CDS"]=False
 
-                EXON_INFO["Contains_start_CDS"]=False
-                EXON_INFO["Contains_end_CDS"]=False
-
-                if CDS:
-                    if CDS_end>=CHRON_START and CDS_end<=CHRON_END:
-                        EXON_INFO["Contains_end_CDS"]=True
-                        EXON_INFO["CDS"]=True
-                        EXON_INFO["Start_phase"]=PHASE
-                        EXON_INFO["End_phase"]=0
-                        EXON_INFO["CDS_length"]=abs(CDS_end-EXON_INFO["Start"])+1
-                        CDS=False
-                    else:
-                        EXON_INFO["CDS"]=True
-                        EXON_INFO["Start_phase"]=PHASE
-                        EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-EXON_INFO["Start"])+1+PHASE)%3
-                        EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-EXON_INFO["Start"])+1
-                elif CDS_start>=CHRON_START and CDS_start<=CHRON_END:
-                    EXON_INFO["Contains_start_CDS"]=True
+            if CDS:
+                if CDS_end>=CHRON_START and CDS_end<=CHRON_END:
+                    EXON_INFO["Contains_end_CDS"]=True
                     EXON_INFO["CDS"]=True
-                    EXON_INFO["Start_phase"]=0
-                    if CDS_end>=CHRON_START and CDS_end<=CHRON_END:
-                        EXON_INFO["Contains_end_CDS"]=True
-                        EXON_INFO["End_phase"]=0
-                        EXON_INFO["CDS_length"]=abs(CDS_end-CDS_start)+1
-                    else:
-                        EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-CDS_start)+1)%3
-                        EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-CDS_start)+1
-                    CDS=True
-
+                    EXON_INFO["Start_phase"]=PHASE
+                    EXON_INFO["End_phase"]=0
+                    EXON_INFO["CDS_length"]=abs(CDS_end-EXON_INFO["Start"])+1
+                    CDS=False
                 else:
-                    EXON_INFO["CDS"]=False
-                    EXON_INFO["Start_phase"]=-1
-                    EXON_INFO["End_phase"]=-1
-                    EXON_INFO["CDS_length"]=0
-                PHASE=EXON_INFO["End_phase"]
-                EXONS.append(EXON_INFO)
+                    EXON_INFO["CDS"]=True
+                    EXON_INFO["Start_phase"]=PHASE
+                    EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-EXON_INFO["Start"])+1+PHASE)%3
+                    EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-EXON_INFO["Start"])+1
+            elif CDS_start>=CHRON_START and CDS_start<=CHRON_END:
+                EXON_INFO["Contains_start_CDS"]=True
+                EXON_INFO["CDS"]=True
+                EXON_INFO["Start_phase"]=0
+                if CDS_end>=CHRON_START and CDS_end<=CHRON_END:
+                    EXON_INFO["Contains_end_CDS"]=True
+                    EXON_INFO["End_phase"]=0
+                    EXON_INFO["CDS_length"]=abs(CDS_end-CDS_start)+1
+                else:
+                    EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-CDS_start)+1)%3
+                    EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-CDS_start)+1
+                CDS=True
 
-                ### INTRONS
-                if rank<len(transcript["Exon"])-1:
-                    INTRON_INFO={}
-                    INTRON_INFO["Type"]="intron"
-                    INTRON_INFO["Rank"]=rank+1
-                    INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
-                    if gene_info["strand"]==1:
-                        INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
-                        INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
-                    else:
-                        INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]
-                        INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]
-                    INTRON_INFO["CDS"]=CDS
-                    INTRONS.append(INTRON_INFO)
+            else:
+                EXON_INFO["CDS"]=False
+                EXON_INFO["Start_phase"]=-1
+                EXON_INFO["End_phase"]=-1
+                EXON_INFO["CDS_length"]=0
+            PHASE=EXON_INFO["End_phase"]
+            EXONS.append(EXON_INFO)
+
+            ### INTRONS
+            if rank<len(transcript["Exon"])-1:
+                INTRON_INFO={}
+                INTRON_INFO["Type"]="intron"
+                INTRON_INFO["Rank"]=rank+1
+                INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
+                if transcript["strand"]==1:
+                    INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
+                    INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                else:
+                    INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]
+                    INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]
+                INTRON_INFO["CDS"]=CDS
+                INTRONS.append(INTRON_INFO)
     return EXONS, INTRONS
 
 def select_random_fusion(TRANS_CHANCE, SET, FUSION_TYPE, chromosomes, chromosome_lengths, SEQ_LENGTH):
@@ -157,6 +156,7 @@ def select_random_fusion(TRANS_CHANCE, SET, FUSION_TYPE, chromosomes, chromosome
                 RETRY=False
                 for transcript in gene1_info["Transcript"]:
                     if transcript["is_canonical"]==1:
+                        gene1_info["Transcript"]=transcript
                         #print(1, transcript["biotype"])
                         if transcript["biotype"]!="protein_coding":
                             RETRY=True
@@ -224,6 +224,7 @@ def select_random_fusion(TRANS_CHANCE, SET, FUSION_TYPE, chromosomes, chromosome
                 FALSE_BIOTYPE=False
                 for transcript in gene2_info["Transcript"]:
                     if transcript["is_canonical"]==1:
+                        gene2_info["Transcript"]=transcript
                         #print(2, transcript["biotype"])
                         if transcript["biotype"]!="protein_coding":
                             FALSE_BIOTYPE=True
@@ -241,8 +242,8 @@ def select_random_fusion(TRANS_CHANCE, SET, FUSION_TYPE, chromosomes, chromosome
             except:
                 continue
 
-        gene1_exon_info, gene1_intron_info=select_exons(gene1_info)
-        gene2_exon_info, gene2_intron_info=select_exons(gene2_info)
+        gene1_exon_info, gene1_intron_info=select_exons(gene1_info["Transcript"])
+        gene2_exon_info, gene2_intron_info=select_exons(gene2_info["Transcript"])
 
         if not gene1_exon_info or not gene1_intron_info or not gene2_exon_info or not gene2_intron_info:
             continue
@@ -566,6 +567,57 @@ def select_random_fusion(TRANS_CHANCE, SET, FUSION_TYPE, chromosomes, chromosome
             if TRY_AGAIN==True:
                 continue
 
+        if FUSION_TYPE=="3'UTR-3'UTR":
+            RETRY=0
+            while True:
+                RETRY+=1
+                #print("TRY:", TRY)
+                if RETRY==10:
+                    TRY_AGAIN=True
+                    break
+
+                if SET:
+                    if gene1_info["strand"]==1:
+                        pos1=random.randrange(gene1_info["Translation_end"], gene1_info["Transcript"]["end"], 1)
+                    else:
+                        pos1=random.randrange(gene1_info["Transcript"]["start"], gene1_info["Translation_end"], 1)
+
+                    if gene2_info["strand"]==1:
+                        pos2=random.randrange(gene2_info["Translation_end"], gene2_info["Transcript"]["end"], 1)
+                    else:
+                        pos2=random.randrange(gene2_info["Transcript"]["start"], gene2_info["Translation_end"], 1)
+
+                    if gene1["strand"]==gene2["strand"]:
+                        read1=[CHROM1, gene1["strand"], pos1-SEQ_LENGTH, pos1, gene1["gene_id"], phase1, exon1]
+                        read2=[CHROM2, gene2["strand"], pos2, pos2+SEQ_LENGTH, gene2["gene_id"], phase2, intron2]
+                    else:
+                        read1=[CHROM1, gene1["strand"], pos1-SEQ_LENGTH, pos1, gene1["gene_id"], phase1, exon1]
+                        read2=[CHROM2, gene2["strand"], pos2-SEQ_LENGTH, pos2, gene2["gene_id"], phase2, intron2]
+                else:
+
+                    break
+
+
+        if FUSION_TYPE=="5'UTR-intron":
+            RETRY=0
+            while True:
+                RETRY+=1
+                #print("TRY:", TRY)
+                if RETRY==10:
+                    TRY_AGAIN=True
+                    break
+
+        if FUSION_TYPE=="5'UTR-5'UTR":
+            RETRY=0
+            while True:
+                RETRY+=1
+                #print("TRY:", TRY)
+                if RETRY==10:
+                    TRY_AGAIN=True
+                    break
+
+
+
         return read1,read2
 
 def get_sequence(range):
@@ -662,7 +714,7 @@ for type in TYPES:
             # print(GENE1[6])
             # print(GENE2[0:6])
             # print(GENE2[6])
-            # print(SEQ1, SEQ2, "\n")
+            print(SEQ1 [-50:len(SEQ1)], SEQ2[0:50], "\n")
             if GENE1[6]["Type"]=="exon":
                 if GENE1[6]["Contains_start_CDS"]:
                     bed.write(str(GENE1[0]) + "\t" + str(pos1) + "\t" + str(GENE2[0]) + "\t" + str(pos2) + "\t" + type+"_"+str(TRUTH)+"_"+str(x+1) + "\t" + GENE1[4]+"-"+GENE2[4]

@@ -9,7 +9,7 @@ Optional parameters:
     -h|--help       Shows help
     -d|--NanoFG_directory Directory that contains NanoFG [$NANOFG_DIR]
     -s|--script     Path to vcf_primer_filter.py [$SCRIPT]
-    -l|--LINES      Number of lines to put in each spit vcf file [Devides vcf in 50 files]
+    -l|--lines     Number of lines to put in each spit vcf file [Devides vcf in 50 files]
     -o|--output     VCF output file [$OUTPUT]
     -e|--venv       Path to virtual environment[$VENV]
 "
