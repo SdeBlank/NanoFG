@@ -15,7 +15,7 @@ Optional parameters:
 POSITIONAL=()
 
 #DEFAULTS
-SPLITDIR=./
+SPLITDIR=./split_vcf
 
 NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
 JOBS=$(expr $NUMBER_OF_SVS / 100 + 1)

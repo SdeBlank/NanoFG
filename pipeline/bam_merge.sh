@@ -3,16 +3,19 @@
 usage() {
 echo "
 Required parameters:
+
+Optional parameters:
     -d|--split_directory
     -s|--sambamba_path
     -o|--output
-
-Optional parameters:
     -h|--help       Shows help
 "
 }
 
 POSITIONAL=()
+SAMBAMBA='/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba'
+OUTPUT='/dev/stdout'
+SPLITDIR=./split_vcf
 
 while [[ $# -gt 0 ]]
 do
@@ -43,24 +46,6 @@ do
     esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
-
-if [ -z $SPLITDIR ]; then
-    echo "Missing -d|--split_directory"
-    usage
-    exit
-fi
-
-if [ -z $SAMBAMBA ]; then
-    echo "Missing -s|--sambamba_path"
-    usage
-    exit
-fi
-
-if [ -z $OUTPUT ]; then
-    echo "Missing -o|--output"
-    usage
-    exit
-fi
 
 echo `date`: Running on `uname -n`
 

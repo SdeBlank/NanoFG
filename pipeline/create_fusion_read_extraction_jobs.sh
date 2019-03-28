@@ -18,12 +18,14 @@ Optional parameters:
 POSITIONAL=()
 
 #DEFAULTS
+NANOFG_DIR=$(realpath $(dirname $(dirname {BASH_SOURCE[0]})))
+SCRIPT=$NANOFG_DIR/scripts/fusion_gene_read_extraction.py
+VENV=$NANOFG_DIR/venv/bin/activate
+
 SPLIT_FUSION_READ_EXTRACTION_THREADS=8
 SPLIT_FUSION_READ_EXTRACTION_MEMORY=5G
 SPLIT_FUSION_READ_EXTRACTION_TIME=0:30:0
-NANOFG_DIR=$(realpath $(dirname $(dirname {BASH_SOURCE[0]})))
-SCRIPT=$NANOFG_DIR/scripts/fusion_gene_read_extraction.py
-VENV=NANOFG_DIR/venv/bin/activate
+
 
 while [[ $# -gt 0 ]]
 do
