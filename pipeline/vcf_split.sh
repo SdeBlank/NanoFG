@@ -17,12 +17,6 @@ POSITIONAL=()
 #DEFAULTS
 SPLITDIR=./split_vcf
 
-NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-JOBS=$(expr $NUMBER_OF_SVS / 100 + 1)
-if [ $LINES -lt 100 ]; then
-  LINES=100
-fi
-
 while [[ $# -gt 0 ]]
 do
     key="$1"
@@ -60,6 +54,13 @@ if [ -z $VCF ]; then
     echo "Missing -v|--vcf parameter"
     usage
     exit
+fi
+if [ -z $LINES ]; then
+  NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
+  LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
+  if [ $LINES -lt 100 ]; then
+    LINES=100
+  fi
 fi
 
 echo `date`: Running on `uname -n`
