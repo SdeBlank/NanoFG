@@ -78,19 +78,19 @@ for record in vcf_reader:
                         donor_chr = record.CHROM
                         donor_start = fusions['donor'][donor]
                         donor_end = record.POS
-                        #create_fasta(donor_chr, donor_start, donor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
+                        create_fasta(donor_chr, donor_start, donor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
                         acceptor_chr = record.ALT[0].chr
                         acceptor_start = record.ALT[0].pos
                         acceptor_end = fusions['acceptor'][acceptor]
-                        #create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_2'], fusion)
+                        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_2'], fusion)
                     elif donor_bp == '2' and acceptor_bp == '1':
                         donor_chr = record.ALT[0].chr
                         donor_start = fusions['donor'][donor]
                         donor_end = record.ALT[0].pos
-                        #create_fasta(donor_chr, donor_start, donor_end, record.ID, record.INFO['REF_READ_IDS_2'], fusion)
+                        create_fasta(donor_chr, donor_start, donor_end, record.ID, record.INFO['REF_READ_IDS_2'], fusion)
                         acceptor_chr = record.CHROM
                         acceptor_start = fusions['acceptor'][acceptor]
                         acceptor_end = record.POS
-                        #create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
+                        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
     #create_fasta(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].pos+1000, record.ID, record.INFO['REF_READ_IDS_2'])
     #break
