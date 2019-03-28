@@ -115,8 +115,8 @@ PREFIX=${FASTA/.fasta/_wtdbg2}
 
 WTDBG2_COMMAND="${WTDBG2} ${WTDBG2_SETTINGS} -i ${FASTA} -t ${THREADS} -o ${PREFIX}"
 WTPOA_CNS_COMMAND="${WTPOA_CNS} -t ${THREADS} -i ${PREFIX}.ctg.lay.gz -o ${PREFIX}.ctg.fa"
-LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin > ${PREFIX}.ctg.last.bam"
-SAMBAMBA_SORT_COMMAND="${SAMBAMBA} sort ${PREFIX}.ctg.last.bam -o ${PREFIX}.ctg.last.sorted.bam"
+LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin | \
+${SAMBAMBA} sort /dev/stdin -o ${PREFIX}.ctg.last.sorted.bam"
 SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.sorted.bam"
 
 echo ${WTDBG2_COMMAND}
