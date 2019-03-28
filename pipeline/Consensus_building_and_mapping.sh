@@ -100,6 +100,8 @@ if [ -z ${FASTA} ]; then
   usage
 fi
 
+echo `date`: Running on `uname -n`
+
 LASTAL=${LAST_DIR}/src/lastal
 LAST_SPLIT=${LAST_DIR}/src/last-split
 LAST_PARAMS=${LAST_DIR}/last_params
@@ -127,3 +129,5 @@ echo ${LAST_COMMAND}
 eval ${LAST_COMMAND}
 echo ${SAMBAMBA_INDEX_COMMAND}
 eval ${SAMBAMBA_INDEX_COMMAND}
+
+echo `date`: Done
