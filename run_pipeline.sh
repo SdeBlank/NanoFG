@@ -4,6 +4,7 @@ usage() {
 echo "
 Required parameters:
     -v|--vcf		                                                                Path to vcf file
+    -b|--bam                                                                    Path to bam file
 
 Optional parameters:
 
@@ -75,11 +76,6 @@ LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
 WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
 
 #VCF SPLIT DEFAULTS
-NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
-if [ $VCF_SPLIT_LINES -lt 100 ]; then
-  VCF_SPLIT_LINES=100
-fi
 VCF_SPLIT_THREADS=8
 VCF_SPLIT_TIME=0:30:0
 VCF_SPLIT_MEMORY=10G
@@ -138,6 +134,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -b|--bam)
+    BAM="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -o|--outputdir)
     OUTPUTDIR="$2"
     shift # past argument
@@ -173,7 +174,7 @@ do
     shift # past value
     ;;
     -vsl|--vcf_split_lines)
-    VCF_SPLIT_LINES="$2"
+    VCF_SPLIT_LINES=$2
     shift # past argument
     shift # past value
     ;;
@@ -310,6 +311,25 @@ if [ -z $VCF ]; then
     usage
     exit
 fi
+if [ -z $BAM ]; then
+    echo "Missing -b|--bam parameter"
+    usage
+    exit
+fi
+NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
+
+if [ -z $VCF_SPLIT_LINES ]; then
+  VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
+  NUMBER_OF_FILES=100
+  if [ $VCF_SPLIT_LINES -lt 100 ]; then
+    VCF_SPLIT_LINES=100
+    NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
+  fi
+else
+  echo $NUMBER_OF_SVS
+  echo $VCF_SPLIT_LINES
+  NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
+fi
 
 echo `date`: Running on `uname -n`
 
@@ -360,8 +380,8 @@ FUSION_CHECK_SH=$JOBDIR/$FUSION_CHECK_JOBNAME.sh
 FUSION_CHECK_ERR=$LOGDIR/$FUSION_CHECK_JOBNAME.err
 FUSION_CHECK_LOG=$LOGDIR/$FUSION_CHECK_JOBNAME.log
 
-mkdir -p $SPLITDIR
-if [ ! -d $SPLITDIR ]; then
+mkdir -p $VCF_SPLIT_OUTDIR
+if [ ! -d $VCF_SPLIT_OUTDIR ]; then
     exit
 fi
 
@@ -418,30 +438,30 @@ qsub $VCF_SPLIT_SH
 }
 
 create_fusion_read_extraction_jobs(){
-cat << EOF > $CREATE_FUSION_READ_EXTRACTION_JOBS_SH
+
+cat << EOF > $FUSION_READ_EXTRACTION_SH
 #!/bin/bash
 
-#$ -N $CREATE_FUSION_READ_EXTRACTION_JOBS_JOBNAME
+#$ -N FUSION_READ_EXTRACTION_JOBNAME
 #$ -cwd
-#$ -pe threaded $CREATE_FUSION_READ_EXTRACTION_JOBS_THREADS
-#$ -l h_vmem=$CREATE_FUSION_READ_EXTRACTION_JOBS_MEMORY
-#$ -l h_rt=$CREATE_FUSION_READ_EXTRACTION_JOBS_TIME
-#$ -e $CREATE_FUSION_READ_EXTRACTION_JOBS_ERR
-#$ -o $CREATE_FUSION_READ_EXTRACTION_JOBS_LOG
+#$ -t 1:$NUMBER_OF_FILES:1
+#$ -pe threaded $FUSION_READ_EXTRACTION_THREADS
+#$ -l h_vmem=$FUSION_READ_EXTRACTION_MEMORY
+#$ -l h_rt=$FUSION_READ_EXTRACTION_TIME
+#$ -e $FUSION_READ_EXTRACTION_ERR_\${SGE_TASK_ID}
+#$ -o $FUSION_READ_EXTRACTION_LOG_\${SGE_TASK_ID}
 
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
-  if [ ! -e $CREATE_FUSION_READ_EXTRACTION_JOBS_JOBNAME.done];then
-    bash $PIPELINE_DIR/create_fusion_read_extraction_jobs.sh \\
-    -d $SPLITDIR
-    -e $VENV
-    -s $FUSION_READ_EXTRACTION_SCRIPT
-    -t $FUSION_READ_EXTRACTION_THREADS
-    -hv $FUSION_READ_EXTRACTION_MEMORY
-    -hr $FUSION_READ_EXTRACTION_TIME
+  if [ ! -e $FUSION_READ_EXTRACTION_JOBNAME.done ]; then
+    bash $SCRIPT_DIR/fusion_gene_read_extraction.py \
+    -b $BAM \
+    -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
+    -o $VCF_SPLIT_OUTDIR
 
-    if asdsad
 EOF
-qsub $CREATE_FUSION_READ_EXTRACTION_JOBS_SH
+#qsub $FUSION_READ_EXTRACTION_SH
 }
+
+create_fusion_read_extraction_jobs
