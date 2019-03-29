@@ -1,4 +1,4 @@
-CHECK_NANOFG_OUT#!/bin/bash
+#!/bin/bash
 
 usage() {
 echo "
