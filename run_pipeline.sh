@@ -480,7 +480,7 @@ EOF
 qsub $VCF_SPLIT_SH
 }
 
-create_fusion_read_extraction_jobs(){
+fusion_read_extraction(){
 
 cat << EOF > $FUSION_READ_EXTRACTION_SH
 #!/bin/bash
@@ -733,29 +733,20 @@ if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     vcf_split
 fi
 if [ ! -e $LOGDIR/$FUSION_READ_EXRACTION_JOBNAME.done ]; then
-    vcf_split
+    fusion_read_extraction
 fi
 if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-    vcf_split
+    consensus_mapping
 fi
 if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
-    vcf_split
+    bam_merge
 fi
 if [ ! -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
-    vcf_split
+    sv_calling
 fi
 if [ ! -e $LOGDIR/$FUSION_CHECK_JOBNAME.done ]; then
-    vcf_split
+    fusion_check
 fi
 if [ ! -e $LOGDIR/$CHECK_NANOFG_JOBNAME.done ]; then
-    vcf_split
+    check_NanoFG
 fi
-#vcf_split
-
-#create_fusion_read_extraction_jobs
-
-#consensus_mapping
-
-#bam_merge
-
-#sv_calling
