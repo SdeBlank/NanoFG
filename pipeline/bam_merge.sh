@@ -13,7 +13,7 @@ Optional parameters:
 }
 
 POSITIONAL=()
-SAMBAMBA='/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba'
+SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
 OUTPUT='/dev/stdout'
 SPLITDIR=./split_vcf
 
@@ -52,6 +52,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 echo `date`: Running on `uname -n`
 
+echo "$SAMBAMBA merge $OUTPUT $SPLITDIR/*/*last.sorted.bam"
 $SAMBAMBA merge $OUTPUT $SPLITDIR/*/*last.sorted.bam
 
 echo `date`: Done

@@ -528,6 +528,7 @@ cat << EOF > $CONSENSUS_MAPPING_SH
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ]; then
+  mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
   if [ ! -e $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done ]; then
     for FASTA in $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID/*.fasta; do
       bash $PIPELINE_DIR/Consensus_building_and_mapping.sh \
@@ -570,6 +571,7 @@ cat << EOF > $MERGE_BAMS_SH
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+  mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
   if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
     bash $PIPELINE_DIR/bam_merge.sh \
       -d $VCF_SPLIT_OUTDIR \
@@ -745,11 +747,9 @@ if [ ! -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
     fusion_read_extraction
 fi
 if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-    mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
     consensus_mapping
 fi
 if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
-    mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
     bam_merge
 fi
 if [ ! -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
