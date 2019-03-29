@@ -72,7 +72,8 @@ FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
-OUTPUTDIR='./'
+OUTPUTDIR='$(realpath ./)'
+echo $OUTPUTDIR
 DONT_CLEAN=false
 
 #TOOL PATH DEFAULTS
@@ -554,7 +555,7 @@ EOF
 qsub $CONSENSUS_MAPPING_SH
 }
 
-bam_merge(){
+bam_merge() {
 
 cat << EOF > $MERGE_BAMS_SH
 #!/bin/bash
