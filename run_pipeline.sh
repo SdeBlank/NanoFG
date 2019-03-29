@@ -497,6 +497,8 @@ echo \`date\`: Running on \`uname -n\`
 if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
   if [ ! -e ${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ]; then
     mkdir -p $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
+
+    . $VENV
     python $SCRIPT_DIR/fusion_gene_read_extraction.py \
     -b $BAM \
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
