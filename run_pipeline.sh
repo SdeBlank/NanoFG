@@ -576,7 +576,9 @@ if [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
       -s $SAMBAMBA \
       -o $MERGE_BAMS_OUT
 
-    touch $LOGDIR/$MERGE_BAMS_JOBNAME.done
+    if [ -e $MERGE_BAMS_OUT ];then
+      touch $LOGDIR/$MERGE_BAMS_JOBNAME.done
+    fi
   fi
 fi
 echo \`date\`: Done
@@ -743,11 +745,11 @@ if [ ! -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
     fusion_read_extraction
 fi
 if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-    mv $FUSION_READ_EXTRACTION_JOBNAME.* $LOGDIR
+    mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
     consensus_mapping
 fi
 if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
-    mv $CONSENSUS_MAPPING_JOBNAME.* $LOGDIR
+    mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
     bam_merge
 fi
 if [ ! -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
