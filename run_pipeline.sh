@@ -735,6 +735,7 @@ EOF
 qsub $CHECK_NANOFG_SH
 }
 
+
 if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     vcf_split
 fi
