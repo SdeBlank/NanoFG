@@ -12,11 +12,13 @@ parser.add_argument('-o', '--output', type=str, help='Annotated VCF output', req
 
 args = parser.parse_args()
 
-def parse_vcf(vcf, output):
-    with open(vcf, "r") as vcf:
+def parse_vcf(vcf, vcf_output, info_output):
+    with open(vcf, "r") as vcf, open(vcf_output, "w") as vcf_output:
         VCF_READER=pyvcf.Reader(vcf)
-        with open(output, "w") as outfile:
-            outfile.write("\t".join(["ID","Fusion_type","5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
+        VCF_READER.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+        VCF_WRITER=pyvcf.Writer(vcf_output, VCF_READER, lineterminator='\n')
+        with open(info_output, "w") as outfile:
+            outfile.write("\t".join(["ID","Fusion_type", "ENSEMBL IDS", "5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
         for record in VCF_READER:
             # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
@@ -40,8 +42,12 @@ def parse_vcf(vcf, output):
             breakend2_info=breakend_annotation(CHROM2, POS2, POS2_ORIENTATION, breakend2_annotation)
 
             #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
-            fusion_check(record, breakend1_info, breakend2_info, POS1_ORIENTATION, POS2_ORIENTATION, output)
+            RECORD_FUSIONS=fusion_check(record, breakend1_info, breakend2_info, POS1_ORIENTATION, POS2_ORIENTATION, info_output)
 
+            if len(RECORD_FUSIONS)>0:
+                #record.INFO["FUSION"]=":".join(RECORD_FUSIONS.keys())
+                record.INFO["FUSION"]=list(RECORD_FUSIONS.keys())
+            VCF_WRITER.write_record(record)
 def overlap_annotation(CHROM, POS):
     ### Request genes, transcripts and exons
     SERVER='http://grch37.rest.ensembl.org'
@@ -295,6 +301,9 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
     POS1=Record.POS
     CHROM2=Record.ALT[0].chr
     POS2=Record.ALT[0].pos
+
+    FUSIONS={}
+
     for annotation1 in Breakend1:
         annotation1["BND"]=str(CHROM1)+":"+str(POS1)
         for annotation2 in Breakend2:
@@ -508,15 +517,18 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                     try:
                         outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
+
+                        FUSIONS[FIVE_PRIME_GENE["Gene_name"]+"-"+THREE_PRIME_GENE["Gene_name"]]=0
                         #outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         #THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
                         # print(annotation1)
                         # print(annotation2)
                     except:
                         continue
+    return FUSIONS
 print("Start:", datetime.datetime.now())
 VCF_IN=args.vcf
-VCF_OUT=args.output
-OUTPUT=args.fusion_output
-parse_vcf(VCF_IN, OUTPUT)
+VCF_OUTPUT=args.output
+INFO_OUTPUT=args.fusion_output
+parse_vcf(VCF_IN, VCF_OUTPUT, INFO_OUTPUT)
 print("End:", datetime.datetime.now())

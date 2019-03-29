@@ -18,7 +18,7 @@ POSITIONAL=()
 
 #DEFAULTS
 READDIR=./
-NANOFG_DIR=$(realpath $(dirname $(dirname {BASH_SOURCE[0]})))
+NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
 VENV=${NANOFG_DIR}/venv/bin/activate
 SCRIPT=${NANOFG_DIR}/scripts/fusion_gene_read_extraction.py
 
