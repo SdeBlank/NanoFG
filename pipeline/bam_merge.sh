@@ -31,14 +31,17 @@ do
     SPLITDIR="$2"
     shift # past argument
     shift # past value
+    ;;
     -s|--sambamba_path)
     SAMBAMBA="$2"
     shift # past argument
     shift # past value
+    ;;
     -o|--output)
     OUTPUT="$2"
     shift # past argument
     shift # past value
+    ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift # past argument
@@ -49,13 +52,6 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 echo `date`: Running on `uname -n`
 
-for SPLIT_BAM in $SPLITDIR/*.bam; do
-  if [ -z $BAM_NAMES ]; then
-    BAM_NAMES=$SPLIT_BAM
-  else
-    BAM_NAMES=$BAM_NAMES' '$SPLIT_BAM
-done
-
-$SAMBAMBA merge $OUTPUT $BAM_NAMES
+$SAMBAMBA merge $OUTPUT $SPLITDIR/*/*last.sorted.bam
 
 echo `date`: Done

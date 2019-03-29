@@ -50,7 +50,7 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
     if end < start:
         end, start = start, end
     bamfile = pysam.AlignmentFile(args.bam, "rb" )
-    fasta = open(args.output_dir+svid+"_"+fusion+".fasta", 'a+')
+    fasta = open(args.output_dir+"/"+svid+"_"+fusion+".fasta", 'a+')
     for read in bamfile.fetch(chr, start, end):
         if read.query_name in exclude or read.seq == None:
             continue
@@ -61,12 +61,10 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
 
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
-    #print( record )
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
     fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1' )
     fusions.update(get_gene_overlap(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, '2' ))
-    #print( fusions )
     if 'donor' in fusions and 'acceptor' in fusions:
         for donor in fusions['donor']:
             donor_gene, donor_bp = donor.split("\t")

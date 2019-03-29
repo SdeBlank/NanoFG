@@ -64,6 +64,7 @@ POSITIONAL=()
 #GENERAL DEFAULTS
 NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
 PIPELINE_DIR=$NANOFG_DIR/pipeline
+FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
@@ -76,7 +77,7 @@ LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
 WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
 
 #VCF SPLIT DEFAULTS
-VCF_SPLIT_THREADS=8
+VCF_SPLIT_THREADS=1
 VCF_SPLIT_TIME=0:30:0
 VCF_SPLIT_MEMORY=10G
 
@@ -88,7 +89,7 @@ CREATE_FUSION_READ_EXTRACTION_JOBS_MEMORY=5G
 
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$NANOFG_DIR/pipeline/fusion_gene_read_extraction.py
-FUSION_READ_EXTRACTION_THREADS=8
+FUSION_READ_EXTRACTION_THREADS=1
 FUSION_READ_EXTRACTION_TIME=0:10:0
 FUSION_READ_EXTRACTION_MEMORY=5G
 
@@ -110,6 +111,7 @@ BAM_MERGE_MEMORY=10G
 SV_CALLING_THREADS=8
 SV_CALLING_TIME=0:10:0
 SV_CALLING_MEMORY=10G
+SV_CALLING_CONFIG=$FILES_DIR/nanosv_last_config.ini
 
 #FUSION CHECK DEFAULTS
 FUSION_CHECK_SCRIPT=$NANOFG_DIR/pipeline/NanoFG.py
@@ -169,7 +171,7 @@ do
     shift # past value
     ;;
     -w|--wtdbg2_dir)
-    LAST_DIR="$2"
+    WTDBG2_DIR="$2"
     shift # past argument
     shift # past value
     ;;
@@ -369,11 +371,13 @@ MERGE_BAMS_JOBNAME=${VCF_NAME}_MERGE_BAMS
 MERGE_BAMS_SH=$JOBDIR/$MERGE_BAMS_JOBNAME.sh
 MERGE_BAMS_ERR=$LOGDIR/$MERGE_BAMS_JOBNAME.err
 MERGE_BAMS_LOG=$LOGDIR/$MERGE_BAMS_JOBNAME.log
+MERGE_BAMS_OUT=$OUTPUTDIR/consensus_last.sorted.bam
 
 SV_CALLING_JOBNAME=${VCF_NAME}_SV_CALLING
 SV_CALLING_SH=$JOBDIR/$SV_CALLING_JOBNAME.sh
 SV_CALLING_ERR=$LOGDIR/$SV_CALLING_JOBNAME.err
 SV_CALLING_LOG=$LOGDIR/$SV_CALLING_JOBNAME.log
+SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
 
 FUSION_CHECK_JOBNAME=${VCF_NAME}_FUSION_CHECK
 FUSION_CHECK_SH=$JOBDIR/$FUSION_CHECK_JOBNAME.sh
@@ -409,21 +413,21 @@ cat << EOF > $VCF_SPLIT_SH
 
 echo \`date\`: Running on \`uname -n\`
 
-if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done];then
+if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
   if [ -e $VCF ];then
     bash $PIPELINE_DIR/vcf_split.sh \\
     -v $VCF \\
-    -d $SPLITDIR \\
+    -d $VCF_SPLIT_OUTDIR \\
     -l $VCF_SPLIT_LINES \\
   else
     echo "VCF file ($VCF) does not exist"
     exit
   fi
 
-  NUMBER_OF_LINES_VCF=$(grep -v "^#" $VCF | wc -l | grep -oP "(^\d+)")
-  NUMBER_OF_LINES_SPLIT_VCFS=$(cat $SPLITDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")
+  NUMBER_OF_LINES_VCF=\$(grep -v "^#" $VCF | wc -l | grep -oP "(^\d+)")
+  NUMBER_OF_LINES_SPLIT_VCFS=\$(cat $VCF_SPLIT_OUTDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")
 
-  if [ $NUMBER_OF_LINES_VCF == $NUMBER_OF_LINES_SPLIT_VCFS ]; then
+  if [ \$NUMBER_OF_LINES_VCF == \$NUMBER_OF_LINES_SPLIT_VCFS ]; then
     touch $LOGDIR/$VCF_SPLIT_JOBNAME.done
   else
     echo "The total number of SVs in the split vcf files is different from the number of SVs in the original vcf" >&2
@@ -442,26 +446,138 @@ create_fusion_read_extraction_jobs(){
 cat << EOF > $FUSION_READ_EXTRACTION_SH
 #!/bin/bash
 
-#$ -N FUSION_READ_EXTRACTION_JOBNAME
+#$ -N $FUSION_READ_EXTRACTION_JOBNAME
 #$ -cwd
 #$ -t 1:$NUMBER_OF_FILES:1
 #$ -pe threaded $FUSION_READ_EXTRACTION_THREADS
 #$ -l h_vmem=$FUSION_READ_EXTRACTION_MEMORY
 #$ -l h_rt=$FUSION_READ_EXTRACTION_TIME
-#$ -e $FUSION_READ_EXTRACTION_ERR_\${SGE_TASK_ID}
-#$ -o $FUSION_READ_EXTRACTION_LOG_\${SGE_TASK_ID}
+#$ -hold_jid $VCF_SPLIT_JOBNAME
 
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
   if [ ! -e $FUSION_READ_EXTRACTION_JOBNAME.done ]; then
-    bash $SCRIPT_DIR/fusion_gene_read_extraction.py \
+    mkdir -p $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
+    python $SCRIPT_DIR/fusion_gene_read_extraction.py \
     -b $BAM \
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
-    -o $VCF_SPLIT_OUTDIR
+    -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
 
+    touch $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done
+  fi
+fi
 EOF
-#qsub $FUSION_READ_EXTRACTION_SH
+qsub $FUSION_READ_EXTRACTION_SH
 }
 
-create_fusion_read_extraction_jobs
+consensus_mapping(){
+
+cat << EOF > $CONSENSUS_MAPPING_SH
+#!/bin/bash
+
+#$ -N $CONSENSUS_MAPPING_JOBNAME
+#$ -cwd
+#$ -t 1:$NUMBER_OF_FILES:1
+#$ -pe threaded $CONSENSUS_MAPPING_THREADS
+#$ -l h_vmem=$CONSENSUS_MAPPING_MEMORY
+#$ -l h_rt=$CONSENSUS_MAPPING_TIME
+#$ -hold_jid $FUSION_READ_EXTRACTION_JOBNAME
+
+echo \`date\`: Running on \`uname -n\`
+
+if [ -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
+  if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+    for FASTA in $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID/*.fasta; do
+      bash $PIPELINE_DIR/Consensus_building_and_mapping.sh \
+      -f \$FASTA \
+      -t $CONSENSUS_MAPPING_THREADS \
+      -r $CONSENSUS_MAPPING_REFGENOME \
+      -rd $CONSENSUS_MAPPING_REFDICT \
+      -w $WTDBG2_DIR \
+      -ws '$CONSENSUS_MAPPING_WTDBG2_SETTINGS' \
+      -l $LAST_DIR \
+      -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
+      -s $SAMBAMBA
+    done
+
+    touch $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done
+
+  fi
+fi
+EOF
+qsub $CONSENSUS_MAPPING_SH
+}
+
+bam_merge(){
+
+cat << EOF > $MERGE_BAMS_SH
+#!/bin/bash
+
+#$ -N $MERGE_BAMS_JOBNAME
+#$ -cwd
+#$ -pe threaded $BAM_MERGE_THREADS
+#$ -l h_vmem=$BAM_MERGE_MEMORY
+#$ -l h_rt=$BAM_MERGE_TIME
+#$ -e $MERGE_BAMS_ERR
+#$ -o $MERGE_BAMS_LOG
+#$ -hold_jid $CONSENSUS_MAPPING_JOBNAME
+
+echo \`date\`: Running on \`uname -n\`
+
+if [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+  if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+    bash $PIPELINE_DIR/bam_merge.sh \
+      -d $VCF_SPLIT_OUTDIR \
+      -s $SAMBAMBA \
+      -o $MERGE_BAMS_OUT
+
+    touch $LOGDIR/$MERGE_BAMS_JOBNAME.done
+  fi
+fi
+EOF
+qsub $MERGE_BAMS_SH
+}
+
+sv_calling() {
+cat << EOF > $SV_CALLING_SH
+#!/bin/bash
+#$ -N $SV_CALLING_JOBNAME
+#$ -cwd
+#$ -pe threaded $SV_CALLING_THREADS
+#$ -l h_vmem=$SV_CALLING_MEMORY
+#$ -l h_rt=$SV_CALLING_TIME
+#$ -e $SV_CALLING_ERR
+#$ -o $SV_CALLING_LOG
+EOF
+
+if [ ! -z $MERGE_BAMS_JOBNAME ]; then
+cat << EOF >> $SV_CALLING_SH
+#$ -hold_jid $MERGE_BAMS_JOBNAME
+EOF
+fi
+
+cat << EOF >> $SV_CALLING_SH
+echo \`date\`: Running on \`uname -n\`
+if [ -e $MERGE_BAMS_JOBNAME.done ]; then
+    bash $PIPELINE_DIR/sv_calling.sh -b $MERGE_BAMS_OUT -t $SV_CALLING_THREADS -s $SAMBAMBA -v $VENV -c $SV_CALLING_CONFIG -o $SV_CALLING_OUT
+    NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
+    if [ \$NUMBER_OF_LINES_VCF != 0 ]; then
+      touch $SV_CALLING_OUT.done
+    fi
+fi
+echo \`date\`: Done
+EOF
+qsub $SV_CALLING_SH
+}
+
+
+#vcf_split
+
+#create_fusion_read_extraction_jobs
+
+#consensus_mapping
+
+#bam_merge
+
+sv_calling

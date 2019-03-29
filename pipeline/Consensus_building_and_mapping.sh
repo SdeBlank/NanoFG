@@ -109,6 +109,7 @@ MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
 
 if [ -z $LAST_SETTINGS_OVERRIDE ];then
   LAST_SETTINGS=$(echo $LAST_SETTINGS | sed -e "s/-p [^ ]\+/-p ${LAST_PARAMS}/")
+fi
 
 WTDBG2=${WTDBG2_DIR}/wtdbg2
 WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
