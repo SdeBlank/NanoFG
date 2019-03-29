@@ -8,6 +8,7 @@ Required parameters:
 Optional parameters:
     -h|--help		Shows help
     -t|--threads	Number of threads [$THREADS]
+    -n|--nanosv   Path to NanoSV [$NANOSV]
     -s|--sambamba	Path to sambamba [$SAMBAMBA]
     -v|--venv		Path to virtual env of NanoSV [$VENV]
     -c|--config		Path to config file [$CONFIG]
@@ -22,6 +23,7 @@ NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
 FILES_DIR=$NANOFG_DIR/files
 
 THREADS=1
+NANOSV='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
 SAMBAMBA='/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba'
 OUTPUT='/dev/stdout'
 VENV=$NANOFG_DIR/venv/bin/activate
@@ -84,7 +86,7 @@ echo `date`: Running on `uname -n`
 
 . $VENV
 
-NanoSV  \
+python $NANOSV  \
 -s $SAMBAMBA \
 -c $CONFIG \
 -t $THREADS \
