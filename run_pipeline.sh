@@ -11,8 +11,9 @@ Optional parameters:
 GENERAL
     -h|--help                                                                     Shows help
     -o|--outputdir                                                                Path to output directory
-    -d|--nanofg_dir                                                         Directory that contains NanoFG [$NANOFG_DIR]
+    -d|--nanofg_dir                                                               Directory that contains NanoFG [$NANOFG_DIR]
     -e|--venv                                                                     Path to virtual environment[$VENV]
+    -m|--mail                                                                     Email adress
     -dc|--dont_clean                                                              Don't clean up the intermediate files []
 
 REQUIRED TOOLS
@@ -52,6 +53,8 @@ SV CALLING
     -schr|sv_calling_h_rt                                                          SV calling time
 
 FUSION CHECK
+    -fcio|--fusion_check_info_output
+    -fcvo|--fusion_check_vcf_output
     -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$SCRIPT]
     -fct|--fusion_check_threads                                                   VCF output file [$OUTPUT]
     -fchv|--fusion_check_h_vmem                                                   VCF output file [$OUTPUT]
@@ -119,6 +122,10 @@ FUSION_CHECK_THREADS=8
 FUSION_CHECK_TIME=0:20:0
 FUSION_CHECK_MEMORY=10G
 
+#CHECK NANOFG DEFAULTS
+CHECK_NANOFG_THREADS=1
+CHECK_NANOFG_TIME=0:5:0
+CHECK_NANOFG_MEMORY=5G
 
 
 while [[ $# -gt 0 ]]
@@ -153,6 +160,11 @@ do
     ;;
     -e|--venv)
     VENV="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -m|--mail)
+    MAIL="$2"
     shift # past argument
     shift # past value
     ;;
@@ -280,6 +292,16 @@ do
     shift # past argument
     shift # past value
     ;;
+    -fcio|--fusion_check_info_output)
+    FUSION_CHECK_INFO_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -fcvo|--fusion_check_vcf_output)
+    FUSION_CHECK_VCF_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -fcs|--fusion_check_script)
     FUSION_CHECK_SCRIPT="$2"
     shift # past argument
@@ -318,6 +340,17 @@ if [ -z $BAM ]; then
     usage
     exit
 fi
+
+if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
+    FUSION_CHECK_VCF_OUTPUT=./$(basename $VCF)
+    FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_VCF_OUTPUT/.vcf/_FusionGenes.vcf}
+fi
+
+if [ -z $FUSION_CHECK_INFO_OUTPUT ]; then
+    FUSION_CHECK_INFO_OUTPUT=./$(basename $VCF)
+    FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_INFO_OUTPUT/.vcf/_FusionGenesInfo.txt}
+fi
+
 NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
 
 if [ -z $VCF_SPLIT_LINES ]; then
@@ -384,6 +417,12 @@ FUSION_CHECK_SH=$JOBDIR/$FUSION_CHECK_JOBNAME.sh
 FUSION_CHECK_ERR=$LOGDIR/$FUSION_CHECK_JOBNAME.err
 FUSION_CHECK_LOG=$LOGDIR/$FUSION_CHECK_JOBNAME.log
 
+CHECK_NANOFG_JOBNAME=${VCF_NAME}_CHECKSHARC
+CHECK_NANOFG_SH=$JOBDIR/$CHECK_NANOFG_JOBNAME.sh
+CHECK_NANOFG_ERR=$LOGDIR/$CHECK_NANOFG_JOBNAME.err
+CHECK_NANOFGC_LOG=$LOGDIR/$CHECK_NANOFG_JOBNAME.log
+CHECK_NANOFG_OUT=$OUTPUTDIR/$VCF_NAME'.check'
+
 mkdir -p $VCF_SPLIT_OUTDIR
 if [ ! -d $VCF_SPLIT_OUTDIR ]; then
     exit
@@ -415,10 +454,10 @@ echo \`date\`: Running on \`uname -n\`
 
 if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
   if [ -e $VCF ];then
-    bash $PIPELINE_DIR/vcf_split.sh \\
-    -v $VCF \\
-    -d $VCF_SPLIT_OUTDIR \\
-    -l $VCF_SPLIT_LINES \\
+    bash $PIPELINE_DIR/vcf_split.sh \
+    -v $VCF \
+    -d $VCF_SPLIT_OUTDIR \
+    -l $VCF_SPLIT_LINES \
   else
     echo "VCF file ($VCF) does not exist"
     exit
@@ -457,14 +496,14 @@ cat << EOF > $FUSION_READ_EXTRACTION_SH
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
-  if [ ! -e $FUSION_READ_EXTRACTION_JOBNAME.done ]; then
+  if [ ! -e $FUSION_READ_EXTRACTION_JOBNAME_\$SGE_TASK_ID.done ]; then
     mkdir -p $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
     python $SCRIPT_DIR/fusion_gene_read_extraction.py \
     -b $BAM \
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
     -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
 
-    touch $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done
+    touch $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME_\$SGE_TASK_ID.done
   fi
 fi
 EOF
@@ -487,7 +526,7 @@ cat << EOF > $CONSENSUS_MAPPING_SH
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
-  if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+  if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME_\$SGE_TASK_ID.done ]; then
     for FASTA in $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID/*.fasta; do
       bash $PIPELINE_DIR/Consensus_building_and_mapping.sh \
       -f \$FASTA \
@@ -501,7 +540,7 @@ if [ -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
       -s $SAMBAMBA
     done
 
-    touch $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done
+    touch $LOGDIR/$CONSENSUS_MAPPING_JOBNAME_\$SGE_TASK_ID.done
 
   fi
 fi
@@ -563,7 +602,7 @@ if [ -e $MERGE_BAMS_JOBNAME.done ]; then
     bash $PIPELINE_DIR/sv_calling.sh -b $MERGE_BAMS_OUT -t $SV_CALLING_THREADS -s $SAMBAMBA -v $VENV -c $SV_CALLING_CONFIG -o $SV_CALLING_OUT
     NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
     if [ \$NUMBER_OF_LINES_VCF != 0 ]; then
-      touch $SV_CALLING_OUT.done
+      touch $LOGDIR/$SV_CALLING_JOBNAME.done
     fi
 fi
 echo \`date\`: Done
@@ -571,7 +610,146 @@ EOF
 qsub $SV_CALLING_SH
 }
 
+fusion_check() {
+cat << EOF > $FUSION_CHECK_SH
+#!/bin/bash
+#$ -N $FUSION_CHECK_JOBNAME
+#$ -cwd
+#$ -pe threaded $FUSION_CHECK_THREADS
+#$ -l h_vmem=$FUSION_CHECK_MEMORY
+#$ -l h_rt=$FUSION_CHECK_TIME
+#$ -e $FUSION_CHECK_ERR
+#$ -o $FUSION_CHECK_LOG
+#$ -hold_jid $SV_CALLING_JOBNAME
 
+echo \`date\`: Running on \`uname -n\`
+if [ -e $SV_CALLING_OUT.done ];then
+  bash $PIPELINE_DIR/fusion_check.sh -v $SV_CALLING_OUT -o $FUSION_CHECK_VCF_OUTPUT -fo $FUSION_CHECK_INFO_OUTPUT -s $FUSION_CHECK_SCRIPT -e $VENV
+
+  NUMBER_VCF_INPUT=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
+  NUMBER_VCF_OUTPUT=\$(grep -v "^#" $FUSION_CHECK_VCF_OUTPUT | wc -l | grep -oP "(^\d+)")
+  FINISHED="\$(tail -n 1 \$LOGFILE | grep -o End)"
+
+  if [ -z \$FINISHED ]; then
+    echo "NanoFG did not complete; Increase NANOFG_SPLIT_MEM or NANOFG_SPLIT_TIME" >&2
+    exit
+  else
+    if [ $NUMBER_OF_LINES_VCF_1 != $NUMBER_OF_LINES_VCF_2 ]; then
+      echo "Number of lines in all split VCF files is not equal to the number of lines in the original VCF file"
+      exit
+    else; then
+      touch $LOGDIR/$FUSION_CHECK_JOBNAME.done
+    fi
+  fi
+fi
+echo \`date\`: Done
+EOF
+qsub $FUSION_CHECK_SH
+}
+
+check_NanoFG() {
+cat << EOF > $CHECK_NANOFG_SH
+#!/bin/bash
+#$ -N $CHECK_NANOFG_JOBNAME
+#$ -cwd
+#$ -pe threaded $CHECK_NANOFG_THREADS
+#$ -l h_vmem=$CHECK_NANOFG_MEMORY
+#$ -l h_rt=$CHECK_NANOFG_TIME
+#$ -e $CHECK_NANOFG_ERR
+#$ -o $CHECK_NANOFG_LOG
+#$ -hold_jid $FUSION_CHECK_JOBNAME
+
+echo \`date\`: Running on \`uname -n\`
+CHECK_BOOL=true
+echo "------------------------------------------------" >> $CHECK_SHARC_OUT
+echo "\`date\`" >> $CHECK_SHARC_OUT
+echo "Sample name: $VCF_NAME" >> $CHECK_SHARC_OUT
+
+if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
+    echo "Vcf split: Done" >> $CHECK_SHARC_OUT
+else
+    echo "Vcf split: Fail" >> $CHECK_SHARC_OUT
+    CHECK_BOOL=false
+fi
+
+NUMBER_OF_FUSION_READ_EXTRACTION_JOBS=\$(ls $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
+if [ \$NUMBER_OF_FUSION_READ_EXTRACTION_JOBS==$NUMBER_OF_FILES ] && [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+    echo "Fusion read extraction: Done" >> $CHECK_SHARC_OUT
+else
+  echo "Fusion read extraction: Fail" >> $CHECK_SHARC_OUT
+  CHECK_BOOL=false
+fi
+
+NUMBER_OF_CONSENSUS_MAPPING_JOBS=\$(ls $LOGDIR/$CONSENSUS_MAPPING_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
+if [ \$NUMBER_OF_CONSENSUS_MAPPING_JOBS==$NUMBER_OF_FILES ] && [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+    echo "Consensus mapping: Done" >> $CHECK_SHARC_OUT
+else
+    echo "Consensus mapping: Fail" >> $CHECK_SHARC_OUT
+    CHECK_BOOL=false
+fi
+
+if [ -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+    echo "Bam merge: Done" >> $CHECK_SHARC_OUT
+else
+    echo "Bam merge: Fail" >> $CHECK_SHARC_OUT
+    CHECK_BOOL=false
+fi
+
+if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
+    echo "SV calling: Done" >> $CHECK_SHARC_OUT
+else
+    echo "SV calling: Fail" >> $CHECK_SHARC_OUT
+    CHECK_BOOL=false
+fi
+
+if [ -e $LOGDIR/$FUSION_CHECK_JOBNAME.done ]; then
+    echo "Fusion check: Done" >> $CHECK_SHARC_OUT
+else
+    echo "Fusion check: Fail" >> $CHECK_SHARC_OUT
+    CHECK_BOOL=false
+fi
+
+if [ \$CHECK_BOOL = true ]; then
+    touch $LOGDIR/$CHECK_NANOFG_JOBNAME.done
+    if [ $DONT_CLEAN = false ]; then
+      rm -rf $SPLITDIR
+      rm $MERGE_BAMS_OUT
+      rm $SV_CALLING_OUT
+    fi
+fi
+
+if [ -z $MAIL ]; then
+  tac $CHECK_SHARC_OUT | sed '/^Qsub/q' | tac | mail -s 'NANOFG_${VCF_NAME}' $MAIL
+fi
+
+echo \`date\`: Done
+
+sleep 20
+EOF
+qsub $CHECK_NANOFG_SH
+}
+
+if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
+    vcf_split
+fi
+if [ ! -e $LOGDIR/$FUSION_READ_EXRACTION_JOBNAME.done ]; then
+    vcf_split
+fi
+if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+    vcf_split
+fi
+if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+    vcf_split
+fi
+if [ ! -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
+    vcf_split
+fi
+if [ ! -e $LOGDIR/$FUSION_CHECK_JOBNAME.done ]; then
+    vcf_split
+fi
+if [ ! -e $LOGDIR/$CHECK_NANOFG_JOBNAME.done ]; then
+    vcf_split
+fi
 #vcf_split
 
 #create_fusion_read_extraction_jobs
@@ -580,4 +758,4 @@ qsub $SV_CALLING_SH
 
 #bam_merge
 
-sv_calling
+#sv_calling
