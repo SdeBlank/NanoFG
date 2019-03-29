@@ -1,4 +1,4 @@
-#!/bin/bash
+CHECK_NANOFG_OUT#!/bin/bash
 
 usage() {
 echo "
@@ -579,6 +579,7 @@ if [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
     touch $LOGDIR/$MERGE_BAMS_JOBNAME.done
   fi
 fi
+echo \`date\`: Done
 EOF
 qsub $MERGE_BAMS_SH
 }
@@ -666,51 +667,51 @@ cat << EOF > $CHECK_NANOFG_SH
 
 echo \`date\`: Running on \`uname -n\`
 CHECK_BOOL=true
-echo "------------------------------------------------" >> $CHECK_SHARC_OUT
-echo "\`date\`" >> $CHECK_SHARC_OUT
-echo "Sample name: $VCF_NAME" >> $CHECK_SHARC_OUT
+echo "------------------------------------------------" >> $CHECK_NANOFG_OUT
+echo "\`date\`" >> $CHECK_NANOFG_OUT
+echo "Sample name: $VCF_NAME" >> $CHECK_NANOFG_OUT
 
 if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
-    echo "Vcf split: Done" >> $CHECK_SHARC_OUT
+    echo "Vcf split: Done" >> $CHECK_NANOFG_OUT
 else
-    echo "Vcf split: Fail" >> $CHECK_SHARC_OUT
+    echo "Vcf split: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
 NUMBER_OF_FUSION_READ_EXTRACTION_JOBS=\$(ls $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
 if [ \$NUMBER_OF_FUSION_READ_EXTRACTION_JOBS==$NUMBER_OF_FILES ] && [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-    echo "Fusion read extraction: Done" >> $CHECK_SHARC_OUT
+    echo "Fusion read extraction: Done" >> $CHECK_NANOFG_OUT
 else
-  echo "Fusion read extraction: Fail" >> $CHECK_SHARC_OUT
+  echo "Fusion read extraction: Fail" >> $CHECK_NANOFG_OUT
   CHECK_BOOL=false
 fi
 
 NUMBER_OF_CONSENSUS_MAPPING_JOBS=\$(ls $LOGDIR/$CONSENSUS_MAPPING_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
 if [ \$NUMBER_OF_CONSENSUS_MAPPING_JOBS==$NUMBER_OF_FILES ] && [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-    echo "Consensus mapping: Done" >> $CHECK_SHARC_OUT
+    echo "Consensus mapping: Done" >> $CHECK_NANOFG_OUT
 else
-    echo "Consensus mapping: Fail" >> $CHECK_SHARC_OUT
+    echo "Consensus mapping: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
 if [ -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
-    echo "Bam merge: Done" >> $CHECK_SHARC_OUT
+    echo "Bam merge: Done" >> $CHECK_NANOFG_OUT
 else
-    echo "Bam merge: Fail" >> $CHECK_SHARC_OUT
+    echo "Bam merge: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
 if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
-    echo "SV calling: Done" >> $CHECK_SHARC_OUT
+    echo "SV calling: Done" >> $CHECK_NANOFG_OUT
 else
-    echo "SV calling: Fail" >> $CHECK_SHARC_OUT
+    echo "SV calling: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
 if [ -e $LOGDIR/$FUSION_CHECK_JOBNAME.done ]; then
-    echo "Fusion check: Done" >> $CHECK_SHARC_OUT
+    echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
 else
-    echo "Fusion check: Fail" >> $CHECK_SHARC_OUT
+    echo "Fusion check: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
@@ -724,7 +725,7 @@ if [ \$CHECK_BOOL = true ]; then
 fi
 
 if [ -z $MAIL ]; then
-  tac $CHECK_SHARC_OUT | sed '/^Qsub/q' | tac | mail -s 'NANOFG_${VCF_NAME}' $MAIL
+  tac $CHECK_NANOFG_OUT | sed '/^Qsub/q' | tac | mail -s 'NANOFG_${VCF_NAME}' $MAIL
 fi
 
 echo \`date\`: Done
@@ -741,9 +742,11 @@ if [ ! -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
     fusion_read_extraction
 fi
 if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+    mv $FUSION_READ_EXTRACTION_JOBNAME.* $LOGDIR
     consensus_mapping
 fi
 if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+    mv $CONSENSUS_MAPPING_JOBNAME.* $LOGDIR
     bam_merge
 fi
 if [ ! -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
