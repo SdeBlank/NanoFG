@@ -72,7 +72,7 @@ FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
-OUTPUTDIR='$(realpath ./)'
+OUTPUTDIR=$(realpath ./)
 echo $OUTPUTDIR
 DONT_CLEAN=false
 
