@@ -762,3 +762,5 @@ fi
 if [ ! -e $LOGDIR/$CHECK_NANOFG_JOBNAME.done ]; then
     check_NanoFG
 fi
+
+echo `date`: Done

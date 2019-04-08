@@ -58,6 +58,7 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
         fasta.write(read.seq+"\n")
         exclude.append(read.query_name)
     fasta.close()
+    bamfile.close()
 
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
