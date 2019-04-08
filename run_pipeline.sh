@@ -639,7 +639,7 @@ if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ];then
 
   NUMBER_VCF_INPUT=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
   NUMBER_VCF_OUTPUT=\$(grep -v "^#" $FUSION_CHECK_VCF_OUTPUT | wc -l | grep -oP "(^\d+)")
-  FINISHED="\$(tail -n 1 \$LOGFILE | grep -o End)"
+  FINISHED="\$(tail -n 1 \$LOGFILE | grep -o Done)"
 
   if [ -z \$FINISHED ]; then
     echo "NanoFG did not complete; Increase NANOFG_SPLIT_MEM or NANOFG_SPLIT_TIME" >&2
