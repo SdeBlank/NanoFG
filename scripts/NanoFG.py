@@ -51,11 +51,11 @@ def parse_vcf(vcf, vcf_output, info_output):
             VCF_WRITER.write_record(record)
 def overlap_annotation(CHROM, POS):
     ### Request genes, transcripts and exons
+
     SERVER='http://grch37.rest.ensembl.org'
     ENDPOINT="/overlap/region/human/"+str(CHROM)+":"+str(POS)+"-"+str(POS)
     HEADERS={"Content-Type" : "application/json"}
     PARAMS={"feature": "transcript"}
-
     genes_data=EnsemblRestClient().perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
 
     UNIQUE_GENES=[]
@@ -72,7 +72,6 @@ def overlap_annotation(CHROM, POS):
 
         ENDPOINT="/lookup/id/"+str(GENE_ID)
         PARAMS={"expand": "1"}
-
         gene_info=EnsemblRestClient().perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
         if gene_info["biotype"]=="protein_coding":
             INFO={}
