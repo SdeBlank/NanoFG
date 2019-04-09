@@ -4,6 +4,7 @@ import argparse
 import vcf as pyvcf
 import pysam
 import sys
+import datetime
 from EnsemblRestClient import EnsemblRestClient
 
 parser = argparse.ArgumentParser()
