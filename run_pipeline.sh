@@ -356,8 +356,8 @@ fi
 NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
 
 if [ -z $VCF_SPLIT_LINES ]; then
-  VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
-  NUMBER_OF_FILES=100
+  VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / 50 + 1)
+  NUMBER_OF_FILES=50
   if [ $VCF_SPLIT_LINES -lt 100 ]; then
     VCF_SPLIT_LINES=100
     NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)

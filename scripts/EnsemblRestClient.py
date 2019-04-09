@@ -24,7 +24,7 @@ class EnsemblRestClient(object):
         x=0
         # check if we need to rate limit ourselves
         if self.req_count >= self.reqs_per_sec:
-            sys.stderr.write("### RATE LIMIT - SELF")
+            sys.stderr.write("### RATE LIMIT - SELF\n")
             delta = time.time() - self.last_req
             if delta < 1:
                 time.sleep(1 - delta)
@@ -42,7 +42,7 @@ class EnsemblRestClient(object):
         except requests.exceptions.HTTPError as error:
             # check if we are being rate limited by the server
             if int(error.response.status_code) == 429:
-                sys.stderr.write("### RATE LIMIT - SERVER")
+                sys.stderr.write("### RATE LIMIT - SERVER\n")
                 if 'Retry-After' in error.response.headers:
                     retry = error.response.headers['Retry-After']
                     time.sleep(float(retry))
@@ -51,16 +51,16 @@ class EnsemblRestClient(object):
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(server+endpoint, error))
 
         except requests.exceptions.ConnectionError as error:
-            sys.stderr.write("### CONNECTION-ERROR")
+            sys.stderr.write("### CONNECTION-ERROR\n")
             time.sleep(1)
             data=self.perform_rest_action(server, endpoint, hdrs, parameters)
 
         if data is None:
-            sys.stderr.write("### DATA IS NONE - UNKNOWN ERROR")
+            sys.stderr.write("### DATA IS NONE - UNKNOWN ERROR\n")
             self.repeat += 1
             if self.repeat <= 5:
                 time.sleep(4)
                 data=self.perform_rest_action(server, endpoint, hdrs, parameters)
             else:
-                sys.stderr.write("Too many tries to connect to the Ensembl database")
+                sys.stderr.write("Too many tries to connect to the Ensembl database\n")
         return data
