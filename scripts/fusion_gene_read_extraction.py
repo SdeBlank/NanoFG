@@ -62,11 +62,15 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
     bamfile.close()
 
 print("Start:", datetime.datetime.now())
+
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
     fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1' )
+    ### Skip next request if the first BND already falls outside of a gene
+    if not fusions:
+        continue
     fusions.update(get_gene_overlap(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, '2' ))
     if 'donor' in fusions and 'acceptor' in fusions:
         for donor in fusions['donor']:
@@ -93,6 +97,7 @@ for record in vcf_reader:
                         acceptor_start = fusions['acceptor'][acceptor]
                         acceptor_end = record.POS
                         create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
+
 print("End:", datetime.datetime.now())
     #create_fasta(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].pos+1000, record.ID, record.INFO['REF_READ_IDS_2'])
     #break
