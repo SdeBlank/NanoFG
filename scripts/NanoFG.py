@@ -169,11 +169,11 @@ def overlap_annotation(CHROM, POS):
                             INTRON_INFO["Rank"]=rank+1
                             INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
                             if INFO["Strand"]==1:
-                                INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
-                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
+                                INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]+1
+                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]-1
                             else:
-                                INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]
-                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]
+                                INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]-1
+                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]+1
                             # INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
                             # INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
                             INTRON_INFO["CDS"]=CDS
