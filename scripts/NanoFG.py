@@ -30,7 +30,7 @@ def parse_vcf(vcf, vcf_output, info_output):
             POS1_ORIENTATION=record.ALT[0].orientation
             POS2_ORIENTATION=record.ALT[0].remoteOrientation
 
-            print(record.ID)
+            #print(record.ID)
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=overlap_annotation(CHROM1, POS1)
             if not breakend1_annotation:
@@ -150,7 +150,7 @@ def overlap_annotation(CHROM, POS):
                                 EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-INFO["CDS_start"])+1
                             else:
                                 EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-INFO["CDS_start"])+1)%3
-                                print("##"+INFO["Gene_name"], EXON_INFO["End"], INFO["CDS_start"], EXON_INFO["Start_phase"], EXON_INFO["End_phase"])
+                                #print("##"+INFO["Gene_name"], EXON_INFO["End"], INFO["CDS_start"], EXON_INFO["Start_phase"], EXON_INFO["End_phase"])
                                 EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-INFO["CDS_start"])+1
                             CDS=True
 
@@ -259,11 +259,9 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                         else:
                             if ORIENTATION:
                                 if sequence["Contains_start_CDS"]:
-                                    print(1)
                                     BND_INFO["Phase"]=(abs(gene["CDS_start"]-POS)+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-gene["CDS_end"])+1
                                 else:
-                                    print(2)
                                     BND_INFO["Phase"]=(abs(sequence["Start"]-POS)+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-sequence["End"])+1
                                 if sequence["Contains_end_CDS"]:
@@ -274,11 +272,9 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                                         BND_INFO["CDS_length"]+=gene["Exons"][rank]["CDS_length"]
                             else:
                                 if sequence["Contains_start_CDS"]:
-                                    print(3)
                                     BND_INFO["Phase"]=(abs(POS-gene["CDS_start"])+1+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-gene["CDS_start"])+1
                                 else:
-                                    print(4)
                                     BND_INFO["Phase"]=(abs(POS-sequence["Start"])+1+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-sequence["Start"])+1
                                 # BND_INFO["Phase"]=(abs(POS-sequence["Start"])+1+sequence["Start_phase"])%3
@@ -523,8 +519,8 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                             continue
                 with open(Output, "a") as outfile:
                     try:
-                        print(annotation1["Gene_name"], annotation1["Phase"])
-                        print(annotation2["Gene_name"], annotation2["Phase"])
+                        #print(annotation1["Gene_name"], annotation1["Phase"])
+                        #print(annotation2["Gene_name"], annotation2["Phase"])
                         outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
 
