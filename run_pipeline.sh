@@ -509,6 +509,7 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
   fi
 fi
+echo \`date\`: Done
 EOF
 qsub $FUSION_READ_EXTRACTION_SH
 }
