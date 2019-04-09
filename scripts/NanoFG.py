@@ -79,16 +79,23 @@ def overlap_annotation(CHROM, POS):
             if "ccdsid" in hit:
                 INFO["CCDS_available"]=True
 
-            if "description" in gene_info:
-                if "readthrough" in gene_info["description"]:
-                    continue
-
             INFO["Gene_id"]=gene_info["id"]
             INFO["Gene_name"]=gene_info["display_name"]
             INFO["Strand"]=gene_info["strand"]
             INFO["Gene_start"]=gene_info["start"]
             INFO["Gene_end"]=gene_info["end"]
             INFO["Chromosome"]=CHROM
+            INFO["Flags"]=[]
+
+            if "description" in gene_info:
+                if "readthrough" in gene_info["description"]:
+                    INFO["Flags"].append("Readthrough")
+
+            if not INFO["CCDS_available"]:
+                INFO["Flags"].append("No CCDS")
+
+            ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or reathrough genes)
+
 
             for transcript in gene_info["Transcript"]:
                 if transcript["is_canonical"]==1:
@@ -180,6 +187,7 @@ def overlap_annotation(CHROM, POS):
                             INFO["Exons"].append(INTRON_INFO)
                     #print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
                     if LENGTH_CDS-3!=transcript["Translation"]["length"]*3:
+                        INFO["Flags"].append("Possible incomplete CDS")
                         print(INFO["Gene_id"] + "\t" + "EXONS DONT ADD UP")                             #If calculated CDS length doesn't resembl the nr of amino acids, most likely it has an incomplete 3' or 5',                                                       #as currently I am unable to request the given ENSEMBL flags. Bias towards incomplete but bases%3=0
             HITS.append(INFO)
     return HITS
