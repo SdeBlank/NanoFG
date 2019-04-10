@@ -323,10 +323,10 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
 
             FLAGS=annotation1["Flags"]+annotation2["Flags"]
 
-            if ((annotation1["gene_start"]>annotation2["gene_start"] and annotation1["gene_start"]<annotation2["gene_end"] and
-                annotation1["gene_end"]>annotation2["gene_start"] and annotation1["gene_end"]<annotation2["gene_end"]) or
-                (annotation2["gene_start"]>annotation1["gene_start"] and annotation2["gene_start"]<annotation1["gene_end"] and
-                annotation2["gene_end"]>annotation1["gene_start"] and annotation2["gene_end"]<annotation1["gene_end"])):
+            if ((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
+                annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
+                (annotation2["Gene_start"]>annotation1["Gene_start"] and annotation2["Gene_start"]<annotation1["Gene_end"] and
+                annotation2["Gene_end"]>annotation1["Gene_start"] and annotation2["Gene_end"]<annotation1["Gene_end"])):
                     FLAGS.append("Gene-within-Gene")
 
             if len(FLAGS)==0:
