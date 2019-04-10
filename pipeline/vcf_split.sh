@@ -80,12 +80,6 @@ fi
 
 echo `date`: Running on `uname -n`
 
-VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
-VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
-
-grep "^#" $VCF > $VCF_NO_INS
-grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
-
 HEADER=$(grep "^#" $VCF_NO_INS)
 AWK="grep -v \"^#\" $VCF_NO_INS | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$SPLITDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
 eval $AWK

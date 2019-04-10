@@ -441,6 +441,7 @@ if [ ! -d $LOGDIR ]; then
     exit
 fi
 
+### Filter out all insertions from the vcf and split them into N files
 vcf_split(){
 cat << EOF > $VCF_SPLIT_SH
 #!/bin/bash
@@ -457,8 +458,15 @@ echo \`date\`: Running on \`uname -n\`
 
 if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
   if [ -e $VCF ];then
+
+    VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
+    VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
+
+    grep "^#" $VCF > \$VCF_NO_INS
+    grep -v "^#" $VCF | awk '$5!="<INS>"' >> \$VCF_NO_INS
+
     bash $PIPELINE_DIR/vcf_split.sh \
-    -v $VCF \
+    -v \$VCF_NO_INS \
     -d $VCF_SPLIT_OUTDIR \
     -l $VCF_SPLIT_LINES
   else
@@ -466,7 +474,7 @@ if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
     exit
   fi
 
-  NUMBER_OF_LINES_VCF=\$(grep -v "^#" $VCF | wc -l | grep -oP "(^\d+)")
+  NUMBER_OF_LINES_VCF=\$(grep -v "^#" \$VCF_NO_INS | wc -l | grep -oP "(^\d+)")
   NUMBER_OF_LINES_SPLIT_VCFS=\$(cat $VCF_SPLIT_OUTDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")
 
   if [ \$NUMBER_OF_LINES_VCF == \$NUMBER_OF_LINES_SPLIT_VCFS ]; then
