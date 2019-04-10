@@ -10,6 +10,7 @@ Optional parameters:
     -o|--outputdir                                                                Path to output directory
     -d|--split_directory        directory that contains NanoFG [$NANOFG_DIR]
     -l|--lines     Number of lines to put in each spit vcf file [Devides vcf in 50 files]
+    -n|--number_of_files
 "
 }
 
@@ -18,6 +19,7 @@ POSITIONAL=()
 #DEFAULTS
 OUTPUTDIR=$(realpath ./)
 SPLITDIR=${OUTPUTDIR}/split_vcf
+NUMBER_OF_FILES=15
 
 while [[ $# -gt 0 ]]
 do
@@ -49,6 +51,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -n|--number_of_files)
+    NUMBER_OF_FILES="$2"
+    shift # past argument
+    shift # past value
+    ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift # past argument
@@ -62,9 +69,10 @@ if [ -z $VCF ]; then
     usage
     exit
 fi
+
 if [ -z $LINES ]; then
   NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-  LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
+  ((LINES = ($NUMBER_OF_SVS + $NUMBER_OF_FILES - 1) / $NUMBER_OF_FILES))
   if [ $LINES -lt 100 ]; then
     LINES=100
   fi
