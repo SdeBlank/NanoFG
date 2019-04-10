@@ -357,13 +357,16 @@ NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
 
 if [ -z $VCF_SPLIT_LINES ]; then
   NUMBER_OF_FILES=15
-  VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / $NUMBER_OF_FILES + 1)           !!!!!!!!!!!!!!!!!! FIND CORRECT WAY TO ROUND UP (+1 after is not good)
+  #VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / $NUMBER_OF_FILES + 1)
+  ((VCF_SPLIT_LINES = ($NUMBER_OF_SVS + $NUMBER_OF_FILES - 1) / $NUMBER_OF_FILES))
   if [ $VCF_SPLIT_LINES -lt 100 ]; then
     VCF_SPLIT_LINES=100
-    NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
+    ((NUMBER_OF_FILES = ($NUMBER_OF_SVS + $VCF_SPLIT_LINES - 1) / $VCF_SPLIT_LINES))
+    #NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
   fi
 else
-  NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
+  #NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
+  ((NUMBER_OF_FILES = ($NUMBER_OF_SVS + $VCF_SPLIT_LINES - 1) / $VCF_SPLIT_LINES))
 fi
 
 echo `date`: Running on `uname -n`
