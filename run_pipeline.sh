@@ -463,7 +463,7 @@ if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
     VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
 
     grep "^#" $VCF > \$VCF_NO_INS
-    grep -v "^#" $VCF | awk '$5!="<INS>"' >> \$VCF_NO_INS
+    grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
 
     bash $PIPELINE_DIR/vcf_split.sh \
     -v \$VCF_NO_INS \
