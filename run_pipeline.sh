@@ -508,8 +508,13 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
     -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
 
-    touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done
-    touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
+    LINES_IN_OUTPUT=\$(wc -l $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID | grep -oP "(^\d+)")
+    if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ] && [ "$LINES_IN_OUTPUT" != "0" ];then
+      touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done
+      touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
+    else
+      echo "$VCF_SPLIT_OUTDIR/\$SGE_TASK_ID does not exist or is empty" >&2
+    fi
   fi
 fi
 echo \`date\`: Done
@@ -517,6 +522,8 @@ EOF
 qsub $FUSION_READ_EXTRACTION_SH
 }
 
+
+#PUT OUTPUTFILE FROM THIS SCRIPT TO MAKE OUTPUT, OTHERWISE CHECKING IF FILES EXIST IS HARDER
 consensus_mapping(){
 
 cat << EOF > $CONSENSUS_MAPPING_SH
