@@ -18,7 +18,7 @@ def parse_vcf(vcf, vcf_output, info_output):
         VCF_READER.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
         VCF_WRITER=pyvcf.Writer(vcf_output, VCF_READER, lineterminator='\n')
         with open(info_output, "w") as outfile:
-            outfile.write("\t".join(["ID","Fusion_type", "ENSEMBL IDS", "5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
+            outfile.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL IDS", "5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
         for record in VCF_READER:
             # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
@@ -314,13 +314,16 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
     POS2=Record.ALT[0].pos
 
     FUSIONS={}
-
     for annotation1 in Breakend1:
         annotation1["BND"]=str(CHROM1)+":"+str(POS1)
         for annotation2 in Breakend2:
             # print(annotation1)
             # print(annotation2)
             annotation2["BND"]=str(CHROM2)+":"+str(POS2)
+
+            FLAGS=annotation1["Flags"]+annotation2["Flags"]
+            if len(FLAGS)==0:
+                FLAGS=["None"]
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
             (POS1 > annotation1["Gene_start"] and POS1 < annotation1["Gene_end"] and POS2 > annotation1["Gene_start"] and POS2 < annotation1["Gene_end"] and
@@ -528,7 +531,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                     try:
                         #print(annotation1["Gene_name"], annotation1["Phase"])
                         #print(annotation2["Gene_name"], annotation2["Phase"])
-                        outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
+                        outfile.write("\t".join([str(Record.ID), FUSION_TYPE, ";".join(FLAGS), FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
 
                         FUSIONS[FIVE_PRIME_GENE["Gene_name"]+"-"+THREE_PRIME_GENE["Gene_name"]]=0
