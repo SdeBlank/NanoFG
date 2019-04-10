@@ -80,8 +80,9 @@ fi
 
 echo `date`: Running on `uname -n`
 
-HEADER=$(grep "^#" $VCF_NO_INS)
-AWK="grep -v \"^#\" $VCF_NO_INS | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$SPLITDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
+HEADER=$(grep "^#" $VCF)
+AWK="grep -v \"^#\" $VCF | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$SPLITDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
+
 eval $AWK
 
 echo `date`: Done
