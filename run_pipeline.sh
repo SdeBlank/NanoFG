@@ -516,8 +516,7 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
     -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
 
-    LINES_IN_OUTPUT=\$(wc -l $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID | grep -oP "(^\d+)")
-    if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ] && [ "$LINES_IN_OUTPUT" != "0" ];then
+    if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ];then
       touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done
       touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
     else

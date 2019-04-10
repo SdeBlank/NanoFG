@@ -322,12 +322,19 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
             annotation2["BND"]=str(CHROM2)+":"+str(POS2)
 
             FLAGS=annotation1["Flags"]+annotation2["Flags"]
+
+            if ((annotation1["gene_start"]>annotation2["gene_start"] and annotation1["gene_start"]<annotation2["gene_end"] and
+                annotation1["gene_end"]>annotation2["gene_start"] and annotation1["gene_end"]<annotation2["gene_end"]) or
+                (annotation2["gene_start"]>annotation1["gene_start"] and annotation2["gene_start"]<annotation1["gene_end"] and
+                annotation2["gene_end"]>annotation1["gene_start"] and annotation2["gene_end"]<annotation1["gene_end"])):
+                    FLAGS.append("Gene-within-Gene")
+
             if len(FLAGS)==0:
                 FLAGS=["None"]
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
-            (POS1 > annotation1["Gene_start"] and POS1 < annotation1["Gene_end"] and POS2 > annotation1["Gene_start"] and POS2 < annotation1["Gene_end"] and
-            POS1 > annotation2["Gene_start"] and POS1 < annotation2["Gene_end"] and POS2 > annotation2["Gene_start"] and POS2 < annotation2["Gene_end"] and
+                (POS1 > annotation1["Gene_start"] and POS1 < annotation1["Gene_end"] and POS2 > annotation1["Gene_start"] and POS2 < annotation1["Gene_end"] and
+                POS1 > annotation2["Gene_start"] and POS1 < annotation2["Gene_end"] and POS2 > annotation2["Gene_start"] and POS2 < annotation2["Gene_end"] and
             annotation1["Strand"]==annotation2["Strand"])):
                 if annotation1["Order"]=="5'" and annotation2["Order"]=="3'":
                     FIVE_PRIME_GENE=annotation1
