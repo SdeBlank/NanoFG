@@ -460,7 +460,7 @@ if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
   if [ -e $VCF ];then
 
     VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
-    VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
+    VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
 
     grep "^#" $VCF > \$VCF_NO_INS
     grep -v "^#" $VCF | awk '$5!="<INS>"' >> \$VCF_NO_INS
