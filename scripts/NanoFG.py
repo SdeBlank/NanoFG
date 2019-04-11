@@ -30,7 +30,7 @@ def parse_vcf(vcf, vcf_output, info_output):
             POS1_ORIENTATION=record.ALT[0].orientation
             POS2_ORIENTATION=record.ALT[0].remoteOrientation
 
-            #print(record.ID)
+            print(record.ID)
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=overlap_annotation(CHROM1, POS1)
             if not breakend1_annotation:
@@ -47,7 +47,7 @@ def parse_vcf(vcf, vcf_output, info_output):
 
             if len(RECORD_FUSIONS)>0:
                 #record.INFO["FUSION"]=":".join(RECORD_FUSIONS.keys())
-                record.INFO["FUSION"]=list(RECORD_FUSIONS.keys())
+                record.INFO["FUSION"]=list(RECORD_FUSIONS.values())
             VCF_WRITER.write_record(record)
 def overlap_annotation(CHROM, POS):
     ### Request genes, transcripts and exons
@@ -95,8 +95,9 @@ def overlap_annotation(CHROM, POS):
 
             for transcript in gene_info["Transcript"]:
                 if transcript["is_canonical"]==1:
-                    if transcript_ccds[transcript["id"]] is None:
-                        INFO["Flags"].append("No CCDS")
+                    if transcript["id"] in transcript_ccds:
+                        if transcript_ccds[transcript["id"]] is None:
+                            INFO["Flags"].append("No CCDS")
                     LENGTH_CDS=0
                     CDS=False
                     INFO["Transcript_id"]=transcript["id"]
@@ -541,7 +542,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                         outfile.write("\t".join([str(Record.ID), FUSION_TYPE, ";".join(FLAGS), FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
 
-                        FUSIONS[FIVE_PRIME_GENE["Gene_name"]+"-"+THREE_PRIME_GENE["Gene_name"]]=0
+                        FUSIONS[FIVE_PRIME_GENE["Gene_name"]+"-"+THREE_PRIME_GENE["Gene_name"]]=FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"]
                         #outfile.write("\t".join([str(Record.ID), FUSION_TYPE, FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         #THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
                         # print(annotation1)
