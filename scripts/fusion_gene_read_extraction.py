@@ -22,7 +22,7 @@ def get_gene_overlap( chr, pos, ori, bp ):
     HEADERS={"Content-Type" : "application/json"}
     PARAMS={"feature": "gene"}
 
-    genes_data=EnsemblRestClient().perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
+    genes_data=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
 
     fusions = dict()
 
@@ -63,6 +63,7 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
 
 print("Start:", datetime.datetime.now())
 
+EnsemblRestClient=EnsemblRestClient()
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):

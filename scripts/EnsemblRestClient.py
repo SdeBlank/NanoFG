@@ -4,7 +4,7 @@ import time
 import sys
 
 class EnsemblRestClient(object):
-    def __init__(self, reqs_per_sec=10):
+    def __init__(self, reqs_per_sec=15):
         #self.server = server
         self.reqs_per_sec = reqs_per_sec
         self.req_count = 0

@@ -56,7 +56,7 @@ def overlap_annotation(CHROM, POS):
     ENDPOINT="/overlap/region/human/"+str(CHROM)+":"+str(POS)+"-"+str(POS)
     HEADERS={"Content-Type" : "application/json"}
     PARAMS={"feature": "transcript"}
-    genes_data=EnsemblRestClient().perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
+    genes_data=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
 
     UNIQUE_GENES=[]
     UNIQUE_GENE_IDS=[]
@@ -72,7 +72,7 @@ def overlap_annotation(CHROM, POS):
 
         ENDPOINT="/lookup/id/"+str(GENE_ID)
         PARAMS={"expand": "1"}
-        gene_info=EnsemblRestClient().perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
+        gene_info=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
         if gene_info["biotype"]=="protein_coding":
             INFO={}
             INFO["CCDS_available"]=False
@@ -549,9 +549,11 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                     except:
                         continue
     return FUSIONS
+
 print("Start:", datetime.datetime.now())
 VCF_IN=args.vcf
 VCF_OUTPUT=args.output
 INFO_OUTPUT=args.fusion_output
+EnsemblRestClient=EnsemblRestClient()
 parse_vcf(VCF_IN, VCF_OUTPUT, INFO_OUTPUT)
 print("End:", datetime.datetime.now())
