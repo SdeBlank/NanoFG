@@ -61,24 +61,20 @@ def overlap_annotation(CHROM, POS):
     UNIQUE_GENES=[]
     UNIQUE_GENE_IDS=[]
     for hit in genes_data:
-        if hit["Parent"] not in UNIQUE_GENE_IDS:
+        if hit["Parent"] not in UNIQUE_GENE_IDS and hit["biotype"]=="protein_coding":
             UNIQUE_GENES.append(hit)
             UNIQUE_GENE_IDS.append(hit["Parent"])
 
     HITS=[]
     for hit in UNIQUE_GENES:
         #print(hit)
-        GENE_ID=hit["Parent"]
 
+        GENE_ID=hit["Parent"]
         ENDPOINT="/lookup/id/"+str(GENE_ID)
         PARAMS={"expand": "1"}
         gene_info=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
         if gene_info["biotype"]=="protein_coding":
             INFO={}
-            INFO["CCDS_available"]=False
-            if "ccdsid" in hit:
-                INFO["CCDS_available"]=True
-
             INFO["Gene_id"]=gene_info["id"]
             INFO["Gene_name"]=gene_info["display_name"]
             INFO["Strand"]=gene_info["strand"]
@@ -91,7 +87,7 @@ def overlap_annotation(CHROM, POS):
                 if "readthrough" in gene_info["description"]:
                     INFO["Flags"].append("Readthrough")
 
-            if not INFO["CCDS_available"]:
+            if "ccdsid" not in hit::
                 INFO["Flags"].append("No CCDS")
 
             ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or reathrough genes)
@@ -354,7 +350,9 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                                 else:
                                     FUSION_TYPE="intron-intron"
                             elif annotation1["Type"]=="exon":
-                                FUSION_TYPE="exon-exon (OUT OF PHASE)"
+                                FUSION_TYPE="exon-exon (OUT OF FRAME)"
+                            elif annotation1["Type"]=="intron"
+                                FUSION_TYPE="exon-exon (OUT OF FRAME)"
                             else:
                                 continue
                         elif annotation1["Type"]=="exon" and annotation2["Type"]=="intron":
@@ -368,7 +366,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                                 for rank in range((annotation1["Rank"]*2)-1, len(annotation1["Exons"])):
                                     if annotation1["Exons"][rank]["Type"]=="exon":
                                         annotation1["CDS_length"]+=annotation1["Exons"][rank]["CDS_length"]
-                                FUSION_TYPE="exon-intron"
+                                FUSION_TYPE="intron-exon"
                             else:
                                 continue
                         elif annotation2["Type"]=="exon" and annotation1["Type"]=="intron":
@@ -382,7 +380,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                                 for rank in range((annotation2["Rank"]*2)-1, len(annotation2["Exons"])):
                                     if annotation2["Exons"][rank]["Type"]=="exon":
                                         annotation2["CDS_length"]+=annotation2["Exons"][rank]["CDS_length"]
-                                FUSION_TYPE="exon-intron"
+                                FUSION_TYPE="intron-exon"
                             else:
                                 continue
                         elif annotation1["Breakpoint_location"]=="5'UTR" and annotation1["Type"]==annotation2["Type"]:
