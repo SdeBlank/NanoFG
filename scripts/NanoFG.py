@@ -58,18 +58,21 @@ def overlap_annotation(CHROM, POS):
     PARAMS={"feature": "transcript"}
     genes_data=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
 
+    transcript_ccds={}
     UNIQUE_GENES=[]
-    UNIQUE_GENE_IDS=[]
     for hit in genes_data:
-        if hit["Parent"] not in UNIQUE_GENE_IDS and hit["biotype"]=="protein_coding":
-            UNIQUE_GENES.append(hit)
-            UNIQUE_GENE_IDS.append(hit["Parent"])
+        if hit["biotype"]=="protein_coding":
+            if "ccdsid" in hit:
+                transcript_ccds[hit["id"]]=hit["ccdsid"]
+            else:
+                transcript_ccds[hit["id"]]=None
+
+            if hit["Parent"] not in UNIQUE_GENES:
+                UNIQUE_GENES.append(hit["Parent"])
 
     HITS=[]
-    for hit in UNIQUE_GENES:
-        #print(hit)
-
-        GENE_ID=hit["Parent"]
+    for GENE_ID in UNIQUE_GENES:
+        #GENE_ID=hit
         ENDPOINT="/lookup/id/"+str(GENE_ID)
         PARAMS={"expand": "1"}
         gene_info=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
@@ -87,14 +90,13 @@ def overlap_annotation(CHROM, POS):
                 if "readthrough" in gene_info["description"]:
                     INFO["Flags"].append("Readthrough")
 
-            if "ccdsid" not in hit::
-                INFO["Flags"].append("No CCDS")
-
-            ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or reathrough genes)
+            ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or readthrough genes)
 
 
             for transcript in gene_info["Transcript"]:
                 if transcript["is_canonical"]==1:
+                    if transcript_ccds[transcript["id"]] is None:
+                        INFO["Flags"].append("No CCDS")
                     LENGTH_CDS=0
                     CDS=False
                     INFO["Transcript_id"]=transcript["id"]
@@ -351,7 +353,7 @@ def fusion_check(Record, Breakend1, Breakend2, Orientation1, Orientation2, Outpu
                                     FUSION_TYPE="intron-intron"
                             elif annotation1["Type"]=="exon":
                                 FUSION_TYPE="exon-exon (OUT OF FRAME)"
-                            elif annotation1["Type"]=="intron"
+                            elif annotation1["Type"]=="intron":
                                 FUSION_TYPE="exon-exon (OUT OF FRAME)"
                             else:
                                 continue
