@@ -10,6 +10,7 @@ class EnsemblRestClient(object):
         self.req_count = 0
         self.last_req = 0
         self.repeat = 0
+        self.req_times=[]
 
     def perform_rest_action(self, server, endpoint, hdrs=None, parameters=None):
         if hdrs is None:
@@ -21,23 +22,32 @@ class EnsemblRestClient(object):
         if parameters is None:
             parameters = {}
         data = None
-        x=0
         # check if we need to rate limit ourselves
-        if self.req_count >= self.reqs_per_sec:
-            sys.stderr.write("### RATE LIMIT - SELF\n")
-            delta = time.time() - self.last_req
-            if delta < 1:
-                time.sleep(1 - delta)
-            self.last_req = time.time()
-            self.req_count = 0
+        if len(self.req_times)==self.reqs_per_sec:
+            print(abs(self.req_times[0]-self.req_times[self.reqs_per_sec-1]))
+            if abs(self.req_times[0]-self.req_times[self.reqs_per_sec-1]) < 1:
+                sys.stderr.write("### RATE LIMIT - SELF\n")
+                delta = time.time() - self.last_req
+                if delta < 1:
+                    time.sleep(1 - delta)
+                self.last_req = time.time()
+                self.req_count = 0
 
         try:
+            if len(self.req_times)>=self.reqs_per_sec:
+                del self.req_times[0]
+            self.req_times.append(time.time())
             request = requests.get(server + endpoint, headers=hdrs, params=parameters)
             request.raise_for_status()
             response = request.text
             if response:
                 data = json.loads(response)
             self.req_count += 1
+
+        except requests.exceptions.ConnectionError as error:
+            sys.stderr.write("### CONNECTION-ERROR\n")
+            time.sleep(1)
+            data=self.perform_rest_action(server, endpoint, hdrs, parameters)
 
         except requests.exceptions.HTTPError as error:
             # check if we are being rate limited by the server
@@ -49,11 +59,6 @@ class EnsemblRestClient(object):
                     data=self.perform_rest_action(server, endpoint, hdrs, parameters)
             else:
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(server+endpoint, error))
-
-        except requests.exceptions.ConnectionError as error:
-            sys.stderr.write("### CONNECTION-ERROR\n")
-            time.sleep(1)
-            data=self.perform_rest_action(server, endpoint, hdrs, parameters)
 
         if data is None:
             sys.stderr.write("### DATA IS NONE - UNKNOWN ERROR\n")
