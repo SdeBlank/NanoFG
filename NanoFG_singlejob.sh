@@ -203,6 +203,8 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 
 SPLITDIR=$OUTPUTDIR/split_vcf
 
+THREADS=1
+
 MERGE_BAMS_OUT=$OUTPUTDIR/consensus_last.sorted.bam
 
 SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
@@ -234,7 +236,7 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
 for FASTA in $SPLITDIR/*.fasta; do
   bash $PIPELINE_DIR/consensus_mapping.sh \
     -f $FASTA \
-    -t $CONSENSUS_MAPPING_THREADS \
+    -t $THREADS \
     -r $CONSENSUS_MAPPING_REFGENOME \
     -rd $CONSENSUS_MAPPING_REFDICT \
     -w $WTDBG2_DIR \
@@ -253,7 +255,7 @@ $SAMBAMBA merge $MERGE_BAMS_OUT $SPLITDIR/*.last.sorted.bam
 bash $PIPELINE_DIR/sv_calling.sh \
   -b $MERGE_BAMS_OUT \
   -n $NANOSV \
-  -t $SV_CALLING_THREADS \
+  -t $THREADS \
   -s $SAMBAMBA \
   -v $VENV \
   -c $SV_CALLING_CONFIG \
