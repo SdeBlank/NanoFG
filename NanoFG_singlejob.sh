@@ -242,6 +242,7 @@ for FASTA in $SPLITDIR/*.fasta; do
     -l $LAST_DIR \
     -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
     -s $SAMBAMBA
+done
 
 ##################################################
 
