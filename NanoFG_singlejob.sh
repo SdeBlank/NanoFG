@@ -246,10 +246,7 @@ done
 
 ##################################################
 
-bash $PIPELINE_DIR/bam_merge.sh \
-  -d $SPLITDIR \
-  -s $SAMBAMBA \
-  -o $MERGE_BAMS_OUT
+$SAMBAMBA merge $MERGE_BAMS_OUT $SPLITDIR/*.last.sorted.bam
 
 ##################################################
 
