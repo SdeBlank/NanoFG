@@ -223,6 +223,7 @@ grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
 ##################################################
 
 . $VENV
+
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
   -v $VCF_NO_INS \
@@ -232,15 +233,15 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
 
 for FASTA in $SPLITDIR/*.fasta; do
   bash $PIPELINE_DIR/consensus_mapping.sh \
-  -f $FASTA \
-  -t $CONSENSUS_MAPPING_THREADS \
-  -r $CONSENSUS_MAPPING_REFGENOME \
-  -rd $CONSENSUS_MAPPING_REFDICT \
-  -w $WTDBG2_DIR \
-  -ws '$CONSENSUS_MAPPING_WTDBG2_SETTINGS' \
-  -l $LAST_DIR \
-  -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
-  -s $SAMBAMBA
+    -f $FASTA \
+    -t $CONSENSUS_MAPPING_THREADS \
+    -r $CONSENSUS_MAPPING_REFGENOME \
+    -rd $CONSENSUS_MAPPING_REFDICT \
+    -w $WTDBG2_DIR \
+    -ws '$CONSENSUS_MAPPING_WTDBG2_SETTINGS' \
+    -l $LAST_DIR \
+    -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
+    -s $SAMBAMBA
 
 ##################################################
 
