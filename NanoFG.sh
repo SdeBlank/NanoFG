@@ -3,18 +3,18 @@
 usage() {
 echo "
 Required parameters:
-    -v|--vcf		                                                                Path to vcf file
-    -b|--bam                                                                    Path to bam file
+    -v|--vcf		                                                                  Path to vcf file
+    -b|--bam                                                                      Path to bam file
 
 Optional parameters:
 
 GENERAL
     -h|--help                                                                     Shows help
     -o|--outputdir                                                                Path to output directory
-    -d|--nanofg_dir                                                               Directory that contains NanoFG [$NANOFG_DIR]
-    -e|--venv                                                                     Path to virtual environment[$VENV]
+    -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
+    -e|--venv                                                                     Path to virtual environment[${VENV}]
     -m|--mail                                                                     Email adress
-    -dc|--dont_clean                                                              Don't clean up the intermediate files []
+    -dc|--dont_clean                                                              Don't clean up the intermediate files
 
 REQUIRED TOOLS
     -n|--nanosv                                                                   Path to NanoSV [${NANOSV}]
@@ -23,43 +23,43 @@ REQUIRED TOOLS
     -w|--wtdbg2_dir                                                               Path to wtdbg2 directory [${WTDBG2_DIR}]
 
 VCF SPLIT
-    -vsl|--vcf_split_lines                                                         Number of files to split the original vcf into
-    -vst|vcf_split_threads                                                        Number of threads
-    -vshv|vcf_split_h_vmem                                                        Vcf split memory
-    -vshr|vcf_split_h_rt                                                          Vcf split time
+    -vsl|--vcf_split_lines                                                        Override the nr of lines to split the original vcf into
+    -vst|vcf_split_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
+    -vshv|vcf_split_h_vmem                                                        Vcf split memory [${VCF_SPLIT_MEMORY}]
+    -vshr|vcf_split_h_rt                                                          Vcf split time [${VCF_SPLIT_TIME}]
 
 FUSION READ EXTRACTION
-    -fres|--fusion_read_extraction_script
-    -fret|--fusion_read_extraction_threads                                        Number of threads
-    -frehv|--fusion_read_extraction_h_vmem                                        Fusion read extraction memory
-    -freht|--fusion_read_extraction_h_rt                                          Fusion read extraction time
+    -fres|--fusion_read_extraction_script                                         Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
+    -fret|--fusion_read_extraction_threads                                        Number of threads [${FUSION_READ_EXTRACTION_THREADS}]
+    -frehv|--fusion_read_extraction_h_vmem                                        Fusion read extraction memory [${FUSION_READ_EXTRACTION_MEMORY}]
+    -freht|--fusion_read_extraction_h_rt                                          Fusion read extraction time [${FUSION_READ_EXTRACTION_TIME}]
 
 CONSENSUS MAPPING
     -cmr|--consensus_mapping_refgenome                                            Reference genome [${REF}]
     -cmrd|--consensus_mapping_refdict                                             Reference genome .dict file [${REF_DICT}]
     -cmws|--consensus_mapping_wtdbg2_settings                                     wtdbg2 settings [${WTDBG2_SETTINGS}]
     -cmls|--consensus_mapping_last_settings                                       LAST settings [${LAST_SETTINGS}]
-    -cmt|--consensus_mapping_threads                                              Number of threads [${THREADS}]
-    -cmhv|--consensus_mapping_h_vmem                                              Number of threads [${THREADS}]
-    -cmhr|--consensus_mapping_h_rt                                                Number of threads [${THREADS}]
+    -cmt|--consensus_mapping_threads                                              Number of threads [${CONSENSUS_MAPPING_THREADS}]
+    -cmhv|--consensus_mapping_h_vmem                                              Consensus mapping memory [${CONSENSUS_MAPPING_MEMORY}]
+    -cmhr|--consensus_mapping_h_rt                                                Consensus mapping time [${CONSENSUS_MAPPING_TIME}]
 
 BAM MERGE
-    -bmt|vcf_split_threads                                                        Number of threads
-    -bmhv|vcf_split_h_vmem                                                        Bam merge memory
-    -bmhr|vcf_split_h_rt                                                          Bam merge time
+    -bmt|vcf_split_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
+    -bmhv|vcf_split_h_vmem                                                        Bam merge memory [${VCF_SPLIT_MEMORY}]
+    -bmhr|vcf_split_h_rt                                                          Bam merge time [${VCF_SPLIT_TIME}]
 
 SV CALLING
-    -sct|sv_calling_threads                                                        Number of threads
-    -schv|sv_calling_h_vmem                                                        SV calling memory
-    -schr|sv_calling_h_rt                                                          SV calling time
+    -sct|sv_calling_threads                                                       Number of threads [${SV_CALLING_THREADS}]
+    -schv|sv_calling_h_vmem                                                       SV calling memory [${SV_CALLING_MEMORY}]
+    -schr|sv_calling_h_rt                                                         SV calling time [${SV_CALLING_TIME}]
 
 FUSION CHECK
-    -fcio|--fusion_check_info_output
-    -fcvo|--fusion_check_vcf_output
-    -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$SCRIPT]
-    -fct|--fusion_check_threads                                                   VCF output file [$OUTPUT]
-    -fchv|--fusion_check_h_vmem                                                   VCF output file [$OUTPUT]
-    -fcht|--fusion_check_h_rt                                                     VCF output file [$OUTPUT]
+    -fcio|--fusion_check_info_output                                              Path to the NanoFG output info file []
+    -fcvo|--fusion_check_vcf_output                                               Path to the NanoFG output vcf file []
+    -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
+    -fct|--fusion_check_threads                                                   VCF output file [$FUSION_CHECK_THREADS]
+    -fchv|--fusion_check_h_vmem                                                   VCF output file [$FUSION_CHECK_MEMORY]
+    -fcht|--fusion_check_h_rt                                                     VCF output file [$FUSION_CHECK_TIME]
 "
 }
 
@@ -67,6 +67,7 @@ POSITIONAL=()
 
 #GENERAL DEFAULTS
 NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
+source $NANOFG_DIR/paths.ini
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
@@ -77,10 +78,16 @@ echo $OUTPUTDIR
 DONT_CLEAN=false
 
 #TOOL PATH DEFAULTS
-SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
-LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
-WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
+#SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
+SAMBAMBA=$PATH_SAMBAMBA
+#LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
+LAST_DIR=$PATH_LAST_DIR
+#WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
+WTDBG2_DIR=$PATH_WTDBG2_DIR
 
+echo $SAMBAMBA
+echo $LAST_DIR
+echo $WTDBG2_DIR
 #VCF SPLIT DEFAULTS
 VCF_SPLIT_THREADS=1
 VCF_SPLIT_TIME=0:5:0
@@ -93,8 +100,12 @@ FUSION_READ_EXTRACTION_TIME=0:10:0
 FUSION_READ_EXTRACTION_MEMORY=10G
 
 #CONSENSUS MAPPING DEFAULTS
-CONSENSUS_MAPPING_REFGENOME=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
-CONSENSUS_MAPPING_REFDICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
+# CONSENSUS_MAPPING_REFGENOME=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
+CONSENSUS_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
+# CONSENSUS_MAPPING_REFDICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
+CONSENSUS_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+echo $CONSENSUS_MAPPING_REFGENOME
+echo $PATH_HOMO_SAPIENS_REFDICT
 CONSENSUS_MAPPING_WTDBG2_SETTINGS='-x ont -g 3g'
 CONSENSUS_MAPPING_LAST_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 CONSENSUS_MAPPING_THREADS=8
@@ -353,8 +364,8 @@ if [ -z $VCF_SPLIT_LINES ]; then
   NUMBER_OF_FILES=5
   #VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / $NUMBER_OF_FILES + 1)
   ((VCF_SPLIT_LINES = ($NUMBER_OF_SVS + $NUMBER_OF_FILES - 1) / $NUMBER_OF_FILES))
-  if [ $VCF_SPLIT_LINES -lt 100 ]; then
-    VCF_SPLIT_LINES=100
+  if [ $VCF_SPLIT_LINES -lt 250 ]; then
+    VCF_SPLIT_LINES=250
     ((NUMBER_OF_FILES = ($NUMBER_OF_SVS + $VCF_SPLIT_LINES - 1) / $VCF_SPLIT_LINES))
     #NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
   fi
@@ -510,11 +521,24 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
     -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
 
-    if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ];then
-      touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done
-      touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
+    FINISHED="\$(tail -n 2 \${FUSION_READ_EXTRACTION_JOBNAME}.*.\$SGE_TASK_ID | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
+
+    if [ \$FINISHED==2 ]; then
+      if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ];then
+        touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done
+      else
+        echo "$VCF_SPLIT_OUTDIR/\$SGE_TASK_ID does not exist or is empty" >&2
+      fi
     else
-      echo "$VCF_SPLIT_OUTDIR/\$SGE_TASK_ID does not exist or is empty" >&2
+      echo "Fusion read extraction did not complete; Increase FUSION_READ_EXTRACTION_MEMORY or FUSION_READ_EXTRACTION_TIME" >&2
+      exit
+    fi
+
+    FUSION_READ_EXTRACTION_JOBS_COMPLETE="\$(ls \${FUSION_READ_EXTRACTION_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
+
+    if [ \$FUSION_READ_EXTRACTION_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
+      touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
+      mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
     fi
   fi
 fi
@@ -540,8 +564,7 @@ cat << EOF > $CONSENSUS_MAPPING_SH
 
 echo \`date\`: Running on \`uname -n\`
 
-if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ]; then
-  mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
+if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ] && [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
   if [ ! -e $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done ]; then
     for FASTA in $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID/*.fasta; do
       bash $PIPELINE_DIR/consensus_mapping.sh \
@@ -555,11 +578,19 @@ if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ]; then
       -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
       -s $SAMBAMBA
 
+    FINISHED="\$(tail -n 2 \${CONSENSUS_MAPPING_JOBNAME}.*.\$SGE_TASK_ID | grep -o Done | wc -l | grep -oP "(^\d+)")"
+    if [ \$FINISHED==2 ];then
       touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done
-
+    else
+      echo "Consensus mapping did not complete; Increase CONSENSUS_MAPPING_MEMORY or CONSENSUS_MAPPING_TIME" >&2
     done
 
-    touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}.done
+    CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls \${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
+
+    if [ \$CONSENSUS_MAPPING_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
+      touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}.done
+      mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
+    fi
 
   fi
 fi
@@ -653,18 +684,19 @@ if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ];then
 
   NUMBER_VCF_INPUT=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
   NUMBER_VCF_OUTPUT=\$(grep -v "^#" $FUSION_CHECK_VCF_OUTPUT | wc -l | grep -oP "(^\d+)")
-  FINISHED="\$(tail -n 1 \$LOGFILE | grep -o Done)"
 
-  if [ -z \$FINISHED ]; then
-    echo "NanoFG did not complete; Increase NANOFG_SPLIT_MEM or NANOFG_SPLIT_TIME" >&2
-    exit
-  else
+  FINISHED="\$(tail -n 2 \$FUSION_CHECK_LOG | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
+
+  if [ \$FINISHED==2 ]; then
     if [ $NUMBER_OF_LINES_VCF_1 != $NUMBER_OF_LINES_VCF_2 ]; then
       echo "Number of lines in all split VCF files is not equal to the number of lines in the original VCF file"
       exit
     else
       touch $LOGDIR/$FUSION_CHECK_JOBNAME.done
     fi
+  else
+    echo "Fusion check did not complete; Increase FUSION_CHECK_MEMORY or FUSION_CHECK_TIME" >&2
+    exit
   fi
 fi
 echo \`date\`: Done
@@ -735,12 +767,15 @@ else
 fi
 
 if [ \$CHECK_BOOL = true ]; then
+  echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
     touch $LOGDIR/$CHECK_NANOFG_JOBNAME.done
     if [ $DONT_CLEAN = false ]; then
       rm -rf $SPLITDIR
       rm $MERGE_BAMS_OUT
       rm $SV_CALLING_OUT
     fi
+else
+  echo "NanoFG check: Fail" >> $CHECK_NANOFG_OUT
 fi
 
 if [ -z $MAIL ]; then

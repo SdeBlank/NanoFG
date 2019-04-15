@@ -6,9 +6,9 @@ from EnsemblRestClient import EnsemblRestClient
 
 parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
-parser.add_argument('-v', '--vcf', type=str, help='input VCF', required=True)
-parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene output file (table)', required=True)
-parser.add_argument('-o', '--output', type=str, help='Annotated VCF output', required=True)
+parser.add_argument('-v', '--vcf', type=str, help='Input NanoSV vcf file', required=True)
+parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
+parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 
 args = parser.parse_args()
 

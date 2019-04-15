@@ -124,15 +124,15 @@ LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT}
 ${SAMBAMBA} sort /dev/stdin -o ${PREFIX}.ctg.last.sorted.bam"
 SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.sorted.bam"
 
-echo ${WTDBG2_COMMAND}
+#echo ${WTDBG2_COMMAND}
 eval ${WTDBG2_COMMAND}
-echo ${WTPOA_CNS_COMMAND}
+#echo ${WTPOA_CNS_COMMAND}
 eval ${WTPOA_CNS_COMMAND}
-echo ${SED_COMMAND}
+#echo ${SED_COMMAND}
 eval ${SED_COMMAND}
-echo ${LAST_COMMAND}
+#echo ${LAST_COMMAND}
 eval ${LAST_COMMAND}
-echo ${SAMBAMBA_INDEX_COMMAND}
+#echo ${SAMBAMBA_INDEX_COMMAND}
 eval ${SAMBAMBA_INDEX_COMMAND}
 
 echo `date`: Done

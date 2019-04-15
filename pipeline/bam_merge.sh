@@ -5,10 +5,10 @@ echo "
 Required parameters:
 
 Optional parameters:
-    -d|--split_directory
-    -s|--sambamba_path
-    -o|--output
-    -h|--help       Shows help
+    -h|--help                   Shows help
+    -d|--split_directory        Directory of the split vcf files [${SPLITDIR}]
+    -s|--sambamba_path          Path to sambamba|samtools [${SAMBAMBA}]
+    -o|--output                 Path to merged output bam [$OUTPUT]
 "
 }
 

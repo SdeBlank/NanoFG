@@ -3,14 +3,13 @@
 usage() {
 echo "
 Required parameters:
-    -v|--vcf		    Path to vcf file
+    -v|--vcf		            Path to vcf file
 
 Optional parameters:
     -h|--help               Shows help
-    -o|--outputdir                                                                Path to output directory
-    -d|--split_directory        directory that contains NanoFG [$NANOFG_DIR]
-    -l|--lines     Number of lines to put in each spit vcf file [Devides vcf in 50 files]
-    -n|--number_of_files
+    -o|--outputdir          Path to output directory
+    -d|--split_directory    Path to the output directory for the split vcf files [$SPLITDIR]
+    -l|--lines              Number of lines to put in each spit vcf file [Devides vcf in 5 files]
 "
 }
 
@@ -19,7 +18,6 @@ POSITIONAL=()
 #DEFAULTS
 OUTPUTDIR=$(realpath ./)
 SPLITDIR=${OUTPUTDIR}/split_vcf
-NUMBER_OF_FILES=15
 
 while [[ $# -gt 0 ]]
 do
@@ -72,9 +70,9 @@ fi
 
 if [ -z $LINES ]; then
   NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-  ((LINES = ($NUMBER_OF_SVS + $NUMBER_OF_FILES - 1) / $NUMBER_OF_FILES))
-  if [ $LINES -lt 100 ]; then
-    LINES=100
+  ((LINES = ($NUMBER_OF_SVS + 5 - 1) / 5))
+  if [ $LINES -lt 250 ]; then
+    LINES=250
   fi
 fi
 
