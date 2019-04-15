@@ -37,10 +37,10 @@ CONSENSUS MAPPING
 
 POSITIONAL=()
 
-source $NANOFG_DIR/paths.ini
-
 #GENERAL DEFAULTS
 NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
+source $NANOFG_DIR/paths.ini
+
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
