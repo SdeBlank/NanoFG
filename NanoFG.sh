@@ -78,16 +78,10 @@ echo $OUTPUTDIR
 DONT_CLEAN=false
 
 #TOOL PATH DEFAULTS
-#SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
 SAMBAMBA=$PATH_SAMBAMBA
-#LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
 LAST_DIR=$PATH_LAST_DIR
-#WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
 WTDBG2_DIR=$PATH_WTDBG2_DIR
 
-echo $SAMBAMBA
-echo $LAST_DIR
-echo $WTDBG2_DIR
 #VCF SPLIT DEFAULTS
 VCF_SPLIT_THREADS=1
 VCF_SPLIT_TIME=0:5:0
@@ -100,12 +94,8 @@ FUSION_READ_EXTRACTION_TIME=0:10:0
 FUSION_READ_EXTRACTION_MEMORY=10G
 
 #CONSENSUS MAPPING DEFAULTS
-# CONSENSUS_MAPPING_REFGENOME=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
 CONSENSUS_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
-# CONSENSUS_MAPPING_REFDICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
 CONSENSUS_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
-echo $CONSENSUS_MAPPING_REFGENOME
-echo $PATH_HOMO_SAPIENS_REFDICT
 CONSENSUS_MAPPING_WTDBG2_SETTINGS='-x ont -g 3g'
 CONSENSUS_MAPPING_LAST_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 CONSENSUS_MAPPING_THREADS=8
@@ -655,7 +645,14 @@ fi
 cat << EOF >> $SV_CALLING_SH
 echo \`date\`: Running on \`uname -n\`
 if [ -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
-    bash $PIPELINE_DIR/sv_calling.sh -b $MERGE_BAMS_OUT -n $NANOSV -t $SV_CALLING_THREADS -s $SAMBAMBA -v $VENV -c $SV_CALLING_CONFIG -o $SV_CALLING_OUT
+    bash $PIPELINE_DIR/sv_calling.sh \
+      -b $MERGE_BAMS_OUT \
+      -n $NANOSV \
+      -t $SV_CALLING_THREADS \
+      -s $SAMBAMBA \
+      -v $VENV \
+      -c $SV_CALLING_CONFIG \
+      -o $SV_CALLING_OUT
     NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
     if [ \$NUMBER_OF_LINES_VCF != 0 ]; then
       touch $LOGDIR/$SV_CALLING_JOBNAME.done
@@ -680,7 +677,12 @@ cat << EOF > $FUSION_CHECK_SH
 
 echo \`date\`: Running on \`uname -n\`
 if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ];then
-  bash $PIPELINE_DIR/fusion_check.sh -v $SV_CALLING_OUT -o $FUSION_CHECK_VCF_OUTPUT -fo $FUSION_CHECK_INFO_OUTPUT -s $FUSION_CHECK_SCRIPT -e $VENV
+  bash $PIPELINE_DIR/fusion_check.sh \
+    -v $SV_CALLING_OUT \
+    -o $FUSION_CHECK_VCF_OUTPUT \
+    -fo $FUSION_CHECK_INFO_OUTPUT \
+    -s $FUSION_CHECK_SCRIPT \
+    -e $VENV
 
   NUMBER_VCF_INPUT=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
   NUMBER_VCF_OUTPUT=\$(grep -v "^#" $FUSION_CHECK_VCF_OUTPUT | wc -l | grep -oP "(^\d+)")
