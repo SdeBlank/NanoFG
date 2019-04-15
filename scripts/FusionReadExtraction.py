@@ -53,11 +53,11 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
     bamfile = pysam.AlignmentFile(args.bam, "rb" )
     fasta = open(args.output_dir+"/"+svid+"_"+fusion+".fasta", 'a+')
     for read in bamfile.fetch(chr, start, end):
-        if read.query_name in exclude or read.seq == None or read.is_supplementary:
+        if read.query_name in exclude or read.seq == None: #or read.is_supplementary:
             continue
         fasta.write( ">"+read.query_name+"\n")
         fasta.write(read.seq+"\n")
-        exclude.append(read.query_name)
+        #exclude.append(read.query_name)
     fasta.close()
     bamfile.close()
 
