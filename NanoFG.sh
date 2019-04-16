@@ -14,6 +14,7 @@ GENERAL
     -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
     -e|--venv                                                                     Path to virtual environment[${VENV}]
     -m|--mail                                                                     Email adress
+    -df|--dont_filter                                                             Don't filter out all non-PASS SVs
     -dc|--dont_clean                                                              Don't clean up the intermediate files
 
 REQUIRED TOOLS
@@ -164,6 +165,10 @@ do
     MAIL="$2"
     shift # past argument
     shift # past value
+    ;;
+    -df|--dont_filter)
+    DONT_FILTER=true
+    shift # past argument
     ;;
     -dc|--dont_clean)
     DONT_CLEAN=true
@@ -395,7 +400,7 @@ FUSION_READ_EXTRACTION_LOG=$LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.log
 
 CONSENSUS_MAPPING_JOBNAME=${VCF_NAME}_CONSENSUS_MAPPING
 CONSENSUS_MAPPING_SH=$JOBDIR/$CONSENSUS_MAPPING_JOBNAME.sh
-CONSENSUS_MAPPING_ERR=$LOGDIR/$CONSENSUS_MAPPING_JOBNAME.err
+CONSENSUS_MAPPING_ERR=$LOGDIR/$CONSENSUS_MAPPING_JOBNAME.err3831595
 CONSENSUS_MAPPING_LOG=$LOGDIR/$CONSENSUS_MAPPING_JOBNAME.log
 
 MERGE_BAMS_JOBNAME=${VCF_NAME}_MERGE_BAMS
@@ -457,8 +462,12 @@ if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
     VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
     VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
 
-    grep "^#" $VCF > \$VCF_NO_INS
-    grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
+    if [ -z $DONT_FILTER ];then
+      grep "^#" $VCF > \$VCF_NO_INS
+      grep -v "^#" $VCF | awk '\$5!="<INS>"' | awk '\$7=="PASS"' >> \$VCF_NO_INS
+    else
+      grep "^#" $VCF > \$VCF_NO_INS
+      grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
 
     bash $PIPELINE_DIR/vcf_split.sh \
     -v \$VCF_NO_INS \
@@ -511,7 +520,7 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
     -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
     -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
 
-    FINISHED="\$(tail -n 2 \${FUSION_READ_EXTRACTION_JOBNAME}.*.\$SGE_TASK_ID | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
+    FINISHED="\$(tail -n 2 ${FUSION_READ_EXTRACTION_JOBNAME}.*.\$SGE_TASK_ID | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
 
     if [ \$FINISHED==2 ]; then
       if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ];then
@@ -524,7 +533,7 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
       exit
     fi
 
-    FUSION_READ_EXTRACTION_JOBS_COMPLETE="\$(ls \${FUSION_READ_EXTRACTION_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
+    FUSION_READ_EXTRACTION_JOBS_COMPLETE="\$(ls ${FUSION_READ_EXTRACTION_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
 
     if [ \$FUSION_READ_EXTRACTION_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
       touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done

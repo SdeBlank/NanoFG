@@ -15,6 +15,7 @@ GENERAL
     -vo|--vcf_output                                                              Path to the NanoFG output vcf file []
     -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
     -t|--threads
+    -df|--dont_filter                                                             Don't filter out all non-PASS SVs
     -e|--venv                                                                     Path to virtual environment[${VENV}]
 
 REQUIRED TOOLS
@@ -101,6 +102,10 @@ do
     NANOFG_DIR="$2"
     shift # past argument
     shift # past value
+    ;;
+    -df|--dont_filter)
+    DONT_FILTER=true
+    shift # past argument
     ;;
     -e|--venv)
     VENV="$2"
@@ -219,8 +224,13 @@ fi
 VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
 VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
 
-grep "^#" $VCF > $VCF_NO_INS
-grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
+if [ -z $DONT_FILTER ];then
+  grep "^#" $VCF > $VCF_NO_INS
+  grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_NO_INS
+else
+  grep "^#" $VCF > $VCF_NO_INS
+  grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
+
 
 ##################################################
 
