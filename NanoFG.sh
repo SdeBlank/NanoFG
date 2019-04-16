@@ -472,7 +472,7 @@ echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
   if [ ! -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
-    for FASTA in $CANDIDATE_DIR/\$SGE_TASK_ID/*.fasta; do
+    for FASTA in $CANDIDATE_DIR/*.fasta; do
       bash $PIPELINE_DIR/consensus_calling.sh \
       -f \$FASTA \
       -t $CONSENSUS_CALLING_THREADS \
