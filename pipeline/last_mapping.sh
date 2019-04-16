@@ -50,10 +50,12 @@ while [[ $# -gt 0 ]]; do
     REF="$2"
     shift # past argument
     shift # past value
+    ;;
     -rd|--refdict)
     REF_DICT="$2"
     shift # past argument
     shift # past value
+    ;;
     -l|--last_dir)
     LAST_DIR="$2"
     shift # past argument
@@ -90,6 +92,7 @@ LASTAL=${LAST_DIR}/src/lastal
 LAST_SPLIT=${LAST_DIR}/src/last-split
 LAST_PARAMS=${LAST_DIR}/last_params
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
+PREFIX=${FASTA/_wtdbg2.ctg.fa/_wtdbg2}
 
 if [ -z $LAST_SETTINGS_OVERRIDE ];then
   LAST_SETTINGS=$(echo $LAST_SETTINGS | sed -e "s/-p [^ ]\+/-p ${LAST_PARAMS}/")
