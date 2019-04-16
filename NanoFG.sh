@@ -23,12 +23,6 @@ REQUIRED TOOLS
     -l|--last_dir                                                                 Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                               Path to wtdbg2 directory [${WTDBG2_DIR}]
 
-VCF SPLIT
-    -vsl|--vcf_split_lines                                                        Override the nr of lines to split the original vcf into
-    -vst|vcf_split_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
-    -vshv|vcf_split_h_vmem                                                        Vcf split memory [${VCF_SPLIT_MEMORY}]
-    -vshr|vcf_split_h_rt                                                          Vcf split time [${VCF_SPLIT_TIME}]
-
 FUSION READ EXTRACTION
     -fres|--fusion_read_extraction_script                                         Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
     -fret|--fusion_read_extraction_threads                                        Number of threads [${FUSION_READ_EXTRACTION_THREADS}]
@@ -36,13 +30,19 @@ FUSION READ EXTRACTION
     -freht|--fusion_read_extraction_h_rt                                          Fusion read extraction time [${FUSION_READ_EXTRACTION_TIME}]
 
 CONSENSUS MAPPING
-    -cmr|--consensus_mapping_refgenome                                            Reference genome [${REF}]
-    -cmrd|--consensus_mapping_refdict                                             Reference genome .dict file [${REF_DICT}]
-    -cmws|--consensus_mapping_wtdbg2_settings                                     wtdbg2 settings [${WTDBG2_SETTINGS}]
-    -cmls|--consensus_mapping_last_settings                                       LAST settings [${LAST_SETTINGS}]
-    -cmt|--consensus_mapping_threads                                              Number of threads [${CONSENSUS_MAPPING_THREADS}]
-    -cmhv|--consensus_mapping_h_vmem                                              Consensus mapping memory [${CONSENSUS_MAPPING_MEMORY}]
-    -cmhr|--consensus_mapping_h_rt                                                Consensus mapping time [${CONSENSUS_MAPPING_TIME}]
+
+    -ccws|--consensus_calling_wtdbg2_settings                                     wtdbg2 settings [${WTDBG2_SETTINGS}]
+    -cct|--consensus_calling_threads                                              Number of threads [${CONSENSUS_CALLING_THREADS}]
+    -cchv|--consensus_calling_h_vmem                                              Consensus mapping memory [${CONSENSUS_CALLING_MEMORY}]
+    -cchr|--consensus_calling_h_rt                                                Consensus mapping time [${CONSENSUS_CALLING_TIME}]
+
+LAST_MAPPING
+    -lmr|--consensus_calling_refgenome                                            Reference genome [${REF}]
+    -lmrd|--consensus_calling_refdict                                             Reference genome .dict file [${REF_DICT}]
+    -lms|--consensus_calling_last_settings                                        LAST settings [${LAST_SETTINGS}]
+    -lmt|--last_mapping_threads                                                   Number of threads[$LAST_MAPPING_THREADS]
+    -lmhv|--last_mapping_h_vmem                                                   Last mapping memory[$LAST_MAPPING_MEMORY]
+    -lmht|--last_mapping_h_rt                                                     Last mapping runtime[$LAST_MAPPING_TIME]
 
 BAM MERGE
     -bmt|vcf_split_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
@@ -83,25 +83,22 @@ SAMBAMBA=$PATH_SAMBAMBA
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
 
-#VCF SPLIT DEFAULTS
-VCF_SPLIT_THREADS=1
-VCF_SPLIT_TIME=0:5:0
-VCF_SPLIT_MEMORY=10G
-
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
 FUSION_READ_EXTRACTION_THREADS=1
 FUSION_READ_EXTRACTION_TIME=0:10:0
 FUSION_READ_EXTRACTION_MEMORY=10G
 
-#CONSENSUS MAPPING DEFAULTS
-CONSENSUS_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
-CONSENSUS_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
-CONSENSUS_MAPPING_WTDBG2_SETTINGS='-x ont -g 3g'
-CONSENSUS_MAPPING_LAST_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
-CONSENSUS_MAPPING_THREADS=8
-CONSENSUS_MAPPING_TIME=0:15:0
-CONSENSUS_MAPPING_MEMORY=20G
+#CONSENSUS CALLING DEFAULTS
+CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g'
+CONSENSUS_CALLING_THREADS=8
+CONSENSUS_CALLING_TIME=0:15:0
+CONSENSUS_CALLING_MEMORY=20G
+
+#LAST MAPPING DEFAULTS
+LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
+LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 
 #BAM MERGE DEFAULTS
 BAM_MERGE_THREADS=1
@@ -189,26 +186,6 @@ do
     shift # past argument
     shift # past value
     ;;
-    -vsl|--vcf_split_lines)
-    VCF_SPLIT_LINES=$2
-    shift # past argument
-    shift # past value
-    ;;
-    -vst|vcf_split_threads)
-    VCF_SPLIT_THREADS="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -vshv|vcf_split_h_vmem)
-    VCF_SPLIT_MEMORY="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -vshr|vcf_split_h_rt)
-    VCF_SPLIT_TIME="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -fres|--fusion_read_extraction_script)
     FUSION_READ_EXTRACTION_SCRIPT="$2"
     shift # past argument
@@ -229,38 +206,43 @@ do
     shift # past argument
     shift # past value
     ;;
-    -cmr|--consensus_mapping_refgenome)
-    CONSENSUS_MAPPING_REFGENOME="$2"
+    -ccws|--consensus_calling_wtdbg2_settings)
+    CONSENSUS_CALLING_WTDBG2_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmrd|--consensus_mapping_refdict)
-    CONSENSUS_MAPPING_REFDICT="$2"
+    -cct|--consensus_calling_threads)
+    CONSENSUS_CALLING_THREADS="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmws|--consensus_mapping_wtdbg2_settings)
-    CONSENSUS_MAPPING_WTDBG2_SETTINGS="$2"
+    -cchv|--consensus_calling_h_vmem)
+    CONSENSUS_CALLING_MEMORY="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmls|--consensus_mapping_last_settings)
-    CONSENSUS_MAPPING_LAST_SETTINGS="$2"
+    -cchr|--consensus_calling_h_rt)
+    CONSENSUS_CALLING_TIME="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmt|--consensus_mapping_threads)
-    CONSENSUS_MAPPING_THREADS="$2"
+    -lmt|--last_mapping_threads)
+    LAST_MAPPING_THREADS="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmhv|--consensus_mapping_h_vmem)
-    CONSENSUS_MAPPING_MEMORY="$2"
+    -lmr|-LAST_MAPPING_REFGENOME)
+    LAST_MAPPING_REFGENOME="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmhr|--consensus_mapping_h_rt)
-    CONSENSUS_MAPPING_TIME="$2"
+    -lmrd|--last_mapping_refdict)
+    LAST_MAPPING_REFDICT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -lms|--last_mapping_settings)
+    LAST_MAPPING_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -353,22 +335,6 @@ if [ -z $FUSION_CHECK_INFO_OUTPUT ]; then
     FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_INFO_OUTPUT/.vcf/_FusionGenesInfo.txt}
 fi
 
-NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-
-if [ -z $VCF_SPLIT_LINES ]; then
-  NUMBER_OF_FILES=2
-  #VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / $NUMBER_OF_FILES + 1)
-  ((VCF_SPLIT_LINES = ($NUMBER_OF_SVS + $NUMBER_OF_FILES - 1) / $NUMBER_OF_FILES))
-  if [ $VCF_SPLIT_LINES -lt 250 ]; then
-    VCF_SPLIT_LINES=250
-    ((NUMBER_OF_FILES = ($NUMBER_OF_SVS + $VCF_SPLIT_LINES - 1) / $VCF_SPLIT_LINES))
-    #NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
-  fi
-else
-  #NUMBER_OF_FILES=$(expr $NUMBER_OF_SVS / $VCF_SPLIT_LINES + 1)
-  ((NUMBER_OF_FILES = ($NUMBER_OF_SVS + $VCF_SPLIT_LINES - 1) / $VCF_SPLIT_LINES))
-fi
-
 echo `date`: Running on `uname -n`
 
 VCF_NAME=$(basename $VCF)
@@ -378,123 +344,61 @@ INFO_OUTPUT=$OUTPUTDIR/${VCF_NAME}_FusionGenesInfo.txt
 
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 SCRIPT_DIR=$NANOFG_DIR/scripts
-
-JOBDIR=$OUTPUTDIR/jobs
-LOGDIR=$OUTPUTDIR/logs
-
-VCF_SPLIT_OUTDIR=$OUTPUTDIR/split_vcf
-VCF_SPLIT_JOBNAME=${VCF_NAME}_SPLIT_VCF
-VCF_SPLIT_SH=$JOBDIR/$VCF_SPLIT_JOBNAME.sh
-VCF_SPLIT_ERR=$LOGDIR/$VCF_SPLIT_JOBNAME.err
-VCF_SPLIT_LOG=$LOGDIR/$VCF_SPLIT_JOBNAME.log
-
-CREATE_FUSION_READ_EXTRACTION_JOBS_JOBNAME=${VCF_NAME}_CREATE_FUSION_READ_EXTRACTION_JOBS
-CREATE_FUSION_READ_EXTRACTION_JOBS_SH=$JOBDIR/$CREATE_FUSION_READ_EXTRACTION_JOBS_JOBNAME.sh
-CREATE_FUSION_READ_EXTRACTION_JOBS_ERR=$LOGDIR/$CREATE_FUSION_READ_EXTRACTION_JOBS_JOBNAME.err
-CREATE_FUSION_READ_EXTRACTION_JOBS_LOG=$LOGDIR/$CREATE_FUSION_READ_EXTRACTION_JOBS_JOBNAME.log
+JOB_DIR=$OUTPUTDIR/jobs
+LOG_DIR=$OUTPUTDIR/logs
 
 FUSION_READ_EXTRACTION_JOBNAME=${VCF_NAME}_FUSION_READ_EXTRACTION
-FUSION_READ_EXTRACTION_SH=$JOBDIR/$FUSION_READ_EXTRACTION_JOBNAME.sh
-FUSION_READ_EXTRACTION_ERR=$LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.err
-FUSION_READ_EXTRACTION_LOG=$LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.log
+FUSION_READ_EXTRACTION_SH=$JOB_DIR/$FUSION_READ_EXTRACTION_JOBNAME.sh
+FUSION_READ_EXTRACTION_ERR=$LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.err
+FUSION_READ_EXTRACTION_LOG=$LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.log
 
-CONSENSUS_MAPPING_JOBNAME=${VCF_NAME}_CONSENSUS_MAPPING
-CONSENSUS_MAPPING_SH=$JOBDIR/$CONSENSUS_MAPPING_JOBNAME.sh
-CONSENSUS_MAPPING_ERR=$LOGDIR/$CONSENSUS_MAPPING_JOBNAME.err3831595
-CONSENSUS_MAPPING_LOG=$LOGDIR/$CONSENSUS_MAPPING_JOBNAME.log
+CONSENSUS_CALLING_JOBNAME=${VCF_NAME}_CONSENSUS_CALLING
+CONSENSUS_CALLING_SH=$JOB_DIR/$CONSENSUS_CALLING_JOBNAME.sh
+CONSENSUS_CALLING_ERR=$LOG_DIR/$CONSENSUS_CALLING_JOBNAME.err
+CONSENSUS_CALLING_LOG=$LOG_DIR/$CONSENSUS_CALLING_JOBNAME.log
+
+LAST_MAPPING_JOBNAME=${VCF_NAME}_LAST_MAPPING
+LAST_MAPPING_SH=$JOB_DIR/$LAST_MAPPING_JOBNAME.sh
+LAST_MAPPING_ERR=$LOG_DIR/$LAST_MAPPING_JOBNAME.err
+LAST_MAPPING_LOG=$LOG_DIR/$LAST_MAPPING_JOBNAME.log
 
 MERGE_BAMS_JOBNAME=${VCF_NAME}_MERGE_BAMS
-MERGE_BAMS_SH=$JOBDIR/$MERGE_BAMS_JOBNAME.sh
-MERGE_BAMS_ERR=$LOGDIR/$MERGE_BAMS_JOBNAME.err
-MERGE_BAMS_LOG=$LOGDIR/$MERGE_BAMS_JOBNAME.log
+MERGE_BAMS_SH=$JOB_DIR/$MERGE_BAMS_JOBNAME.sh
+MERGE_BAMS_ERR=$LOG_DIR/$MERGE_BAMS_JOBNAME.err
+MERGE_BAMS_LOG=$LOG_DIR/$MERGE_BAMS_JOBNAME.log
 MERGE_BAMS_OUT=$OUTPUTDIR/consensus_last.sorted.bam
 
 SV_CALLING_JOBNAME=${VCF_NAME}_SV_CALLING
-SV_CALLING_SH=$JOBDIR/$SV_CALLING_JOBNAME.sh
-SV_CALLING_ERR=$LOGDIR/$SV_CALLING_JOBNAME.err
-SV_CALLING_LOG=$LOGDIR/$SV_CALLING_JOBNAME.log
+SV_CALLING_SH=$JOB_DIR/$SV_CALLING_JOBNAME.sh
+SV_CALLING_ERR=$LOG_DIR/$SV_CALLING_JOBNAME.err
+SV_CALLING_LOG=$LOG_DIR/$SV_CALLING_JOBNAME.log
 SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
 
 FUSION_CHECK_JOBNAME=${VCF_NAME}_FUSION_CHECK
-FUSION_CHECK_SH=$JOBDIR/$FUSION_CHECK_JOBNAME.sh
-FUSION_CHECK_ERR=$LOGDIR/$FUSION_CHECK_JOBNAME.err
-FUSION_CHECK_LOG=$LOGDIR/$FUSION_CHECK_JOBNAME.log
+FUSION_CHECK_SH=$JOB_DIR/$FUSION_CHECK_JOBNAME.sh
+FUSION_CHECK_ERR=$LOG_DIR/$FUSION_CHECK_JOBNAME.err
+FUSION_CHECK_LOG=$LOG_DIR/$FUSION_CHECK_JOBNAME.log
 
 CHECK_NANOFG_JOBNAME=${VCF_NAME}_CHECKSHARC
-CHECK_NANOFG_SH=$JOBDIR/$CHECK_NANOFG_JOBNAME.sh
-CHECK_NANOFG_ERR=$LOGDIR/$CHECK_NANOFG_JOBNAME.err
-CHECK_NANOFG_LOG=$LOGDIR/$CHECK_NANOFG_JOBNAME.log
+CHECK_NANOFG_SH=$JOB_DIR/$CHECK_NANOFG_JOBNAME.sh
+CHECK_NANOFG_ERR=$LOG_DIR/$CHECK_NANOFG_JOBNAME.err
+CHECK_NANOFG_LOG=$LOG_DIR/$CHECK_NANOFG_JOBNAME.log
 CHECK_NANOFG_OUT=$OUTPUTDIR/$VCF_NAME'.check'
 
-mkdir -p $VCF_SPLIT_OUTDIR
-if [ ! -d $VCF_SPLIT_OUTDIR ]; then
+mkdir -p $CANDIDATE_DIR
+if [ ! -d $CANDIDATE_DIR ]; then
     exit
 fi
 
-mkdir -p $JOBDIR
-if [ ! -d $JOBDIR ]; then
+mkdir -p $JOB_DIR
+if [ ! -d $JOB_DIR ]; then
     exit
 fi
 
-mkdir -p $LOGDIR
-if [ ! -d $LOGDIR ]; then
+mkdir -p $LOG_DIR
+if [ ! -d $LOG_DIR ]; then
     exit
 fi
-
-### Filter out all insertions from the vcf and split them into N files
-vcf_split(){
-cat << EOF > $VCF_SPLIT_SH
-#!/bin/bash
-
-#$ -N $VCF_SPLIT_JOBNAME
-#$ -cwd
-#$ -pe threaded $VCF_SPLIT_THREADS
-#$ -l h_vmem=$VCF_SPLIT_MEMORY
-#$ -l h_rt=$VCF_SPLIT_TIME
-#$ -e $VCF_SPLIT_ERR
-#$ -o $VCF_SPLIT_LOG
-
-echo \`date\`: Running on \`uname -n\`
-
-if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
-  if [ -e $VCF ];then
-
-    VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
-    VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
-
-    if [ -z $DONT_FILTER ];then
-      grep "^#" $VCF > \$VCF_NO_INS
-      grep -v "^#" $VCF | awk '\$5!="<INS>"' | awk '\$7=="PASS"' >> \$VCF_NO_INS
-    else
-      grep "^#" $VCF > \$VCF_NO_INS
-      grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
-    fi
-
-    bash $PIPELINE_DIR/vcf_split.sh \
-    -v \$VCF_NO_INS \
-    -d $VCF_SPLIT_OUTDIR \
-    -l $VCF_SPLIT_LINES
-  else
-    echo "VCF file ($VCF) does not exist"
-    exit
-  fi
-
-  NUMBER_OF_LINES_VCF=\$(grep -v "^#" \$VCF_NO_INS | wc -l | grep -oP "(^\d+)")
-  NUMBER_OF_LINES_SPLIT_VCFS=\$(cat $VCF_SPLIT_OUTDIR/*.vcf | grep -v "^#" | wc -l | grep -oP "(^\d+)")
-
-  if [ \$NUMBER_OF_LINES_VCF == \$NUMBER_OF_LINES_SPLIT_VCFS ]; then
-    touch $LOGDIR/$VCF_SPLIT_JOBNAME.done
-  else
-    echo "The total number of SVs in the split vcf files is different from the number of SVs in the original vcf" >&2
-  fi
-else
-  echo "$VCF_SPLIT_JOBNAME has been completed already"
-fi
-
-echo \`date\`: Done
-EOF
-qsub $VCF_SPLIT_SH
-}
 
 fusion_read_extraction(){
 
@@ -503,39 +407,42 @@ cat << EOF > $FUSION_READ_EXTRACTION_SH
 
 #$ -N $FUSION_READ_EXTRACTION_JOBNAME
 #$ -cwd
-#$ -t 1:$NUMBER_OF_FILES:1
 #$ -pe threaded $FUSION_READ_EXTRACTION_THREADS
 #$ -l h_vmem=$FUSION_READ_EXTRACTION_MEMORY
 #$ -l h_rt=$FUSION_READ_EXTRACTION_TIME
-#$ -hold_jid $VCF_SPLIT_JOBNAME
+#$ -e $FUSION_READ_EXTRACTION_ERR
+#$ -o $FUSION_READ_EXTRACTION_LOG
 
 echo \`date\`: Running on \`uname -n\`
 
-if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
-  if [ ! -e ${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ]; then
-    mkdir -p $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
+VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
+VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
 
-    . $VENV
-    python $FUSION_READ_EXTRACTION_SCRIPT \
-    -b $BAM \
-    -v $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID.vcf \
-    -o $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID
+if [ -z $DONT_FILTER ];then
+  grep "^#" $VCF > \$VCF_NO_INS
+  grep -v "^#" $VCF | awk '\$5!="<INS>"' | awk '\$7=="PASS"' >> \$VCF_NO_INS
+else
+  grep "^#" $VCF > \$VCF_NO_INS
+  grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
+fi
 
-    FINISHED="\$(tail -n 2 ${FUSION_READ_EXTRACTION_JOBNAME}.*.\$SGE_TASK_ID | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
+if [ ! -e ${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
+  . $VENV
+  python $FUSION_READ_EXTRACTION_SCRIPT \
+  -b $BAM \
+  -v \$VCF_NO_INS \
+  -o $CANDIDATE_DIR/
 
-    if [ \$FINISHED==2 ]; then
-      if [ -e $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID ];then
-        touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done
-      else
-        echo "$VCF_SPLIT_OUTDIR/\$SGE_TASK_ID does not exist or is empty" >&2
-      fi
-    else
-      echo "Fusion read extraction did not complete; Increase FUSION_READ_EXTRACTION_MEMORY or FUSION_READ_EXTRACTION_TIME" >&2
-      exit
-    fi
+  FINISHED="\$(tail -n 2 ${FUSION_READ_EXTRACTION_ERR} | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
 
+  if [ \$FINISHED==2 ]; then
+    touch $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
+  else
+    echo "Fusion read extraction did not complete; Increase FUSION_READ_EXTRACTION_MEMORY or FUSION_READ_EXTRACTION_TIME" >&2
+    exit
   fi
 fi
+
 echo \`date\`: Done
 EOF
 qsub $FUSION_READ_EXTRACTION_SH
@@ -543,55 +450,86 @@ qsub $FUSION_READ_EXTRACTION_SH
 
 
 #PUT OUTPUTFILE FROM THIS SCRIPT TO MAKE OUTPUT, OTHERWISE CHECKING IF FILES EXIST IS HARDER
-consensus_mapping(){
+consensus_calling(){
 
-cat << EOF > $CONSENSUS_MAPPING_SH
+cat << EOF > $CONSENSUS_CALLING_SH
 #!/bin/bash
 
-#$ -N $CONSENSUS_MAPPING_JOBNAME
+#$ -N $CONSENSUS_CALLING_JOBNAME
 #$ -cwd
-#$ -t 1:$NUMBER_OF_FILES:1
-#$ -pe threaded $CONSENSUS_MAPPING_THREADS
-#$ -l h_vmem=$CONSENSUS_MAPPING_MEMORY
-#$ -l h_rt=$CONSENSUS_MAPPING_TIME
+#$ -pe threaded $CONSENSUS_CALLING_THREADS
+#$ -l h_vmem=$CONSENSUS_CALLING_MEMORY
+#$ -l h_rt=$CONSENSUS_CALLING_TIME
+#$ -e $CONSENSUS_CALLING_ERR
+#$ -o $CONSENSUS_CALLING_LOG
 #$ -hold_jid $FUSION_READ_EXTRACTION_JOBNAME
 
 echo \`date\`: Running on \`uname -n\`
 
-FUSION_READ_EXTRACTION_JOBS_COMPLETE="\$(ls ${FUSION_READ_EXTRACTION_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
-
-if [ \$FUSION_READ_EXTRACTION_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
-  touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
-  mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
-fi
-
-if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ] && [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
-  if [ ! -e $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done ]; then
-    for FASTA in $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID/*.fasta; do
-      bash $PIPELINE_DIR/consensus_mapping.sh \
+if [ -e $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
+  if [ ! -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
+    for FASTA in $CANDIDATE_DIR/\$SGE_TASK_ID/*.fasta; do
+      bash $PIPELINE_DIR/consensus_calling.sh \
       -f \$FASTA \
-      -t $CONSENSUS_MAPPING_THREADS \
-      -r $CONSENSUS_MAPPING_REFGENOME \
-      -rd $CONSENSUS_MAPPING_REFDICT \
+      -t $CONSENSUS_CALLING_THREADS \
       -w $WTDBG2_DIR \
-      -ws '$CONSENSUS_MAPPING_WTDBG2_SETTINGS' \
-      -l $LAST_DIR \
-      -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
-      -s $SAMBAMBA
-
-      FINISHED="\$(tail -n 2 ${CONSENSUS_MAPPING_JOBNAME}.*.\$SGE_TASK_ID | grep -o "Done" | wc -l | grep -oP "(^\d+)")"
-      if [ \$FINISHED==2 ];then
-        touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done
-      else
-        echo "Consensus mapping did not complete; Increase CONSENSUS_MAPPING_MEMORY or CONSENSUS_MAPPING_TIME" >&2
-      fi
+      -ws '$CONSENSUS_CALLING_WTDBG2_SETTINGS'
     done
+
+    NUMBER_FASTA_INPUT=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
+    NUMBER_CONTIG_OUTPUT=\$(ls $CANDIDATE_DIR/*.ctg.fa | wc -l | grep -oP "(^\d+)")
+
+    if [ \$NUMBER_FASTA_INPUT==\$NUMBER_CONTIG_OUTPUT ];then
+      touch $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done
+    else
+      echo "Number of made contig files is not equal to the nubmer of input fasta files " >&2
+    fi
+
   fi
 fi
 
 echo \`date\`: Done
 EOF
-qsub $CONSENSUS_MAPPING_SH
+qsub $CONSENSUS_CALLING_SH
+}
+
+last_mapping() {
+
+cat << EOF > $LAST_MAPPING_SH
+#!/bin/bash
+
+#$ -N $LAST_MAPPING_JOBNAME
+#$ -cwd
+#$ -pe threaded $LAST_MAPPING_THREADS
+#$ -l h_vmem=$LAST_MAPPING_MEMORY
+#$ -l h_rt=$LAST_MAPPING_TIME
+#$ -e $LAST_MAPPING_ERR
+#$ -o $LAST_MAPPING_LOG
+#$ -hold_jid $CONSENSUS_CALLING_JOBNAME
+
+echo \`date\`: Running on \`uname -n\`
+
+if [ -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
+  if [ ! -e $LOG_DIR/${LAST_MAPPING_JOBNAME}.done ]; then
+    LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
+
+    for FA in $CANDIDATE_DIR/*.fa; do
+        echo \$FA;
+    done | \
+    xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f \$FA \$LAST_MAPPING_ARGS {}; echo 'Done' {}; exit 1;"
+
+    NUMBER_FA_INPUT=\$(ls $CANDIDATE_DIR/*.fa | wc -l | grep -oP "(^\d+)")
+    NUMBER_BAM_OUTPUT=\$(ls $CANDIDATE_DIR/*.ctg.last.sorted.bam | wc -l | grep -oP "(^\d+)")
+
+    if [ \$NUMBER_FA_INPUT==\$NUMBER_BAM_OUTPUT ];then
+      touch $LOG_DIR/${LAST_MAPPING_JOBNAME}.done
+    else
+      echo "Number of output bam files is not equal to the number of input contig fasta files" >&2
+    fi
+  fi
+fi
+EOF
+qsub $LAST_MAPPING_SH
 }
 
 bam_merge() {
@@ -606,27 +544,19 @@ cat << EOF > $MERGE_BAMS_SH
 #$ -l h_rt=$BAM_MERGE_TIME
 #$ -e $MERGE_BAMS_ERR
 #$ -o $MERGE_BAMS_LOG
-#$ -hold_jid $CONSENSUS_MAPPING_JOBNAME
+#$ -hold_jid $LAST_MAPPING_JOBNAME
 
 echo \`date\`: Running on \`uname -n\`
 
-CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls ${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
-
-if [ \$CONSENSUS_MAPPING_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
-  touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}.done
-  mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
-fi
-
-if [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-  mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
-  if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
+  if [ ! -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
     bash $PIPELINE_DIR/bam_merge.sh \
-      -d $VCF_SPLIT_OUTDIR \
+      -d $CANDIDATE_DIR \
       -s $SAMBAMBA \
       -o $MERGE_BAMS_OUT
 
     if [ -e $MERGE_BAMS_OUT ];then
-      touch $LOGDIR/$MERGE_BAMS_JOBNAME.done
+      touch $LOG_DIR/$MERGE_BAMS_JOBNAME.done
     fi
   fi
 fi
@@ -655,7 +585,7 @@ fi
 
 cat << EOF >> $SV_CALLING_SH
 echo \`date\`: Running on \`uname -n\`
-if [ -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
     bash $PIPELINE_DIR/sv_calling.sh \
       -b $MERGE_BAMS_OUT \
       -n $NANOSV \
@@ -666,7 +596,7 @@ if [ -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
       -o $SV_CALLING_OUT
     NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
     if [ \$NUMBER_OF_LINES_VCF != 0 ]; then
-      touch $LOGDIR/$SV_CALLING_JOBNAME.done
+      touch $LOG_DIR/$SV_CALLING_JOBNAME.done
     fi
 fi
 echo \`date\`: Done
@@ -687,7 +617,7 @@ cat << EOF > $FUSION_CHECK_SH
 #$ -hold_jid $SV_CALLING_JOBNAME
 
 echo \`date\`: Running on \`uname -n\`
-if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ];then
+if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ];then
   bash $PIPELINE_DIR/fusion_check.sh \
     -v $SV_CALLING_OUT \
     -o $FUSION_CHECK_VCF_OUTPUT \
@@ -705,7 +635,7 @@ if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ];then
       echo "Number of lines in all split VCF files is not equal to the number of lines in the original VCF file"
       exit
     else
-      touch $LOGDIR/$FUSION_CHECK_JOBNAME.done
+      touch $LOG_DIR/$FUSION_CHECK_JOBNAME.done
     fi
   else
     echo "Fusion check did not complete; Increase FUSION_CHECK_MEMORY or FUSION_CHECK_TIME" >&2
@@ -735,44 +665,44 @@ echo "------------------------------------------------" >> $CHECK_NANOFG_OUT
 echo "\`date\`" >> $CHECK_NANOFG_OUT
 echo "Sample name: $VCF_NAME" >> $CHECK_NANOFG_OUT
 
-if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$VCF_SPLIT_JOBNAME.done ]; then
     echo "Vcf split: Done" >> $CHECK_NANOFG_OUT
 else
     echo "Vcf split: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
-NUMBER_OF_FUSION_READ_EXTRACTION_JOBS=\$(ls $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
-if [ \$NUMBER_OF_FUSION_READ_EXTRACTION_JOBS==$NUMBER_OF_FILES ] && [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+NUMBER_OF_FUSION_READ_EXTRACTION_JOBS=\$(ls $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
+if [ \$NUMBER_OF_FUSION_READ_EXTRACTION_JOBS==$NUMBER_OF_FILES ] && [ -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
     echo "Fusion read extraction: Done" >> $CHECK_NANOFG_OUT
 else
   echo "Fusion read extraction: Fail" >> $CHECK_NANOFG_OUT
   CHECK_BOOL=false
 fi
 
-NUMBER_OF_CONSENSUS_MAPPING_JOBS=\$(ls $LOGDIR/$CONSENSUS_MAPPING_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
-if [ \$NUMBER_OF_CONSENSUS_MAPPING_JOBS==$NUMBER_OF_FILES ] && [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
+NUMBER_OF_CONSENSUS_CALLING_JOBS=\$(ls $LOG_DIR/$CONSENSUS_CALLING_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
+if [ \$NUMBER_OF_CONSENSUS_CALLING_JOBS==$NUMBER_OF_FILES ] && [ -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
     echo "Consensus mapping: Done" >> $CHECK_NANOFG_OUT
 else
     echo "Consensus mapping: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
-if [ -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
     echo "Bam merge: Done" >> $CHECK_NANOFG_OUT
 else
     echo "Bam merge: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
-if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ]; then
     echo "SV calling: Done" >> $CHECK_NANOFG_OUT
 else
     echo "SV calling: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
-if [ -e $LOGDIR/$FUSION_CHECK_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$FUSION_CHECK_JOBNAME.done ]; then
     echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
 else
     echo "Fusion check: Fail" >> $CHECK_NANOFG_OUT
@@ -781,7 +711,7 @@ fi
 
 if [ \$CHECK_BOOL = true ]; then
   echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
-    touch $LOGDIR/$CHECK_NANOFG_JOBNAME.done
+    touch $LOG_DIR/$CHECK_NANOFG_JOBNAME.done
     if [ $DONT_CLEAN = false ]; then
       rm -rf $SPLITDIR
       rm $MERGE_BAMS_OUT
@@ -803,25 +733,25 @@ qsub $CHECK_NANOFG_SH
 }
 
 
-if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$VCF_SPLIT_JOBNAME.done ]; then
     vcf_split
 fi
-if [ ! -e $LOGDIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
     fusion_read_extraction
 fi
-if [ ! -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
-    consensus_mapping
+if [ ! -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
+    consensus_calling
 fi
-if [ ! -e $LOGDIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
     bam_merge
 fi
-if [ ! -e $LOGDIR/$SV_CALLING_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$SV_CALLING_JOBNAME.done ]; then
     sv_calling
 fi
-if [ ! -e $LOGDIR/$FUSION_CHECK_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$FUSION_CHECK_JOBNAME.done ]; then
     fusion_check
 fi
-if [ ! -e $LOGDIR/$CHECK_NANOFG_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$CHECK_NANOFG_JOBNAME.done ]; then
     check_NanoFG
 fi
 
