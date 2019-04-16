@@ -668,26 +668,24 @@ echo "------------------------------------------------" >> $CHECK_NANOFG_OUT
 echo "\`date\`" >> $CHECK_NANOFG_OUT
 echo "Sample name: $VCF_NAME" >> $CHECK_NANOFG_OUT
 
-if [ -e $LOG_DIR/$VCF_SPLIT_JOBNAME.done ]; then
-    echo "Vcf split: Done" >> $CHECK_NANOFG_OUT
-else
-    echo "Vcf split: Fail" >> $CHECK_NANOFG_OUT
-    CHECK_BOOL=false
-fi
-
-NUMBER_OF_FUSION_READ_EXTRACTION_JOBS=\$(ls $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
-if [ \$NUMBER_OF_FUSION_READ_EXTRACTION_JOBS==$NUMBER_OF_FILES ] && [ -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
-    echo "Fusion read extraction: Done" >> $CHECK_NANOFG_OUT
+if [ -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
+  echo "Fusion read extraction: Done" >> $CHECK_NANOFG_OUT
 else
   echo "Fusion read extraction: Fail" >> $CHECK_NANOFG_OUT
   CHECK_BOOL=false
 fi
 
-NUMBER_OF_CONSENSUS_CALLING_JOBS=\$(ls $LOG_DIR/$CONSENSUS_CALLING_JOBNAME_*.done | wc -l | grep -oP "(^\d+)")
-if [ \$NUMBER_OF_CONSENSUS_CALLING_JOBS==$NUMBER_OF_FILES ] && [ -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
-    echo "Consensus mapping: Done" >> $CHECK_NANOFG_OUT
+if [ -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
+    echo "Consensus calling: Done" >> $CHECK_NANOFG_OUT
 else
-    echo "Consensus mapping: Fail" >> $CHECK_NANOFG_OUT
+    echo "Consensus calling: Fail" >> $CHECK_NANOFG_OUT
+    CHECK_BOOL=false
+fi
+
+if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
+    echo "Last mapping: Done" >> $CHECK_NANOFG_OUT
+else
+    echo "Last mapping: Fail" >> $CHECK_NANOFG_OUT
     CHECK_BOOL=false
 fi
 
@@ -716,7 +714,7 @@ if [ \$CHECK_BOOL = true ]; then
   echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
     touch $LOG_DIR/$CHECK_NANOFG_JOBNAME.done
     if [ $DONT_CLEAN = false ]; then
-      rm -rf $SPLITDIR
+      rm -rf $CANDIDATE_DIR
       rm $MERGE_BAMS_OUT
       rm $SV_CALLING_OUT
     fi
@@ -736,14 +734,14 @@ qsub $CHECK_NANOFG_SH
 }
 
 
-if [ ! -e $LOG_DIR/$VCF_SPLIT_JOBNAME.done ]; then
-    vcf_split
-fi
 if [ ! -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
     fusion_read_extraction
 fi
 if [ ! -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
     consensus_calling
+fi
+if [ ! -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
+    last_mapping
 fi
 if [ ! -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
     bam_merge
