@@ -534,12 +534,6 @@ if [ -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ]; then
       exit
     fi
 
-    FUSION_READ_EXTRACTION_JOBS_COMPLETE="\$(ls ${FUSION_READ_EXTRACTION_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
-
-    if [ \$FUSION_READ_EXTRACTION_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
-      touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
-      mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
-    fi
   fi
 fi
 echo \`date\`: Done
@@ -564,6 +558,13 @@ cat << EOF > $CONSENSUS_MAPPING_SH
 
 echo \`date\`: Running on \`uname -n\`
 
+FUSION_READ_EXTRACTION_JOBS_COMPLETE="\$(ls ${FUSION_READ_EXTRACTION_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
+
+if [ \$FUSION_READ_EXTRACTION_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
+  touch $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
+  mv ${FUSION_READ_EXTRACTION_JOBNAME}.* $LOGDIR
+fi
+
 if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ] && [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
   if [ ! -e $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done ]; then
     for FASTA in $VCF_SPLIT_OUTDIR/\$SGE_TASK_ID/*.fasta; do
@@ -585,14 +586,6 @@ if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ] && [ -e $
         echo "Consensus mapping did not complete; Increase CONSENSUS_MAPPING_MEMORY or CONSENSUS_MAPPING_TIME" >&2
       fi
     done
-
-    CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls ${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
-
-    if [ \$CONSENSUS_MAPPING_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
-      touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}.done
-      mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
-    fi
-
   fi
 fi
 
@@ -616,6 +609,13 @@ cat << EOF > $MERGE_BAMS_SH
 #$ -hold_jid $CONSENSUS_MAPPING_JOBNAME
 
 echo \`date\`: Running on \`uname -n\`
+
+CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls ${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
+
+if [ \$CONSENSUS_MAPPING_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
+  touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}.done
+  mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
+fi
 
 if [ -e $LOGDIR/$CONSENSUS_MAPPING_JOBNAME.done ]; then
   mv ${CONSENSUS_MAPPING_JOBNAME}.* $LOGDIR
