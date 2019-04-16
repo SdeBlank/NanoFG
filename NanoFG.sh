@@ -468,6 +468,7 @@ if [ ! -e $LOGDIR/$VCF_SPLIT_JOBNAME.done ];then
     else
       grep "^#" $VCF > \$VCF_NO_INS
       grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
+    fi
 
     bash $PIPELINE_DIR/vcf_split.sh \
     -v \$VCF_NO_INS \
@@ -577,11 +578,12 @@ if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ] && [ -e $
       -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
       -s $SAMBAMBA
 
-      FINISHED="\$(tail -n 2 ${CONSENSUS_MAPPING_JOBNAME}.*.\$SGE_TASK_ID | grep -o Done | wc -l | grep -oP "(^\d+)")"
+      FINISHED="\$(tail -n 2 ${CONSENSUS_MAPPING_JOBNAME}.*.\$SGE_TASK_ID | grep -o "Done" | wc -l | grep -oP "(^\d+)")"
       if [ \$FINISHED==2 ];then
         touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done
       else
         echo "Consensus mapping did not complete; Increase CONSENSUS_MAPPING_MEMORY or CONSENSUS_MAPPING_TIME" >&2
+      fi
     done
 
     CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls ${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
