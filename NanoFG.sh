@@ -356,7 +356,7 @@ fi
 NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
 
 if [ -z $VCF_SPLIT_LINES ]; then
-  NUMBER_OF_FILES=5
+  NUMBER_OF_FILES=2
   #VCF_SPLIT_LINES=$(expr $NUMBER_OF_SVS / $NUMBER_OF_FILES + 1)
   ((VCF_SPLIT_LINES = ($NUMBER_OF_SVS + $NUMBER_OF_FILES - 1) / $NUMBER_OF_FILES))
   if [ $VCF_SPLIT_LINES -lt 250 ]; then
@@ -577,14 +577,14 @@ if [ -e $LOGDIR/${FUSION_READ_EXTRACTION_JOBNAME}_\$SGE_TASK_ID.done ] && [ -e $
       -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
       -s $SAMBAMBA
 
-    FINISHED="\$(tail -n 2 \${CONSENSUS_MAPPING_JOBNAME}.*.\$SGE_TASK_ID | grep -o Done | wc -l | grep -oP "(^\d+)")"
-    if [ \$FINISHED==2 ];then
-      touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done
-    else
-      echo "Consensus mapping did not complete; Increase CONSENSUS_MAPPING_MEMORY or CONSENSUS_MAPPING_TIME" >&2
+      FINISHED="\$(tail -n 2 ${CONSENSUS_MAPPING_JOBNAME}.*.\$SGE_TASK_ID | grep -o Done | wc -l | grep -oP "(^\d+)")"
+      if [ \$FINISHED==2 ];then
+        touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}_\$SGE_TASK_ID.done
+      else
+        echo "Consensus mapping did not complete; Increase CONSENSUS_MAPPING_MEMORY or CONSENSUS_MAPPING_TIME" >&2
     done
 
-    CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls \${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
+    CONSENSUS_MAPPING_JOBS_COMPLETE="\$(ls ${CONSENSUS_MAPPING_JOBNAME}_*.done | wc -l | grep -oP "(^\d+)")"
 
     if [ \$CONSENSUS_MAPPING_JOBS_COMPLETE==$NUMBER_OF_FILES ];then
       touch $LOGDIR/${CONSENSUS_MAPPING_JOBNAME}.done
@@ -696,7 +696,7 @@ if [ -e $LOGDIR/$SV_CALLING_JOBNAME.done ];then
   NUMBER_VCF_INPUT=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
   NUMBER_VCF_OUTPUT=\$(grep -v "^#" $FUSION_CHECK_VCF_OUTPUT | wc -l | grep -oP "(^\d+)")
 
-  FINISHED="\$(tail -n 2 \$FUSION_CHECK_LOG | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
+  FINISHED="\$(tail -n 2 $FUSION_CHECK_LOG | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
 
   if [ \$FINISHED==2 ]; then
     if [ $NUMBER_OF_LINES_VCF_1 != $NUMBER_OF_LINES_VCF_2 ]; then
