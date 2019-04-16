@@ -52,7 +52,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 echo `date`: Running on `uname -n`
 
-echo "$SAMBAMBA merge $OUTPUT $SPLITDIR/*/*last.sorted.bam"
-$SAMBAMBA merge $OUTPUT $SPLITDIR/*/*last.sorted.bam
+echo "$SAMBAMBA merge $OUTPUT $SPLITDIR/*.last.sorted.bam"
+$SAMBAMBA merge $OUTPUT $SPLITDIR/*.last.sorted.bam
 
 echo `date`: Done
