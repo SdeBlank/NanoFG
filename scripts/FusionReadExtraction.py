@@ -59,7 +59,7 @@ def create_fasta( chr, start, end, svid, exclude, fusion ):
             continue
         fasta.write( ">"+read.query_name+"\n")
         fasta.write(read.seq+"\n")
-        exclude.append(read.query_name)
+        #exclude.append(read.query_name)
     fasta.close()
     bamfile.close()
 
