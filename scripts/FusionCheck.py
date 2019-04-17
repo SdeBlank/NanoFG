@@ -19,9 +19,6 @@ def ParseVcf(vcf, vcf_output, info_output):
         VCF_WRITER=pyvcf.Writer(vcf_output, VCF_READER, lineterminator='\n')
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL IDS", "5'_gene", "5'_BND","5'_CDS length", "5' Original_CDS_length","3'_gene", "3'_BND","3'_CDS length", "3' Original_CDS_length"])+"\n")
         for record in VCF_READER:
-            # Do not activate filter step yet, testing on SOMATIC set, so filter will contain BPI-SOMATIC and PCR-SOMATIC
-            if not isinstance(record.ALT[0], pyvcf.model._Breakend):# or len(record.FILTER)>0:
-                continue
             CHROM1=record.CHROM
             POS1=record.POS
             CHROM2=record.ALT[0].chr
@@ -33,9 +30,11 @@ def ParseVcf(vcf, vcf_output, info_output):
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=EnsemblAnnotation(CHROM1, POS1)
             if not breakend1_annotation:
+                VCF_WRITER.write_record(record)
                 continue
             breakend2_annotation=EnsemblAnnotation(CHROM2, POS2)
             if not breakend2_annotation:
+                VCF_WRITER.write_record(record)
                 continue
             #Use requested information to calculate BND specific features
             breakend1_info=BreakendAnnotation(CHROM1, POS1, POS1_ORIENTATION, breakend1_annotation)
@@ -90,7 +89,7 @@ def EnsemblAnnotation(CHROM, POS):
 
             if "description" in gene_info:
                 if "readthrough" in gene_info["description"]:
-                    INFO["Flags"].append("Readthrough")
+                    INFO["Flags"].append("fusion-with-readthrough")
 
             ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or readthrough genes)
 
@@ -99,7 +98,7 @@ def EnsemblAnnotation(CHROM, POS):
                 if transcript["is_canonical"]==1:
                     if transcript["id"] in transcript_ccds:
                         if transcript_ccds[transcript["id"]] is None:
-                            INFO["Flags"].append("No CCDS")
+                            INFO["Flags"].append("No-CCDS")
                     LENGTH_CDS=0
                     CDS=False
                     INFO["Transcript_id"]=transcript["id"]
@@ -187,7 +186,7 @@ def EnsemblAnnotation(CHROM, POS):
                             INFO["Exons"].append(INTRON_INFO)
                     #print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
                     if LENGTH_CDS-3!=transcript["Translation"]["length"]*3:
-                        INFO["Flags"].append("Possible incomplete CDS")             #as currently I am unable to request the given ENSEMBL flags. Bias towards incomplete but bases%3=0
+                        INFO["Flags"].append("Possible-incomplete-CDS")             #as currently I am unable to request the given ENSEMBL flags. Bias towards incomplete but bases%3=0
             HITS.append(INFO)
     return HITS
 

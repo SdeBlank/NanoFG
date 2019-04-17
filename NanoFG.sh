@@ -37,9 +37,9 @@ CONSENSUS MAPPING
     -cchr|--consensus_calling_h_rt                                                Consensus mapping time [${CONSENSUS_CALLING_TIME}]
 
 LAST_MAPPING
-    -lmr|--consensus_calling_refgenome                                            Reference genome [${REF}]
-    -lmrd|--consensus_calling_refdict                                             Reference genome .dict file [${REF_DICT}]
-    -lms|--consensus_calling_last_settings                                        LAST settings [${LAST_SETTINGS}]
+    -lmr|--last_mapping_refgenome                                                 Reference genome [${REF}]
+    -lmrd|--last_mapping_refdict                                                  Reference genome .dict file [${REF_DICT}]
+    -lms|--last_mapping_settings                                                  LAST settings [${LAST_SETTINGS}]
     -lmt|--last_mapping_threads                                                   Number of threads[$LAST_MAPPING_THREADS]
     -lmhv|--last_mapping_h_vmem                                                   Last mapping memory[$LAST_MAPPING_MEMORY]
     -lmht|--last_mapping_h_rt                                                     Last mapping runtime[$LAST_MAPPING_TIME]
@@ -86,13 +86,13 @@ WTDBG2_DIR=$PATH_WTDBG2_DIR
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
 FUSION_READ_EXTRACTION_THREADS=1
-FUSION_READ_EXTRACTION_TIME=0:10:0
+FUSION_READ_EXTRACTION_TIME=0:30:0
 FUSION_READ_EXTRACTION_MEMORY=10G
 
 #CONSENSUS CALLING DEFAULTS
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g'
 CONSENSUS_CALLING_THREADS=8
-CONSENSUS_CALLING_TIME=0:15:0
+CONSENSUS_CALLING_TIME=0:30:0
 CONSENSUS_CALLING_MEMORY=50G
 
 #LAST MAPPING DEFAULTS
@@ -100,12 +100,12 @@ LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
 LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=8
-LAST_MAPPING_TIME=1:0:0
-LAST_MAPPING_MEMORY=30G
+LAST_MAPPING_TIME=0:20:0
+LAST_MAPPING_MEMORY=50G
 
 #BAM MERGE DEFAULTS
 BAM_MERGE_THREADS=1
-BAM_MERGE_TIME=0:10:0
+BAM_MERGE_TIME=0:5:0
 BAM_MERGE_MEMORY=40G
 
 #SV CALLING DEFAULTS
@@ -117,7 +117,7 @@ SV_CALLING_CONFIG=$FILES_DIR/nanosv_last_config.ini
 #FUSION CHECK DEFAULTS
 FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 FUSION_CHECK_THREADS=1
-FUSION_CHECK_TIME=0:30:0
+FUSION_CHECK_TIME=0:10:0
 FUSION_CHECK_MEMORY=10G
 
 #CHECK NANOFG DEFAULTS
@@ -234,7 +234,7 @@ do
     shift # past argument
     shift # past value
     ;;
-    -lmr|-LAST_MAPPING_REFGENOME)
+    -lmr|--last_mapping_refgenome)
     LAST_MAPPING_REFGENOME="$2"
     shift # past argument
     shift # past value
@@ -246,6 +246,16 @@ do
     ;;
     -lms|--last_mapping_settings)
     LAST_MAPPING_SETTINGS="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -lmhv|--last_mapping_h_vmem)
+    LAST_MAPPING_MEMORY="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -lmht|--last_mapping_h_rt)
+    LAST_MAPPING_TIME="$2"
     shift # past argument
     shift # past value
     ;;
@@ -437,10 +447,10 @@ if [ ! -e ${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
   -v \$VCF_NO_INS \
   -o $CANDIDATE_DIR/
 
-  FINISHED="\$(tail -n 1 ${FUSION_READ_EXTRACTION_ERR} | grep -o "End" | wc -l | grep -oP "(^\d+)")"
+  FINISHED="\$(tail -n 1 ${FUSION_READ_EXTRACTION_LOG} | grep -o "End" | wc -l | grep -oP "(^\d+)")"
 
   NUMBER_OF_CANDIDATE_FUSIONS=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
-  echo "NUMBER OF FUSION CANDIDATES: \$NUMBER_OF_CANDIDATE_FUSIONS"
+  echo "NUMBER OF FUSION CANDIDATES: \$NUMBER_OF_CANDIDATE_FUSIONS" >&1
   if [ \$FINISHED -eq 2 ]; then
     if [ \$NUMBER_OF_CANDIDATE_FUSIONS -ne 0 ];then
       touch $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
@@ -491,13 +501,10 @@ if [ -e $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
     NUMBER_FASTA_INPUT=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
     NUMBER_CONTIG_OUTPUT=\$(ls $CANDIDATE_DIR/*.ctg.fa | wc -l | grep -oP "(^\d+)")
 
-    echo "NUMBER OF FUSION CANDIDATE FASTA FILES: \$NUMBER_FASTA_INPUT"
-    echo "NUMBER OF FUSION CANDIDATE CONTIG FILES: \$NUMBER_CONTIG_OUTPUT"
-
     if [ \$NUMBER_FASTA_INPUT -eq \$NUMBER_CONTIG_OUTPUT ];then
       touch $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done
     else
-      echo "Number of made contig files is not equal to the nubmer of input fasta files " >&2
+      echo "Number of made contig files (\${NUMBER_CONTIG_OUTPUT}) is not equal to the nubmer of input fasta files (\${NUMBER_FASTA_INPUT}) " >&2
     fi
 
   fi
@@ -537,15 +544,15 @@ if [ -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
     NUMBER_FA_INPUT=\$(ls $CANDIDATE_DIR/*.ctg.fa | wc -l | grep -oP "(^\d+)")
     NUMBER_BAM_OUTPUT=\$(ls $CANDIDATE_DIR/*.ctg.last.sorted.bam | wc -l | grep -oP "(^\d+)")
 
-    echo "NUMBER OF FUSION CANDIDATE CONTIG FILES: \$NUMBER_FA_INPUT"
-    echo "NUMBER OF FUSION CANDIDATE BAM FILES: \$NUMBER_BAM_OUTPUT"
     if [ \$ERROR -eq 0 ];then
       if [ \$NUMBER_FA_INPUT -eq \$NUMBER_BAM_OUTPUT ];then
         touch $LOG_DIR/${LAST_MAPPING_JOBNAME}.done
       else
-        echo "Number of output bam files is not equal to the number of input contig fasta files" >&2
+        echo "Number of output bam files (\${NUMBER_BAM_OUTPUT}) is not equal to the number of input contig fasta files (\${NUMBER_FA_INPUT})" >&2
         exit
       fi
+    else
+      exit
     fi
   fi
 fi
@@ -580,6 +587,8 @@ if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
 
     if [ -e $MERGE_BAMS_OUT ];then
       touch $LOG_DIR/$MERGE_BAMS_JOBNAME.done
+    else
+      "BAM merge did not complete correctly" >&2
     fi
   fi
 fi
@@ -620,6 +629,9 @@ if [ -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
     NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
     if [ \$NUMBER_OF_LINES_VCF -ne 0 ]; then
       touch $LOG_DIR/$SV_CALLING_JOBNAME.done
+    else
+      echo "Consensus VCF file is empty" >&2
+      exit
     fi
 fi
 echo \`date\`: Done
@@ -654,11 +666,11 @@ if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ];then
   FINISHED="\$(tail -n 2 $FUSION_CHECK_LOG | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
 
   if [ \$FINISHED -eq 2 ]; then
-    if [ $NUMBER_OF_LINES_VCF_1 -ne $NUMBER_OF_LINES_VCF_2 ]; then
-      echo "Number of lines in all split VCF files is not equal to the number of lines in the original VCF file"
-      exit
-    else
+    if [ $NUMBER_VCF_INPUT -eq $NUMBER_VCF_OUTPUT ]; then
       touch $LOG_DIR/$FUSION_CHECK_JOBNAME.done
+    else
+      echo "Number of lines in all split VCF files (\${NUMBER_VCF_OUTPUT}) is not equal to the number of lines in the original VCF file (\${NUMBER_VCF_INPUT})" >&2
+      exit
     fi
   else
     echo "Fusion check did not complete; Increase FUSION_CHECK_MEMORY or FUSION_CHECK_TIME" >&2
@@ -754,11 +766,9 @@ qsub $CHECK_NANOFG_SH
 }
 
 if [ ! -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
-    echo "1"
     fusion_read_extraction
 fi
 if [ ! -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
-  echo "2"
     consensus_calling
 fi
 if [ ! -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
