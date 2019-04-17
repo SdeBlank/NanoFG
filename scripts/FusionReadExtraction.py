@@ -47,11 +47,11 @@ def get_gene_overlap( chr, pos, ori, bp ):
 
     return( fusions )
 
-def create_fasta( chr, start, end, svid, exclude, fusion ):
+def create_fasta( chr, start, end, svid, exclude ):
     if end < start:
         end, start = start, end
     bamfile = pysam.AlignmentFile(args.bam, "rb" )
-    fasta = open(args.output_dir+"/"+svid+"_"+fusion+".fasta", 'a+')
+    fasta = open(args.output_dir+"/"+svid+".fasta", 'a+')
     for read in bamfile.fetch(chr, start, end):
         #### Breakpoints that only have supplementary reads and not a primary read spanning the breakpoint will be excluded
         #### No effect when testing on the truthset in recall, but see if it ever happens in real sets
@@ -75,7 +75,13 @@ for record in vcf_reader:
     if not fusions:
         continue
     fusions.update(get_gene_overlap(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, '2' ))
+
+    good_fusion=False
+
     if 'donor' in fusions and 'acceptor' in fusions:
+        largest_donor_size=0
+        largest_acceptor_size=0
+        REF_READ_IDS=record.INFO['REF_READ_IDS_1']+record.INFO['REF_READ_IDS_2']
         for donor in fusions['donor']:
             donor_gene, donor_bp = donor.split("\t")
             for acceptor in fusions['acceptor']:
@@ -83,23 +89,40 @@ for record in vcf_reader:
                 fusion = donor_gene+"_"+acceptor_gene
                 if donor_gene != acceptor_gene:
                     if donor_bp == '1' and acceptor_bp == '2':
-                        donor_chr = record.CHROM
-                        donor_start = fusions['donor'][donor]
-                        donor_end = record.POS
-                        create_fasta(donor_chr, donor_start, donor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
-                        acceptor_chr = record.ALT[0].chr
-                        acceptor_start = record.ALT[0].pos
-                        acceptor_end = fusions['acceptor'][acceptor]
-                        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_2'], fusion)
+                        good_fusion=True
+                        donor_size=abs(record.POS-fusions['donor'][donor])
+                        if donor_size>largest_donor_size:
+                            largest_donor_size=donor_size
+                            donor_chr = record.CHROM
+                            donor_start = fusions['donor'][donor]
+                            donor_end = record.POS
+
+                        acceptor_size=abs(record.ALT[0].pos-fusions['acceptor'][acceptor])
+                        if acceptor_size>largest_acceptor_size:
+                            largest_acceptor_size=acceptor_size
+                            acceptor_chr = record.ALT[0].chr
+                            acceptor_start = record.ALT[0].pos
+                            acceptor_end = fusions['acceptor'][acceptor]
+
                     elif donor_bp == '2' and acceptor_bp == '1':
-                        donor_chr = record.ALT[0].chr
-                        donor_start = fusions['donor'][donor]
-                        donor_end = record.ALT[0].pos
-                        create_fasta(donor_chr, donor_start, donor_end, record.ID, record.INFO['REF_READ_IDS_2'], fusion)
-                        acceptor_chr = record.CHROM
-                        acceptor_start = fusions['acceptor'][acceptor]
-                        acceptor_end = record.POS
-                        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, record.INFO['REF_READ_IDS_1'], fusion)
+                        good_fusion=True
+                        donor_size=abs(record.ALT[0].pos-fusions['donor'][donor])
+                        if donor_size>largest_donor_size:
+                            largest_donor_size=donor_size
+                            donor_chr = record.ALT[0].chr
+                            donor_start = fusions['donor'][donor]
+                            donor_end = record.ALT[0].pos
+
+                        acceptor_size=abs(record.POS-fusions['acceptor'][acceptor])
+
+                        if acceptor_size>largest_acceptor_size:
+                            largest_acceptor_size=acceptor_size
+                            acceptor_chr = record.CHROM
+                            acceptor_start = fusions['acceptor'][acceptor]
+                            acceptor_end = record.POS
+    if good_fusion:
+        create_fasta(donor_chr, donor_start, donor_end, record.ID, REF_READ_IDS)
+        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, REF_READ_IDS)
 
 print("End:", datetime.datetime.now())
     #create_fasta(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].pos+1000, record.ID, record.INFO['REF_READ_IDS_2'])

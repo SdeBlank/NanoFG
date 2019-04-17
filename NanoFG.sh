@@ -1,4 +1,4 @@
-#!/bin/bash
+BAM_MERGE#!/bin/bash
 
 usage() {
 echo "
@@ -45,14 +45,14 @@ LAST_MAPPING
     -lmht|--last_mapping_h_rt                                                     Last mapping runtime[$LAST_MAPPING_TIME]
 
 BAM MERGE
-    -bmt|vcf_split_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
-    -bmhv|vcf_split_h_vmem                                                        Bam merge memory [${VCF_SPLIT_MEMORY}]
-    -bmhr|vcf_split_h_rt                                                          Bam merge time [${VCF_SPLIT_TIME}]
+    -bmt|--bam_merge_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
+    -bmhv|--bam_merge_h_vmem                                                        Bam merge memory [${VCF_SPLIT_MEMORY}]
+    -bmhr|--bam_merge_h_rt                                                          Bam merge time [${VCF_SPLIT_TIME}]
 
 SV CALLING
-    -sct|sv_calling_threads                                                       Number of threads [${SV_CALLING_THREADS}]
-    -schv|sv_calling_h_vmem                                                       SV calling memory [${SV_CALLING_MEMORY}]
-    -schr|sv_calling_h_rt                                                         SV calling time [${SV_CALLING_TIME}]
+    -sct|--sv_calling_threads                                                       Number of threads [${SV_CALLING_THREADS}]
+    -schv|--sv_calling_h_vmem                                                       SV calling memory [${SV_CALLING_MEMORY}]
+    -schr|--sv_calling_h_rt                                                         SV calling time [${SV_CALLING_TIME}]
 
 FUSION CHECK
     -fcio|--fusion_check_info_output                                              Path to the NanoFG output info file []
@@ -100,7 +100,7 @@ LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
 LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=8
-LAST_MAPPING_TIME=0:10:0
+LAST_MAPPING_TIME=0:15:0
 LAST_MAPPING_MEMORY=30G
 
 #BAM MERGE DEFAULTS
@@ -376,11 +376,11 @@ LAST_MAPPING_SH=$JOB_DIR/$LAST_MAPPING_JOBNAME.sh
 LAST_MAPPING_ERR=$LOG_DIR/$LAST_MAPPING_JOBNAME.err
 LAST_MAPPING_LOG=$LOG_DIR/$LAST_MAPPING_JOBNAME.log
 
-MERGE_BAMS_JOBNAME=${VCF_NAME}_MERGE_BAMS
-MERGE_BAMS_SH=$JOB_DIR/$MERGE_BAMS_JOBNAME.sh
-MERGE_BAMS_ERR=$LOG_DIR/$MERGE_BAMS_JOBNAME.err
-MERGE_BAMS_LOG=$LOG_DIR/$MERGE_BAMS_JOBNAME.log
-MERGE_BAMS_OUT=$OUTPUTDIR/consensus_last.sorted.bam
+BAM_MERGE_JOBNAME=${VCF_NAME}_BAM_MERGE
+BAM_MERGE_SH=$JOB_DIR/$BAM_MERGE_JOBNAME.sh
+BAM_MERGE_ERR=$LOG_DIR/$BAM_MERGE_JOBNAME.err
+BAM_MERGE_LOG=$LOG_DIR/$BAM_MERGE_JOBNAME.log
+BAM_MERGE_OUT=$OUTPUTDIR/consensus_last.sorted.bam
 
 SV_CALLING_JOBNAME=${VCF_NAME}_SV_CALLING
 SV_CALLING_SH=$JOB_DIR/$SV_CALLING_JOBNAME.sh
@@ -447,16 +447,15 @@ if [ ! -e ${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
   -v \$VCF_NO_INS \
   -o $CANDIDATE_DIR/
 
-  FINISHED="\$(tail -n 1 ${FUSION_READ_EXTRACTION_LOG} | grep -o "End" | wc -l | grep -oP "(^\d+)")"
-
   NUMBER_OF_CANDIDATE_FUSIONS=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
-  echo "NUMBER OF FUSION CANDIDATES: \$NUMBER_OF_CANDIDATE_FUSIONS" >&1
-  if [ \$FINISHED -eq 2 ]; then
+  FINISHED="\$( tail -n 2 ${FUSION_READ_EXTRACTION_LOG} | grep "End" | wc -l | grep -oP "(^\d+)")"
+
+  if [ \$FINISHED -ne 0 ]; then
     if [ \$NUMBER_OF_CANDIDATE_FUSIONS -ne 0 ];then
+      echo "NUMBER OF FUSION CANDIDATES: \$NUMBER_OF_CANDIDATE_FUSIONS" >&1
       touch $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
     else
       echo "No fusion candidates found" >&1
-      echo "No fusion candidates found" >&2
       exit
     fi
   else
@@ -564,29 +563,29 @@ qsub $LAST_MAPPING_SH
 
 bam_merge() {
 
-cat << EOF > $MERGE_BAMS_SH
+cat << EOF > $BAM_MERGE_SH
 #!/bin/bash
 
-#$ -N $MERGE_BAMS_JOBNAME
+#$ -N $BAM_MERGE_JOBNAME
 #$ -cwd
 #$ -pe threaded $BAM_MERGE_THREADS
 #$ -l h_vmem=$BAM_MERGE_MEMORY
 #$ -l h_rt=$BAM_MERGE_TIME
-#$ -e $MERGE_BAMS_ERR
-#$ -o $MERGE_BAMS_LOG
+#$ -e $BAM_MERGE_ERR
+#$ -o $BAM_MERGE_LOG
 #$ -hold_jid $LAST_MAPPING_JOBNAME
 
 echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
-  if [ ! -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
+  if [ ! -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
     bash $PIPELINE_DIR/bam_merge.sh \
       -d $CANDIDATE_DIR \
       -s $SAMBAMBA \
-      -o $MERGE_BAMS_OUT
+      -o $BAM_MERGE_OUT
 
-    if [ -e $MERGE_BAMS_OUT ];then
-      touch $LOG_DIR/$MERGE_BAMS_JOBNAME.done
+    if [ -e $BAM_MERGE_OUT ];then
+      touch $LOG_DIR/$BAM_MERGE_JOBNAME.done
     else
       "BAM merge did not complete correctly" >&2
     fi
@@ -594,7 +593,7 @@ if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
 fi
 echo \`date\`: Done
 EOF
-qsub $MERGE_BAMS_SH
+qsub $BAM_MERGE_SH
 }
 
 sv_calling() {
@@ -609,17 +608,17 @@ cat << EOF > $SV_CALLING_SH
 #$ -o $SV_CALLING_LOG
 EOF
 
-if [ ! -z $MERGE_BAMS_JOBNAME ]; then
+if [ ! -z $BAM_MERGE_JOBNAME ]; then
 cat << EOF >> $SV_CALLING_SH
-#$ -hold_jid $MERGE_BAMS_JOBNAME
+#$ -hold_jid $BAM_MERGE_JOBNAME
 EOF
 fi
 
 cat << EOF >> $SV_CALLING_SH
 echo \`date\`: Running on \`uname -n\`
-if [ -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
     bash $PIPELINE_DIR/sv_calling.sh \
-      -b $MERGE_BAMS_OUT \
+      -b $BAM_MERGE_OUT \
       -n $NANOSV \
       -t $SV_CALLING_THREADS \
       -s $SAMBAMBA \
@@ -721,7 +720,7 @@ else
     CHECK_BOOL=false
 fi
 
-if [ -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
     echo "Bam merge: Done" >> $CHECK_NANOFG_OUT
 else
     echo "Bam merge: Fail" >> $CHECK_NANOFG_OUT
@@ -747,7 +746,7 @@ if [ \$CHECK_BOOL = true ]; then
     touch $LOG_DIR/$CHECK_NANOFG_JOBNAME.done
     if [ $DONT_CLEAN = false ]; then
       rm -rf $CANDIDATE_DIR
-      rm $MERGE_BAMS_OUT
+      rm $BAM_MERGE_OUT
       rm $SV_CALLING_OUT
     fi
 else
@@ -775,7 +774,7 @@ if [ ! -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
     last_mapping
 fi
 
-if [ ! -e $LOG_DIR/$MERGE_BAMS_JOBNAME.done ]; then
+if [ ! -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
     bam_merge
 fi
 if [ ! -e $LOG_DIR/$SV_CALLING_JOBNAME.done ]; then

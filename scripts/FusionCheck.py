@@ -2,6 +2,7 @@ import vcf as pyvcf
 import argparse
 import datetime
 import sys
+import nltk
 from EnsemblRestClient import EnsemblRestClient
 
 parser = argparse.ArgumentParser()
@@ -410,10 +411,12 @@ def BreakpointAnnotation(Record, Breakend1, Breakend2, Orientation1, Orientation
                 annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
                 (annotation2["Gene_start"]>annotation1["Gene_start"] and annotation2["Gene_start"]<annotation1["Gene_end"] and
                 annotation2["Gene_end"]>annotation1["Gene_start"] and annotation2["Gene_end"]<annotation1["Gene_end"])):
-                    FLAGS.append("Gene-within-Gene")
 
-            if len(FLAGS)==0:
-                FLAGS=["None"]
+                FLAGS.append("Gene-within-Gene")
+
+            Gene_difference=nltk.edit_distance(annotation1["Gene_name"], annotation2["Gene_name"])
+            if Gene_difference/len(annotation1["Gene_name"]) <= 0.4 and Gene_difference/len(annotation2["Gene_name"]) <= 0.4:
+                FLAGS.append("Similar-genes")
 
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
@@ -434,7 +437,8 @@ def BreakpointAnnotation(Record, Breakend1, Breakend2, Orientation1, Orientation
                     (not Orientation1 and Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (not Orientation1 and not Orientation2 and annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"])):
                         FUSION_TYPE, annotation1["CDS_length"], annotation2["CDS_length"] = FusionCheck(annotation1, annotation2)
-
+                        if len(FLAGS)==0:
+                            FLAGS=["None"]
                         Fusion_output.append("\t".join([str(Record.ID), FUSION_TYPE, ";".join(FLAGS), FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"] ,FIVE_PRIME_GENE["Gene_name"], FIVE_PRIME_GENE["BND"],str(FIVE_PRIME_GENE["CDS_length"]), str(FIVE_PRIME_GENE["Original_CDS_length"]),
                         THREE_PRIME_GENE["Gene_name"], THREE_PRIME_GENE["BND"], str(THREE_PRIME_GENE["CDS_length"]), str(THREE_PRIME_GENE["Original_CDS_length"])])+"\n")
 

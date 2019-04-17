@@ -22,9 +22,9 @@ class EnsemblRestClient(object):
         if parameters is None:
             parameters = {}
         data = None
+
         # check if we need to rate limit ourselves
         if len(self.req_times)==self.reqs_per_sec:
-            print(abs(self.req_times[0]-self.req_times[self.reqs_per_sec-1]))
             if abs(self.req_times[0]-self.req_times[self.reqs_per_sec-1]) < 1:
                 delta = time.time() - self.last_req
                 if delta < 1:

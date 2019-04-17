@@ -28,11 +28,14 @@ SCRIPTS
     -fres|--fusion_read_extraction_script                                         Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
     -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
 
-CONSENSUS MAPPING
-    -r|--consensus_marefgenome                                                    Reference genome [${REF}]
-    -rd|-consensus_mapping_refdict                                                Reference genome .dict file [${REF_DICT}]
-    -ws|--wtdbg2_settings                                                         wtdbg2 settings [${WTDBG2_SETTINGS}]
-    -ls|--last_settings                                                           LAST settings [${LAST_SETTINGS}]
+CONSENSUS CALLING
+    -ccws|--consensus_calling_wtdbg2_settings                                     Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
+
+LAST MAPPING
+    -lmr|--last_mapping_refgenome                                                 Reference genome [${LAST_MAPPING_REFGENOME}]
+    -lmrd|--last_mapping_refdict                                                  Reference genome .dict file [${LAST_MAPPING_REFDICT}]
+    -lms|--last_mapping_settings                                                  LAST settings [${LAST_MAPPING_SETTINGS}]
+    -lmt|--last_mapping_threads                                                   Number of threads [${LAST_MAPPING_THREADS}]
 "
 }
 
@@ -46,6 +49,7 @@ PIPELINE_DIR=$NANOFG_DIR/pipeline
 FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
+THREADS=8
 
 OUTPUTDIR=$(realpath ./)
 
@@ -57,14 +61,14 @@ WTDBG2_DIR=$PATH_WTDBG2_DIR
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
 
-#CONSENSUS MAPPING DEFAULTS
-CONSENSUS_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
-CONSENSUS_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
-CONSENSUS_MAPPING_WTDBG2_SETTINGS='-x ont -g 3g'
-CONSENSUS_MAPPING_LAST_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
-CONSENSUS_MAPPING_THREADS=1
-CONSENSUS_MAPPING_TIME=0:15:0
-CONSENSUS_MAPPING_MEMORY=20G
+#CONSENSUS CALLING DEFAULTS
+CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g'
+
+#LAST MAPPING DEFAULTS
+LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
+LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
+LAST_MAPPING_THREADS=1
 
 SV_CALLING_CONFIG=$FILES_DIR/nanosv_last_config.ini
 
@@ -132,23 +136,23 @@ do
     shift # past argument
     shift # past value
     ;;
-    -cmr|--consensus_mapping_refgenome)
-    CONSENSUS_MAPPING_REFGENOME="$2"
+    -ccws|--consensus_calling_wtdbg2_settings)
+    CONSENSUS_CALLING_WTDBG2_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmrd|--consensus_mapping_refdict)
-    CONSENSUS_MAPPING_REFDICT="$2"
+    -lmr|--last_mapping_refgenome)
+    LAST_MAPPING_REFGENOME="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmws|--consensus_mapping_wtdbg2_settings)
-    CONSENSUS_MAPPING_WTDBG2_SETTINGS="$2"
+    -lmrd|--last_mapping_refdict)
+    LAST_MAPPING_REFDICT="$2"
     shift # past argument
     shift # past value
     ;;
-    -cmls|--consensus_mapping_last_settings)
-    CONSENSUS_MAPPING_LAST_SETTINGS="$2"
+    -lms|--last_mapping_settings)
+    LAST_MAPPING_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -205,17 +209,13 @@ INFO_OUTPUT=$OUTPUTDIR/${VCF_NAME}_FusionGenesInfo.txt
 
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 SCRIPT_DIR=$NANOFG_DIR/scripts
-
-SPLITDIR=$OUTPUTDIR/split_vcf
-
-THREADS=1
+CANDIDATE_DIR=$OUTPUTDIR/candidate_fusions
 
 MERGE_BAMS_OUT=$OUTPUTDIR/consensus_last.sorted.bam
-
 SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
 
-mkdir -p $SPLITDIR
-if [ ! -d $SPLITDIR ]; then
+mkdir -p $CANDIDATE_DIR
+if [ ! -d $CANDIDATE_DIR ]; then
     exit
 fi
 
@@ -230,6 +230,7 @@ if [ -z $DONT_FILTER ];then
 else
   grep "^#" $VCF > $VCF_NO_INS
   grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
+fi
 
 
 ##################################################
@@ -239,26 +240,30 @@ else
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
   -v $VCF_NO_INS \
-  -o $SPLITDIR
+  -o $CANDIDATE_DIR
 
 ##################################################
 
-for FASTA in $SPLITDIR/*.fasta; do
-  bash $PIPELINE_DIR/consensus_mapping.sh \
+for FASTA in $CANDIDATE_DIR/*.fasta; do
+  bash $PIPELINE_DIR/consensus_calling.sh \
     -f $FASTA \
     -t $THREADS \
-    -r $CONSENSUS_MAPPING_REFGENOME \
-    -rd $CONSENSUS_MAPPING_REFDICT \
     -w $WTDBG2_DIR \
-    -ws '$CONSENSUS_MAPPING_WTDBG2_SETTINGS' \
-    -l $LAST_DIR \
-    -ls '$CONSENSUS_MAPPING_LAST_SETTINGS' \
-    -s $SAMBAMBA
+    -ws '$CONSENSUS_CALLING_WTDBG2_SETTINGS'
 done
 
 ##################################################
 
-$SAMBAMBA merge $MERGE_BAMS_OUT $SPLITDIR/*.last.sorted.bam
+LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
+
+for FA in $CANDIDATE_DIR/*.fa; do
+  echo $FA;
+done | \
+xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
+
+##################################################
+
+$SAMBAMBA merge $MERGE_BAMS_OUT $CANDIDATE_DIR/*.last.sorted.bam
 
 ##################################################
 
