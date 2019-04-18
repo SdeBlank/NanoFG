@@ -7,19 +7,18 @@ Required parameters:
 
 
 Optional parameters:
-    -h|--help       Shows help
-    -o|--output     Vcf output file [_FusionGenes.vcf]
-    -fo|--fusion_output    Txt output file [_FusionGenesInfo.txt]
-    -s|--script     Path to vcf_primer_filter.py [$SCRIPT]
-    -e|--venv       Path to virtual environment[$VENV]
+    -h|--help               Shows help
+    -o|--output             Path to output vcf file [_FusionGenes.vcf]
+    -fo|--fusion_output     Path to output info file [_FusionGenesInfo.txt]
+    -s|--script             Path to the FusionCheck.py script [$SCRIPT]
+    -e|--venv               Path to virtual environment[$VENV]
 "
 }
 
 POSITIONAL=()
 
 NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
-echo $NANOFG_DIR
-SCRIPT=$NANOFG_DIR/scripts/NanoFG.py
+SCRIPT=$NANOFG_DIR/scripts/FusionCheck.py
 VENV=$NANOFG_DIR/venv/bin/activate
 
 while [[ $# -gt 0 ]]

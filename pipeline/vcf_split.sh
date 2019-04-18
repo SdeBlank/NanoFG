@@ -3,19 +3,21 @@
 usage() {
 echo "
 Required parameters:
-    -v|--vcf		    Path to vcf file
+    -v|--vcf		            Path to vcf file
 
 Optional parameters:
     -h|--help               Shows help
-    -d|--split_directory        directory that contains NanoFG [$NANOFG_DIR]
-    -l|--lines     Number of lines to put in each spit vcf file [Devides vcf in 50 files]
+    -o|--outputdir          Path to output directory
+    -d|--split_directory    Path to the output directory for the split vcf files [$SPLITDIR]
+    -l|--lines              Number of lines to put in each spit vcf file [Devides vcf in 5 files]
 "
 }
 
 POSITIONAL=()
 
 #DEFAULTS
-SPLITDIR=./split_vcf
+OUTPUTDIR=$(realpath ./)
+SPLITDIR=${OUTPUTDIR}/split_vcf
 
 while [[ $# -gt 0 ]]
 do
@@ -32,6 +34,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -o|--vcf)
+    VCF="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -d|--split_directory)
     SPLITDIR="$2"
     shift # past argument
@@ -39,6 +46,11 @@ do
     ;;
     -l|--lines)
     LINES="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -n|--number_of_files)
+    NUMBER_OF_FILES="$2"
     shift # past argument
     shift # past value
     ;;
@@ -55,11 +67,12 @@ if [ -z $VCF ]; then
     usage
     exit
 fi
+
 if [ -z $LINES ]; then
   NUMBER_OF_SVS=$(grep -vc "^#" $VCF | grep -oP "(^\d+)")
-  LINES=$(expr $NUMBER_OF_SVS / 100 + 1)
-  if [ $LINES -lt 100 ]; then
-    LINES=100
+  ((LINES = ($NUMBER_OF_SVS + 5 - 1) / 5))
+  if [ $LINES -lt 250 ]; then
+    LINES=250
   fi
 fi
 
@@ -67,6 +80,7 @@ echo `date`: Running on `uname -n`
 
 HEADER=$(grep "^#" $VCF)
 AWK="grep -v \"^#\" $VCF | awk -v HEADER=\"\$HEADER\" 'NR%$LINES==1 { file = \"$SPLITDIR/\" int(NR/$LINES)+1 \".vcf\"; print HEADER > file } { print > file }'"
+
 eval $AWK
 
 echo `date`: Done

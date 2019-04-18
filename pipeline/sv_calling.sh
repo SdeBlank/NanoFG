@@ -3,16 +3,16 @@
 usage() {
 echo "
 Required parameters:
-    -b|--bam		Path to sorted bam file
+    -b|--bam		     Path to sorted bam file
 
 Optional parameters:
-    -h|--help		Shows help
-    -t|--threads	Number of threads [$THREADS]
-    -n|--nanosv   Path to NanoSV [$NANOSV]
-    -s|--sambamba	Path to sambamba [$SAMBAMBA]
-    -v|--venv		Path to virtual env of NanoSV [$VENV]
-    -c|--config		Path to config file [$CONFIG]
-    -o|--output		Path to vcf output file [$OUTPUT]
+    -h|--help		     Shows help
+    -t|--threads	   Number of threads [$THREADS]
+    -n|--nanosv      Path to NanoSV [$NANOSV]
+    -s|--sambamba	   Path to sambamba [$SAMBAMBA]
+    -v|--venv		     Path to virtual env of NanoSV [$VENV]
+    -c|--config		   Path to config file [$CONFIG]
+    -o|--output		   Path to vcf output file [$OUTPUT]
 "
 }
 
