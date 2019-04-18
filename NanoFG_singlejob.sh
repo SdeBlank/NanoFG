@@ -249,7 +249,7 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
     -f $FASTA \
     -t $THREADS \
     -w $WTDBG2_DIR \
-    -ws '$CONSENSUS_CALLING_WTDBG2_SETTINGS'
+    -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
 done
 
 ##################################################

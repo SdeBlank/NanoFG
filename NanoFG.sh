@@ -1,4 +1,4 @@
-BAM_MERGE#!/bin/bash
+#!/bin/bash
 
 usage() {
 echo "
