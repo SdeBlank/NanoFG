@@ -28,6 +28,7 @@ def get_gene_overlap( chr, pos, ori, bp ):
 
     for gene in genes_data:
         if gene["biotype"]=="protein_coding":
+            fusion=[]
             if not ori and gene['strand'] == 1:
                 if 'donor' not in fusions:
                     fusions['donor'] = dict()
@@ -70,14 +71,22 @@ vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
-    fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1' )
+    fusions={'donor':{}, 'acceptor':{}}
+    bnd1_fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1')
+
     ### Skip next request if the first BND already falls outside of a gene
     if not fusions:
         continue
-    fusions.update(get_gene_overlap(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, '2' ))
+    bnd2_fusions=get_gene_overlap(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, '2')
+
+    fusions.update(bnd1_fusions)
+    if 'donor' in bnd2_fusions:
+        fusions['donor'].update(bnd2_fusions['donor'])
+    if 'acceptor' in bnd2_fusions:
+        fusions['acceptor'].update(bnd2_fusions['acceptor'])
 
     good_fusion=False
-
+    print(fusions)
     if 'donor' in fusions and 'acceptor' in fusions:
         largest_donor_size=0
         largest_acceptor_size=0
