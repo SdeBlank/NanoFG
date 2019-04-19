@@ -70,6 +70,7 @@ EnsemblRestClient=EnsemblRestClient()
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
+        #Possibility to add converter for different SV callers
         continue
     fusions={'donor':{}, 'acceptor':{}}
     bnd1_fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1')
