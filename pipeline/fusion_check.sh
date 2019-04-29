@@ -10,6 +10,7 @@ Optional parameters:
     -h|--help               Shows help
     -o|--output             Path to output vcf file [_FusionGenes.vcf]
     -fo|--fusion_output     Path to output info file [_FusionGenesInfo.txt]
+    -p|--pdf               Path to output pdf file [_FusionGenes.pdf]
     -s|--script             Path to the FusionCheck.py script [$SCRIPT]
     -e|--venv               Path to virtual environment[$VENV]
 "
@@ -43,6 +44,11 @@ do
     ;;
     -fo|--fusion_output)
     FUSION_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -p|--pdf)
+    PDF="$2"
     shift # past argument
     shift # past value
     ;;
@@ -80,10 +86,15 @@ if [ -z $FUSION_OUTPUT ]; then
     FUSION_OUTPUT=${FUSION_OUTPUT/.vcf/_FusionGenesInfo.txt}
 fi
 
+if [ -z $PDF ]; then
+    PDF=./$(basename $VCF)
+    PDF=${FUSION_OUTPUT/.vcf/_FusionGenes.pdf}
+fi
+
 echo `date`: Running on `uname -n`
 
 . $VENV
 
-python $SCRIPT -v $VCF -o $OUTPUT -fo $FUSION_OUTPUT
+python $SCRIPT -v $VCF -o $OUTPUT -fo $FUSION_OUTPUT -p $PDF
 
 echo `date`: Done

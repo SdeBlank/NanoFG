@@ -55,8 +55,9 @@ SV CALLING
     -schr|--sv_calling_h_rt                                                         SV calling time [${SV_CALLING_TIME}]
 
 FUSION CHECK
-    -fcio|--fusion_check_info_output                                              Path to the NanoFG output info file []
-    -fcvo|--fusion_check_vcf_output                                               Path to the NanoFG output vcf file []
+    -fcio|--fusion_check_info_output                                              Path to the NanoFG output info file [_FusionGenesInfo.txt]
+    -fcvo|--fusion_check_vcf_output                                               Path to the NanoFG output vcf file [_FusionGenes.vcf]
+    -fcpo|--fusion_check_pdf_output                                               Path to the NanoFG output pdf file [_FusionGenes.pdf]
     -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
     -fct|--fusion_check_threads                                                   VCF output file [$FUSION_CHECK_THREADS]
     -fchv|--fusion_check_h_vmem                                                   VCF output file [$FUSION_CHECK_MEMORY]
@@ -299,6 +300,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -fcpo|--fusion_check_pdf_output)
+    FUSION_CHECK_PDF_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -fcs|--fusion_check_script)
     FUSION_CHECK_SCRIPT="$2"
     shift # past argument
@@ -346,6 +352,11 @@ fi
 if [ -z $FUSION_CHECK_INFO_OUTPUT ]; then
     FUSION_CHECK_INFO_OUTPUT=./$(basename $VCF)
     FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_INFO_OUTPUT/.vcf/_FusionGenesInfo.txt}
+fi
+
+if [ -z $FUSION_CHECK_PDF_OUTPUT ]; then
+    FUSION_CHECK_PDF_OUTPUT=./$(basename $VCF)
+    FUSION_CHECK_PDF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_PDF_OUTPUT/.vcf/_FusionGenes.pdf}
 fi
 
 echo `date`: Running on `uname -n`
