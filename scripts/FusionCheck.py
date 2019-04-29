@@ -227,8 +227,8 @@ def BreakendAnnotation(CHROM, POS, orientation, Info):
             elif POS>gene["CDS_start"] and POS<gene["CDS_end"]:
                 if abs(POS-gene["CDS_end"])<3:
                     BND_INFO["Breakpoint_location"]="StopCodon"
-                elif abs(POS-gene["CDS_end"])>3 and abs(POS-gene["CDS_end"])<10:                 #### ADDED pos inside stop codon==different and pos close to translation end gives 3'UTR fusion instead
-                    BND_INFO["Breakpoint_location"]="3'UTR"
+                # elif abs(POS-gene["CDS_end"])<10:                 #### ADDED pos inside stop codon==different and pos close to translation end gives 3'UTR fusion instead
+                #     BND_INFO["Breakpoint_location"]="3'UTR"
                 else:
                     BND_INFO["Breakpoint_location"]="CDS"
             elif POS>gene["Transcript_end"]:
