@@ -9,7 +9,7 @@ import nltk
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+from matplotlib import patches
 from matplotlib import gridspec
 from matplotlib.backends.backend_pdf import PdfPages
 from difflib import SequenceMatcher
@@ -25,59 +25,60 @@ parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', requir
 
 args = parser.parse_args()
 
-def ParseVcf(vcf, vcf_output, info_output, pdf):
+def parse_vcf(vcf, vcf_output, info_output, pdf):
     with open(vcf, "r") as vcf, open(vcf_output, "w") as vcf_output, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
-        VCF_READER=pyvcf.Reader(vcf)
-        VCF_READER.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
-        VCF_WRITER=pyvcf.Writer(vcf_output, VCF_READER, lineterminator='\n')
+        vcf_reader=pyvcf.Reader(vcf)
+        vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+        vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length"])+"\n")
-        for record in VCF_READER:
-            CHROM1=record.CHROM
-            POS1=record.POS
-            CHROM2=record.ALT[0].chr
-            POS2=record.ALT[0].pos
-            POS1_ORIENTATION=record.ALT[0].orientation
-            POS2_ORIENTATION=record.ALT[0].remoteOrientation
+        for record in vcf_reader:
+            chrom1=record.CHROM
+            pos1=record.POS
+            chrom2=record.ALT[0].chr
+            pos2=record.ALT[0].pos
+            pos1_orientation=record.ALT[0].orientation
+            pos2_orientation=record.ALT[0].remoteOrientation
 
             print(record.ID)
             #Gather all ENSEMBL information on genes that overlap with the BND
-            breakend1_annotation=EnsemblAnnotation(CHROM1, POS1)
+            breakend1_annotation=ensembl_annotation(chrom1, pos1)
             if not breakend1_annotation:
-                VCF_WRITER.write_record(record)
+                vcf_writer.write_record(record)
                 continue
-            breakend2_annotation=EnsemblAnnotation(CHROM2, POS2)
+            breakend2_annotation=ensembl_annotation(chrom2, pos2)
             if not breakend2_annotation:
-                VCF_WRITER.write_record(record)
+                vcf_writer.write_record(record)
                 continue
+
             #Use requested information to calculate BND specific features
-            breakend1_info=BreakendAnnotation(CHROM1, POS1, POS1_ORIENTATION, breakend1_annotation)
-            breakend2_info=BreakendAnnotation(CHROM2, POS2, POS2_ORIENTATION, breakend2_annotation)
+            breakend1_info=breakend_annotation(chrom1, pos1, pos1_orientation, breakend1_annotation)
+            breakend2_info=breakend_annotation(chrom2, pos2, pos2_orientation, breakend2_annotation)
 
             #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
-            Fusions, Vcf_fusion_info=BreakpointAnnotation(record, breakend1_info, breakend2_info, POS1_ORIENTATION, POS2_ORIENTATION, info_output)
+            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, info_output)
 
             #Produce output
-            for fusion in Fusions:
+            for fusion in fusions:
                 fusion_output.write("\t".join([str(record.ID), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["5'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
                 str(fusion["3'"]["Original_CDS_length"])])+"\n")
                 visualisation(fusion, record, output_pdf)
 
-            if len(Vcf_fusion_info)>0:
-                record.INFO["FUSION"]=Vcf_fusion_info
-            VCF_WRITER.write_record(record)
+            if len(vcf_fusion_info)>0:
+                record.INFO["FUSION"]=vcf_fusion_info
+            vcf_writer.write_record(record)
 
 # Gather all information about protein coding genes that overlap with a break-end, independent of the location of the breakend in the gene
-def EnsemblAnnotation(CHROM, POS):
-    SERVER='http://grch37.rest.ensembl.org'
-    ENDPOINT="/overlap/region/human/"+str(CHROM)+":"+str(POS)+"-"+str(POS)
-    HEADERS={"Content-Type" : "application/json"}
-    PARAMS={"feature": "transcript"}
-    genes_data=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
+def ensembl_annotation(CHROM, POS):
+    server='http://grch37.rest.ensembl.org'
+    endpoint="/overlap/region/human/"+str(CHROM)+":"+str(POS)+"-"+str(POS)
+    headers={"Content-Type" : "application/json"}
+    params={"feature": "transcript"}
+    genes_data=EnsemblRestClient.perform_rest_action(server, endpoint, headers, params)
 
     transcript_ccds={}
-    UNIQUE_GENES=[]
+    unqiue_genes=[]
     for hit in genes_data:
         if hit["biotype"]=="protein_coding":
             if "ccdsid" in hit:
@@ -85,28 +86,28 @@ def EnsemblAnnotation(CHROM, POS):
             else:
                 transcript_ccds[hit["id"]]=None
 
-            if hit["Parent"] not in UNIQUE_GENES:
-                UNIQUE_GENES.append(hit["Parent"])
+            if hit["Parent"] not in unqiue_genes:
+                unqiue_genes.append(hit["Parent"])
 
     HITS=[]
-    for GENE_ID in UNIQUE_GENES:
-        #GENE_ID=hit
-        ENDPOINT="/lookup/id/"+str(GENE_ID)
-        PARAMS={"expand": "1"}
-        gene_info=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
+    for gene_id in unqiue_genes:
+        #gene_id=hit
+        endpoint="/lookup/id/"+str(gene_id)
+        params={"expand": "1"}
+        gene_info=EnsemblRestClient.perform_rest_action(server, endpoint, headers, params)
         if gene_info["biotype"]=="protein_coding":
-            INFO={}
-            INFO["Gene_id"]=gene_info["id"]
-            INFO["Gene_name"]=gene_info["display_name"]
-            INFO["Strand"]=gene_info["strand"]
-            INFO["Gene_start"]=gene_info["start"]
-            INFO["Gene_end"]=gene_info["end"]
-            INFO["Chromosome"]=CHROM
-            INFO["Flags"]=[]
+            ensembl_info={}
+            ensembl_info["Gene_id"]=gene_info["id"]
+            ensembl_info["Gene_name"]=gene_info["display_name"]
+            ensembl_info["Strand"]=gene_info["strand"]
+            ensembl_info["Gene_start"]=gene_info["start"]
+            ensembl_info["Gene_end"]=gene_info["end"]
+            ensembl_info["Chromosome"]=CHROM
+            ensembl_info["Flags"]=[]
 
             if "description" in gene_info:
                 if "readthrough" in gene_info["description"]:
-                    INFO["Flags"].append("fusion-with-readthrough")
+                    ensembl_info["Flags"].append("fusion-with-readthrough")
 
             ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or readthrough genes)
 
@@ -115,103 +116,101 @@ def EnsemblAnnotation(CHROM, POS):
                 if transcript["is_canonical"]==1:
                     if transcript["id"] in transcript_ccds:
                         if transcript_ccds[transcript["id"]] is None:
-                            INFO["Flags"].append("No-CCDS")
-                    LENGTH_CDS=0
+                            ensembl_info["Flags"].append("No-CCDS")
+                    cds_length=0
                     CDS=False
-                    INFO["Transcript_id"]=transcript["id"]
-                    INFO["Translation_id"]=transcript["Translation"]["id"]
-                    INFO["Biotype"]=transcript["biotype"]
-                    INFO["Transcript_start"]=transcript["start"]
-                    INFO["Transcript_end"]=transcript["end"]
-                    INFO["Total_exons"]=len(transcript["Exon"])
-                    INFO["Total_exon_length"]=0
-                    INFO["Original_CDS_length"]=(transcript["Translation"]["length"]*3)+3
-                    if INFO["Strand"]==1:
-                        INFO["CDS_start"]=transcript["Translation"]["start"]
-                        INFO["CDS_end"]=transcript["Translation"]["end"]
+                    ensembl_info["Transcript_id"]=transcript["id"]
+                    ensembl_info["Translation_id"]=transcript["Translation"]["id"]
+                    ensembl_info["Biotype"]=transcript["biotype"]
+                    ensembl_info["Transcript_start"]=transcript["start"]
+                    ensembl_info["Transcript_end"]=transcript["end"]
+                    ensembl_info["Total_exons"]=len(transcript["Exon"])
+                    ensembl_info["Total_exon_length"]=0
+                    ensembl_info["Original_CDS_length"]=(transcript["Translation"]["length"]*3)+3
+                    if ensembl_info["Strand"]==1:
+                        ensembl_info["CDS_start"]=transcript["Translation"]["start"]
+                        ensembl_info["CDS_end"]=transcript["Translation"]["end"]
                     else:
-                        INFO["CDS_start"]=transcript["Translation"]["end"]
-                        INFO["CDS_end"]=transcript["Translation"]["start"]
-                    INFO["Exons"]=[]
+                        ensembl_info["CDS_start"]=transcript["Translation"]["end"]
+                        ensembl_info["CDS_end"]=transcript["Translation"]["start"]
+                    ensembl_info["Exons"]=[]
 
                     ### EXONS
                     for rank, exon in enumerate(transcript["Exon"]):
-                        EXON_INFO={}
-                        EXON_INFO["Rank"]=rank+1
-                        EXON_INFO["Type"]="exon"
+                        exon_info={}
+                        exon_info["Rank"]=rank+1
+                        exon_info["Type"]="exon"
                         CHRON_START=exon["start"]
                         CHRON_END=exon["end"]
-                        INFO["Total_exon_length"]+=abs(exon["end"]-exon["start"])
-                        if INFO["Strand"]==1:
-                            EXON_INFO["Start"]=exon["start"]
-                            EXON_INFO["End"]=exon["end"]
+                        ensembl_info["Total_exon_length"]+=abs(exon["end"]-exon["start"])
+                        if ensembl_info["Strand"]==1:
+                            exon_info["Start"]=exon["start"]
+                            exon_info["End"]=exon["end"]
                         else:
-                            EXON_INFO["Start"]=exon["end"]
-                            EXON_INFO["End"]=exon["start"]
-                        EXON_INFO["Contains_start_CDS"]=False
-                        EXON_INFO["Contains_end_CDS"]=False
+                            exon_info["Start"]=exon["end"]
+                            exon_info["End"]=exon["start"]
+                        exon_info["Contains_start_CDS"]=False
+                        exon_info["Contains_end_CDS"]=False
 
                         if CDS:
-                            if INFO["CDS_end"]>=CHRON_START and INFO["CDS_end"]<=CHRON_END:
-                                EXON_INFO["Contains_end_CDS"]=True
-                                EXON_INFO["CDS"]=True
-                                EXON_INFO["Start_phase"]=PHASE
-                                #EXON_INFO["End_phase"]=-1
-                                EXON_INFO["End_phase"]=0
-                                EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-EXON_INFO["Start"])+1
+                            if ensembl_info["CDS_end"]>=CHRON_START and ensembl_info["CDS_end"]<=CHRON_END:
+                                exon_info["Contains_end_CDS"]=True
+                                exon_info["CDS"]=True
+                                exon_info["Start_phase"]=phase
+                                #exon_info["End_phase"]=-1
+                                exon_info["End_phase"]=0
+                                exon_info["CDS_length"]=abs(ensembl_info["CDS_end"]-exon_info["Start"])+1
                                 CDS=False
                             else:
-                                EXON_INFO["CDS"]=True
-                                EXON_INFO["Start_phase"]=PHASE
-                                EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-EXON_INFO["Start"])+1+PHASE)%3
-                                EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-EXON_INFO["Start"])+1
-                        elif INFO["CDS_start"]>=CHRON_START and INFO["CDS_start"]<=CHRON_END:
-                            EXON_INFO["Contains_start_CDS"]=True
-                            EXON_INFO["CDS"]=True
-                            #EXON_INFO["Start_phase"]=-1
-                            EXON_INFO["Start_phase"]=0
-                            if INFO["CDS_end"]>=CHRON_START and INFO["CDS_end"]<=CHRON_END:
-                                EXON_INFO["Contains_end_CDS"]=True
-                                EXON_INFO["End_phase"]=0
-                                EXON_INFO["CDS_length"]=abs(INFO["CDS_end"]-INFO["CDS_start"])+1
+                                exon_info["CDS"]=True
+                                exon_info["Start_phase"]=phase
+                                exon_info["End_phase"]=(abs(exon_info["End"]-exon_info["Start"])+1+phase)%3
+                                exon_info["CDS_length"]=abs(exon_info["End"]-exon_info["Start"])+1
+                        elif ensembl_info["CDS_start"]>=CHRON_START and ensembl_info["CDS_start"]<=CHRON_END:
+                            exon_info["Contains_start_CDS"]=True
+                            exon_info["CDS"]=True
+                            #exon_info["Start_phase"]=-1
+                            exon_info["Start_phase"]=0
+                            if ensembl_info["CDS_end"]>=CHRON_START and ensembl_info["CDS_end"]<=CHRON_END:
+                                exon_info["Contains_end_CDS"]=True
+                                exon_info["End_phase"]=0
+                                exon_info["CDS_length"]=abs(ensembl_info["CDS_end"]-ensembl_info["CDS_start"])+1
                             else:
-                                EXON_INFO["End_phase"]=(abs(EXON_INFO["End"]-INFO["CDS_start"])+1)%3
-                                EXON_INFO["CDS_length"]=abs(EXON_INFO["End"]-INFO["CDS_start"])+1
+                                exon_info["End_phase"]=(abs(exon_info["End"]-ensembl_info["CDS_start"])+1)%3
+                                exon_info["CDS_length"]=abs(exon_info["End"]-ensembl_info["CDS_start"])+1
                             CDS=True
 
                         else:
-                            EXON_INFO["CDS"]=False
-                            EXON_INFO["Start_phase"]="-1"                                         #ADD SOMETHING ELSE SO AN ERROR IS GIVEN IF USED
-                            EXON_INFO["End_phase"]="-1"
-                            EXON_INFO["CDS_length"]=0
-                        PHASE=EXON_INFO["End_phase"]
-                        LENGTH_CDS+=EXON_INFO["CDS_length"]
-                        INFO["Exons"].append(EXON_INFO)
+                            exon_info["CDS"]=False
+                            exon_info["Start_phase"]="-1"
+                            exon_info["End_phase"]="-1"
+                            exon_info["CDS_length"]=0
+                        phase=exon_info["End_phase"]
+                        cds_length+=exon_info["CDS_length"]
+                        ensembl_info["Exons"].append(exon_info)
 
                         ### INTRONS
                         if rank<len(transcript["Exon"])-1:
-                            INTRON_INFO={}
-                            INTRON_INFO["Type"]="intron"
-                            INTRON_INFO["Rank"]=rank+1
-                            INTRON_INFO["Phase"]=EXON_INFO["End_phase"]
-                            if INFO["Strand"]==1:
-                                INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]+1
-                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]-1
+                            intron_info={}
+                            intron_info["Type"]="intron"
+                            intron_info["Rank"]=rank+1
+                            intron_info["Phase"]=exon_info["End_phase"]
+                            if ensembl_info["Strand"]==1:
+                                intron_info["Start"]=transcript["Exon"][rank]["end"]+1
+                                intron_info["End"]=transcript["Exon"][rank+1]["start"]-1
                             else:
-                                INTRON_INFO["Start"]=transcript["Exon"][rank]["start"]-1
-                                INTRON_INFO["End"]=transcript["Exon"][rank+1]["end"]+1
-                            # INTRON_INFO["Start"]=transcript["Exon"][rank]["end"]
-                            # INTRON_INFO["End"]=transcript["Exon"][rank+1]["start"]
-                            INTRON_INFO["CDS"]=CDS
-                            INFO["Exons"].append(INTRON_INFO)
-                    #print(INFO["Gene_id"],LENGTH_CDS, transcript["Translation"]["length"]*3)
-                    if LENGTH_CDS-3!=transcript["Translation"]["length"]*3:
-                        INFO["Flags"].append("Possible-incomplete-CDS")             #as currently I am unable to request the given ENSEMBL Flags. Bias towards incomplete but bases%3=0
-            HITS.append(INFO)
+                                intron_info["Start"]=transcript["Exon"][rank]["start"]-1
+                                intron_info["End"]=transcript["Exon"][rank+1]["end"]+1
+                            intron_info["CDS"]=CDS
+                            ensembl_info["Exons"].append(intron_info)
+                    #print(ensembl_info["Gene_id"],cds_length, transcript["Translation"]["length"]*3)
+                    if cds_length-3!=transcript["Translation"]["length"]*3:
+                        ensembl_info["Flags"].append("Possible-incomplete-CDS")             #as currently I am unable to request the given ENSEMBL Flags. Bias towards incomplete but bases%3=0
+            HITS.append(ensembl_info)
     return HITS
 
-# Use the gene information gathered in EnsemblAnnotation and add specific breakend information (e.g. what exon, what frame is created etc.)
-def BreakendAnnotation(CHROM, POS, orientation, Info):
+# Use the gene information gathered in ensembl_annotation and add specific breakend information (e.g. what exon, what frame is created etc.)
+def breakend_annotation(CHROM, POS, orientation, Info):
     HITS=[]
     for gene in Info:
         BND_INFO={k:v for k,v in gene.items()}
@@ -327,7 +326,7 @@ def BreakendAnnotation(CHROM, POS, orientation, Info):
         HITS.append(BND_INFO)
     return HITS
 
-#Takes the information from two breakend gathered by BreakendAnnotation and what type of fusion is present and if it is in phase
+#Takes the information from two breakend gathered by breakend_annotation and what type of fusion is present and if it is in phase
 def FusionCheck(Annotation1, Annotation2):
     if Annotation1["Breakpoint_location"]=="CDS" and Annotation1["Type"]==Annotation2["Type"]:
         Annotation1_CDS_length=Annotation1["CDS_length"]
@@ -412,17 +411,17 @@ def FusionCheck(Annotation1, Annotation2):
 
     return (Fusion_type, Annotation1_CDS_length, Annotation2_CDS_length)
 
-def BreakpointAnnotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Output):
-    CHROM1=Record.CHROM
-    POS1=Record.POS
-    CHROM2=Record.ALT[0].chr
-    POS2=Record.ALT[0].pos
+def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Output):
+    chrom1=Record.CHROM
+    pos1=Record.POS
+    chrom2=Record.ALT[0].chr
+    pos2=Record.ALT[0].pos
     Fusion_output=[]
     Vcf_output=[]
     for annotation1 in Breakend1:
-        annotation1["BND"]=str(CHROM1)+":"+str(POS1)
+        annotation1["BND"]=str(chrom1)+":"+str(pos1)
         for annotation2 in Breakend2:
-            annotation2["BND"]=str(CHROM2)+":"+str(POS2)
+            annotation2["BND"]=str(chrom2)+":"+str(pos2)
 
             #Add an extra flag based on both fused genes and produce a list of flags
             FLAGS=annotation1["Flags"]+annotation2["Flags"]
@@ -441,15 +440,15 @@ def BreakpointAnnotation(Record, Breakend1, Breakend2, Orientation1, Orientation
 
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
             if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
-                (POS1 > annotation1["Gene_start"] and POS1 < annotation1["Gene_end"] and POS2 > annotation1["Gene_start"] and POS2 < annotation1["Gene_end"] and
-                POS1 > annotation2["Gene_start"] and POS1 < annotation2["Gene_end"] and POS2 > annotation2["Gene_start"] and POS2 < annotation2["Gene_end"] and
+                (pos1 > annotation1["Gene_start"] and pos1 < annotation1["Gene_end"] and pos2 > annotation1["Gene_start"] and pos2 < annotation1["Gene_end"] and
+                pos1 > annotation2["Gene_start"] and pos1 < annotation2["Gene_end"] and pos2 > annotation2["Gene_start"] and pos2 < annotation2["Gene_end"] and
                 annotation1["Strand"]==annotation2["Strand"])):
                 if annotation1["Order"]=="5'" and annotation2["Order"]=="3'":
-                    FIVE_PRIME_GENE=annotation1
-                    THREE_PRIME_GENE=annotation2
+                    five_prime_gene=annotation1
+                    three_prime_gene=annotation2
                 elif annotation2["Order"]=="5'" and annotation1["Order"]=="3'":
-                    FIVE_PRIME_GENE=annotation2
-                    THREE_PRIME_GENE=annotation1
+                    five_prime_gene=annotation2
+                    three_prime_gene=annotation1
                 else:
                     continue
 
@@ -460,57 +459,56 @@ def BreakpointAnnotation(Record, Breakend1, Breakend2, Orientation1, Orientation
                         FUSION_TYPE, annotation1["CDS_length"], annotation2["CDS_length"] = FusionCheck(annotation1, annotation2)
                         if len(FLAGS)==0:
                             FLAGS=["None"]
-                        Fusion_output.append({"5'": FIVE_PRIME_GENE, "3'": THREE_PRIME_GENE, "Fusion_type": FUSION_TYPE, "Flags":FLAGS})
-                        Vcf_output.append(FIVE_PRIME_GENE["Gene_id"]+"-"+THREE_PRIME_GENE["Gene_id"])
+                        Fusion_output.append({"5'": five_prime_gene, "3'": three_prime_gene, "Fusion_type": FUSION_TYPE, "Flags":FLAGS})
+                        Vcf_output.append(five_prime_gene["Gene_id"]+"-"+three_prime_gene["Gene_id"])
 
     return (Fusion_output, Vcf_output)
 
-def GetDomains(Protein_ID, Coding_exons, Plot_space, Intron_length):
-    SERVER='http://grch37.rest.ensembl.org'
-    ENDPOINT="/overlap/translation/"+Protein_ID
-    HEADERS={"Content-Type" : "application/json"}
-    #PARAMS={"feature": "transcript"}
-    domains=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS)
+def get_domains(protein_id, coding_exons, relative_length, intron_relative_length):
+    server='http://grch37.rest.ensembl.org'
+    endpoint="/overlap/translation/"+protein_id
+    headers={"Content-Type" : "application/json"}
+    ensembl_domains=EnsemblRestClient.perform_rest_action(server, endpoint, headers)
 
-    LAYERS=[[],[],[],[],[],[],[],[],[],[],[],[]]
-    cds_start=Coding_exons["rel_pos"][0][0]
-    cds_end=Coding_exons["rel_pos"][-1][1]
+    domain_layers=[[] for n in range(12)]
+    cds_start=coding_exons["rel_pos"][0][0]
+    cds_end=coding_exons["rel_pos"][-1][1]
     used_domains={}
     to_be_used_domains={}
-    for domain in domains:
+    for domain in ensembl_domains:
         next_domain=False
         if domain["description"]=="":
             continue
 
-        for index, exon in enumerate(Coding_exons["pos"]):
+        for index, exon in enumerate(coding_exons["pos"]):
             nr_of_introns=index
             if domain["start"]*3>=exon[0] and domain["start"]*3<=exon[1]:
-                pos_start=Coding_exons["rel_pos"][index][0]+abs(domain["start"]*3-exon[0])*Plot_space
+                pos_start=coding_exons["rel_pos"][index][0]+abs(domain["start"]*3-exon[0])*relative_length
             if domain["end"]*3>=exon[0] and domain["end"]*3<=exon[1]:
-                pos_end=Coding_exons["rel_pos"][index][0]+abs(domain["end"]*3-exon[0])*Plot_space
+                pos_end=coding_exons["rel_pos"][index][0]+abs(domain["end"]*3-exon[0])*relative_length
 
         text_begin=pos_start+0.5*abs(pos_end-pos_start)-(0.5*len(domain["description"])/3)
         text_end=pos_start+0.5*abs(pos_end-pos_start)+(0.5*len(domain["description"])/3)
 
         #print(domain["description"])
-        for layer, items in enumerate(LAYERS):
+        for layer, domains in enumerate(domain_layers):
             next_layer=False
-            nr_of_items=len(items)
+            nr_of_items=len(domains)
             if nr_of_items==0:
-                LAYERS[layer].append([pos_start, pos_end, domain["description"],0.075*layer, domain["start"], domain["end"], text_begin, text_end])
+                domain_layers[layer].append([pos_start, pos_end, domain["description"],0.075*layer, domain["start"], domain["end"], text_begin, text_end])
                 break
             else:
                 index=0
                 while index < nr_of_items:
-                    pos=items[index]
+                    pos=domains[index]
                     if domain["description"]==pos[2] or SequenceMatcher(None, domain["description"], pos[2]).ratio()>0.75:
                         if abs(domain["start"]-pos[4])<=50 and abs(domain["end"]-pos[5])<=50 or (domain["start"]>pos[4] and domain["end"]<pos[5]):
                             if domain["start"]<pos[4]:
-                                LAYERS[layer][index][0]=pos_start
-                                LAYERS[layer][index][4]=domain["start"]
+                                domain_layers[layer][index][0]=pos_start
+                                domain_layers[layer][index][4]=domain["start"]
                             if domain["end"]>pos[5]:
-                                LAYERS[layer][index][1]=pos_end
-                                LAYERS[layer][index][5]=domain["end"]
+                                domain_layers[layer][index][1]=pos_end
+                                domain_layers[layer][index][5]=domain["end"]
                             next_layer=True
                             next_domain=True
                             break
@@ -524,11 +522,11 @@ def GetDomains(Protein_ID, Coding_exons, Plot_space, Intron_length):
                 if next_domain:
                     break
                 if not next_layer:
-                    LAYERS[layer].append([pos_start, pos_end, domain["description"],0.075*layer, domain["start"], domain["end"], text_begin, text_end])
+                    domain_layers[layer].append([pos_start, pos_end, domain["description"],0.075*layer, domain["start"], domain["end"], text_begin, text_end])
                     break
 
-    for index, layer in enumerate(LAYERS):
-        for domain in layer:
+    for index, domains in enumerate(domain_layers):
+        for domain in domains:
             if domain[2] not in to_be_used_domains:
                 to_be_used_domains[domain[2]]=[domain]
             else:
@@ -542,8 +540,8 @@ def visualisation(annotated_breakpoints, Record, pdf):
     xmin = 0
     xmax = 100
     yvalue = .5
-    CDS_height=0.2
-    Non_CDS_height=0.1
+    cds_height=0.2
+    non_cds_height=0.1
     Intron_size=1
 
     def domains_plot( domains, n, color, order ):
@@ -582,11 +580,11 @@ def visualisation(annotated_breakpoints, Record, pdf):
         ax = fig.add_subplot(gs[n, 1])
         for exon in exons:
             if exon[3]:
-                y0 = yvalue-CDS_height
-                y1 = 2*CDS_height
+                y0 = yvalue-cds_height
+                y1 = 2*cds_height
             else:
-                y0 = yvalue-Non_CDS_height
-                y1 = 2*Non_CDS_height
+                y0 = yvalue-non_cds_height
+                y1 = 2*non_cds_height
 
             if exon[4]=="5'":
                 color="blue"
@@ -630,15 +628,15 @@ def visualisation(annotated_breakpoints, Record, pdf):
                         cds_exons["pos"].append([0, abs(exon["End"]-gene_info["CDS_start"])+1])
                         cds_exons["introns"]+=1
                         CDS_start=exon_start+abs(gene_info["CDS_start"]-exon["Start"])*part
-                        CDS_length=abs((exon["End"]-gene_info["CDS_start"])+1)*part
+                        coding_length=abs((exon["End"]-gene_info["CDS_start"])+1)*part
                         exon_list.append((exon_start, exon_length, None, False, origin, False))
-                        exon_list.append((CDS_start, CDS_length, label, True, origin, False))
+                        exon_list.append((CDS_start, coding_length, label, True, origin, False))
                     elif exon["Contains_end_CDS"]:
                         cds_exons["rel_pos"].append([exon_start, exon_start+exon_length])
                         cds_exons["pos"].append([cds_end+1, abs(gene_info["CDS_end"]-exon["Start"])+1+cds_end])
-                        CDS_length=abs(exon["Start"]-gene_info["CDS_end"])*part
+                        coding_length=abs(exon["Start"]-gene_info["CDS_end"])*part
                         exon_list.append((exon_start, exon_length, None, False, origin, False))
-                        exon_list.append((exon_start, CDS_length, label, True, origin, False))
+                        exon_list.append((exon_start, coding_length, label, True, origin, False))
                     else:
                         cds_exons["rel_pos"].append([exon_start, exon_start+exon_length])
                         cds_exons["pos"].append([cds_end+1, abs(exon["End"]-exon["Start"])+1+cds_end])
@@ -649,8 +647,8 @@ def visualisation(annotated_breakpoints, Record, pdf):
                     exon_list.append((exon_start, exon_length, label, False, origin, False))
                 space=Intron_size
 
-        domains=GetDomains(gene_info["Translation_id"], cds_exons, part, space)
-        for info in domains.values():
+        ensembl_domains=get_domains(gene_info["Translation_id"], cds_exons, part, space)
+        for info in ensembl_domains.values():
             for positions in info:
                 domain_list.append(positions)
 
@@ -761,11 +759,11 @@ def visualisation(annotated_breakpoints, Record, pdf):
                     if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
                         CDS_start=abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])*part
-                        CDS_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
-                        fused_exons.append((CDS_start, CDS_length, label, True,origin, False))
+                        coding_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
+                        fused_exons.append((CDS_start, coding_length, label, True,origin, False))
                     elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
+                        coding_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
                     else:
                         fused_exons.append((exon_start, exon_length, label, True, origin, False))
                 else:
@@ -797,12 +795,12 @@ def visualisation(annotated_breakpoints, Record, pdf):
                     if exon["Contains_start_CDS"]:
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
                         CDS_start=abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])*part
-                        CDS_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
-                        fused_exons.append((CDS_start, CDS_length, label, True,origin, False))
+                        coding_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
+                        fused_exons.append((CDS_start, coding_length, label, True,origin, False))
                     elif exon["Contains_end_CDS"]:
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
-                        fused_exons.append((exon_start, CDS_length, label, True, origin, False))
+                        coding_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
+                        fused_exons.append((exon_start, coding_length, label, True, origin, False))
                     else:
                         fused_exons.append((exon_start, exon_length, label, True, origin, False))
                 else:
@@ -852,12 +850,12 @@ def visualisation(annotated_breakpoints, Record, pdf):
                     if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
                         CDS_start=exon_start+abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])*part
-                        CDS_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
-                        fused_exons.append((CDS_start, CDS_length, label, True,origin, False))
+                        coding_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
+                        fused_exons.append((CDS_start, coding_length, label, True,origin, False))
                     elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
-                        fused_exons.append((exon_start, CDS_length, label, True, origin, False))
+                        coding_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
+                        fused_exons.append((exon_start, coding_length, label, True, origin, False))
                     else:
                         fused_exons.append((exon_start, exon_length, label, True, origin, False))
                 else:
@@ -904,5 +902,5 @@ VCF_OUTPUT=args.output
 INFO_OUTPUT=args.fusion_output
 PDF=args.pdf
 EnsemblRestClient=EnsemblRestClient()
-ParseVcf(VCF_IN, VCF_OUTPUT, INFO_OUTPUT, PDF)
+parse_vcf(VCF_IN, VCF_OUTPUT, INFO_OUTPUT, PDF)
 print("End:", datetime.datetime.now())
