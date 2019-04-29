@@ -88,7 +88,7 @@ fi
 
 if [ -z $PDF ]; then
     PDF=./$(basename $VCF)
-    PDF=${FUSION_OUTPUT/.vcf/_FusionGenes.pdf}
+    PDF=${PDF/.vcf/_FusionGenes.pdf}
 fi
 
 echo `date`: Running on `uname -n`

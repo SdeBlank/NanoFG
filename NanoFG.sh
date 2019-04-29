@@ -667,6 +667,7 @@ if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ];then
     -v $SV_CALLING_OUT \
     -o $FUSION_CHECK_VCF_OUTPUT \
     -fo $FUSION_CHECK_INFO_OUTPUT \
+    -p $FUSION_CHECK_PDF_OUTPUT \
     -s $FUSION_CHECK_SCRIPT \
     -e $VENV
 
