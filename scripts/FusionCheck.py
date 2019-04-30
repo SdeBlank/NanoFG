@@ -601,8 +601,13 @@ def visualisation(annotated_breakpoints, Record, pdf):
         plt.xlim( (xmin,xmax) )
         plt.axis('off')
 
-    def gene_visualisation(gene_info, order):
+    def breakpoint_plot(breakpoint_x, n):
+        ax = fig.add_subplot(gs[n, 1])
+        ax.axvline(x=breakpoint_x, ymin=yvalue-0.5, ymax=yvalue+0.5, color="black")
+        plt.xlim( (xmin,xmax) )
+        plt.axis('off')
 
+    def gene_visualisation(gene_info, order):
         exon_list=[]
         domain_list=[]
 
@@ -617,6 +622,11 @@ def visualisation(annotated_breakpoints, Record, pdf):
         for index, exon in enumerate(gene_info["Exons"]):
             gene_info["Exons"][index]["Origin"]=order
             origin=order
+            if gene_info["Type"]==exon["Type"] and gene_info["Rank"]==exon["Rank"]:
+                if gene_info["Type"]=="intron":
+                    breakpoint=exon_start+exon_length+0.5*space
+                elif gene_info["Type"]=="exon":
+                    breakpoint=exon_start+exon_length+space+(abs(gene_info["Breakend_position"]-exon["Start"])+1)*part
             if exon["Type"]=="exon":
                 exon_start=exon_start+exon_length+space
                 exon_length=(abs(exon["End"]-exon["Start"])+1)*part
@@ -652,7 +662,7 @@ def visualisation(annotated_breakpoints, Record, pdf):
             for positions in info:
                 domain_list.append(positions)
 
-        return (exon_list, domain_list)
+        return (exon_list, domain_list, breakpoint)
 
 ############################################################################# Plot Title and flags
 
@@ -661,10 +671,10 @@ def visualisation(annotated_breakpoints, Record, pdf):
 
     ax = fig.add_subplot(gs[0,:])
     if "OUT OF FRAME" in annotated_breakpoints["Fusion_type"]:
-        #ax.text(0.5*xmax, 0, Record.ID+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
-        ax.text(0.5*xmax, 0.5, "(OUT OF FRAME)", horizontalalignment='center',verticalalignment='bottom', size=16, color="red")
-        ax.text(0.5*xmax, 0.8, annotated_breakpoints["5'"]["Gene_id"]+"-"+annotated_breakpoints["3'"]["Gene_id"], horizontalalignment='center',verticalalignment='bottom', size=9)
-        ax.axhline(y=0.8, xmin=0, xmax=100, color="black", linewidth=1)
+        ax.text(0.5*xmax, 0, Record.ID+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
+        ax.text(0.5*xmax, 0.35, "(OUT OF FRAME)", horizontalalignment='center',verticalalignment='bottom', size=14, color="red")
+        ax.text(0.5*xmax, 0.6, annotated_breakpoints["5'"]["Gene_id"]+"-"+annotated_breakpoints["3'"]["Gene_id"], horizontalalignment='center',verticalalignment='bottom', size=9)
+        ax.axhline(y=0.7, xmin=0, xmax=100, color="black", linewidth=1)
     else:
         ax.text(0.5*xmax, 0, Record.ID+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
         ax.text(0.5*xmax, 0.3, annotated_breakpoints["5'"]["Gene_id"]+"-"+annotated_breakpoints["3'"]["Gene_id"], horizontalalignment='center',verticalalignment='bottom', size=9)
@@ -681,7 +691,7 @@ def visualisation(annotated_breakpoints, Record, pdf):
 
 
 ############################################################################# DONOR GENE VISUALISATION
-    donor_exons, donor_domains = gene_visualisation(annotated_breakpoints["5'"], "5'")
+    donor_exons, donor_domains, breakpoint = gene_visualisation(annotated_breakpoints["5'"], "5'")
 
     ax = fig.add_subplot(gs[2, 0])
     ax.text(0, yvalue, annotated_breakpoints["5'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
@@ -699,9 +709,11 @@ def visualisation(annotated_breakpoints, Record, pdf):
     exons_plot( donor_exons , 2 )
     introns_plot( 0, 100, 2, "blue" )
 
+    breakpoint_plot(breakpoint, 2)
+
 ############################################################################# ACCEPTOR GENE VISUALISATION
 
-    acceptor_exons, acceptor_domains = gene_visualisation(annotated_breakpoints["3'"], "3'")
+    acceptor_exons, acceptor_domains, breakpoint = gene_visualisation(annotated_breakpoints["3'"], "3'")
 
     Protein_info=annotated_breakpoints["3'"]["Gene_name"]+"\n"+"("+str(int(annotated_breakpoints["3'"]["Original_CDS_length"]/3))+" aa)"
     ax = fig.add_subplot(gs[4, 0])
@@ -718,6 +730,7 @@ def visualisation(annotated_breakpoints, Record, pdf):
 
     introns_plot( 0, 100, 4, "red" )
     exons_plot( acceptor_exons, 4 )
+    breakpoint_plot(breakpoint, 4)
     domains_plot( acceptor_domains, 5 , "red", "3'")
 
 ############################################################################# FUSION GENE VISUALISATION
@@ -880,7 +893,7 @@ def visualisation(annotated_breakpoints, Record, pdf):
     ax.text(0, 0.2, "Original SV_ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0, 0.5, SV_ID, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.2, 0.2, "Fusion type:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.2, 0.5, annotated_breakpoints["Fusion_type"], horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.2, 0.5, annotated_breakpoints["Fusion_type"].split(" ")[0], horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.4, 0.2, "5' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.4, 0.5, annotated_breakpoints["5'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.6, 0.2, "3' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
