@@ -426,10 +426,10 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
             #Add an extra flag based on both fused genes and produce a list of flags
             FLAGS=annotation1["Flags"]+annotation2["Flags"]
 
-            if ((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
+            if (((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
                 annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
                 (annotation2["Gene_start"]>annotation1["Gene_start"] and annotation2["Gene_start"]<annotation1["Gene_end"] and
-                annotation2["Gene_end"]>annotation1["Gene_start"] and annotation2["Gene_end"]<annotation1["Gene_end"]) and
+                annotation2["Gene_end"]>annotation1["Gene_start"] and annotation2["Gene_end"]<annotation1["Gene_end"])) and
                 annotation1['Strand']==annotation2['Strand']):
 
                 FLAGS.append("Gene-within-Gene")
@@ -439,10 +439,17 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
                 FLAGS.append("Similar-genes")
 
             #Discard fusions of the same gene and discard fusions where fused genes lie on the same strand and both breakends are in both fusion partners
-            if (annotation1["Gene_id"]!=annotation2["Gene_id"] and annotation1["Gene_name"]!=annotation2["Gene_name"] and not
+            if (annotation1["Gene_id"]==annotation2["Gene_id"] or annotation1["Gene_name"]==annotation2["Gene_name"] or
                 (pos1 > annotation1["Gene_start"] and pos1 < annotation1["Gene_end"] and pos2 > annotation1["Gene_start"] and pos2 < annotation1["Gene_end"] and
                 pos1 > annotation2["Gene_start"] and pos1 < annotation2["Gene_end"] and pos2 > annotation2["Gene_start"] and pos2 < annotation2["Gene_end"] and
                 annotation1["Strand"]==annotation2["Strand"])):
+                continue
+            elif (annotation1["Gene_id"]==annotation2["Gene_id"] or annotation1["Gene_name"]==annotation2["Gene_name"] or
+                (pos1 > annotation1["Gene_start"] and pos1 < annotation1["Gene_end"] and pos2 > annotation1["Gene_start"] and pos2 < annotation1["Gene_end"] and
+                pos1 > annotation2["Gene_start"] and pos1 < annotation2["Gene_end"] and pos2 > annotation2["Gene_start"] and pos2 < annotation2["Gene_end"] and
+                annotation1["Strand"]!=annotation2["Strand"])):
+                continue
+            else:
                 if annotation1["Order"]=="5'" and annotation2["Order"]=="3'":
                     five_prime_gene=annotation1
                     three_prime_gene=annotation2
