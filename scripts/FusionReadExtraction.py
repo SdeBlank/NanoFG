@@ -87,7 +87,6 @@ for record in vcf_reader:
         fusions['acceptor'].update(bnd2_fusions['acceptor'])
 
     good_fusion=False
-    print(fusions)
     if 'donor' in fusions and 'acceptor' in fusions:
         largest_donor_size=0
         largest_acceptor_size=0
