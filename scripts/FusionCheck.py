@@ -22,15 +22,21 @@ parser.add_argument('-v', '--vcf', type=str, help='Input NanoSV vcf file', requi
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
 parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', required=True)
+parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file', required=True)
 
 args = parser.parse_args()
 
-def parse_vcf(vcf, vcf_output, info_output, pdf):
+def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
+    with open(original_vcf, "r") as original_vcf:
+        supporting_reads={}
+        original_vcf_reader=pyvcf.Reader(original_vcf)
+        for original_record in original_vcf_reader:
+            supporting_reads[original_record.ID]=(len(original_record.INFO["ALT_READ_IDS"]), len(original_record.INFO["REF_READ_IDS_1"])+len(original_record.INFO["REF_READ_IDS_2"]))
     with open(vcf, "r") as vcf, open(vcf_output, "w") as vcf_output, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
         vcf_reader=pyvcf.Reader(vcf)
         vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
         vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
-        fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length"])+"\n")
+        fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for record in vcf_reader:
             chrom1=record.CHROM
             pos1=record.POS
@@ -57,13 +63,18 @@ def parse_vcf(vcf, vcf_output, info_output, pdf):
             #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
             fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, info_output)
 
+            compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
+
+            if compared_id in supporting_reads:
+                supporting_vs_reference=supporting_reads[compared_id]
+
             #Produce output
             for fusion in fusions:
                 fusion_output.write("\t".join([str(record.ID), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["5'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
-                str(fusion["3'"]["Original_CDS_length"])])+"\n")
-                visualisation(fusion, record, output_pdf)
+                str(fusion["3'"]["Original_CDS_length"])+str(supporting_vs_reference[0])+"/"+str(supporting_vs_reference[0]+supporting_vs_reference[1])])+"\n")
+                visualisation(fusion, record, supporting_vs_reference, output_pdf)
 
             if len(vcf_fusion_info)>0:
                 record.INFO["FUSION"]=vcf_fusion_info
@@ -490,9 +501,9 @@ def get_domains(protein_id, coding_exons, relative_length, intron_relative_lengt
         for index, exon in enumerate(coding_exons["pos"]):
             nr_of_introns=index
             if domain["start"]*3>=exon[0] and domain["start"]*3<=exon[1]:
-                pos_start=coding_exons["rel_pos"][index][0]+abs(domain["start"]*3-exon[0])*relative_length
+                pos_start=coding_exons["rel_pos"][index][0]+(abs(domain["start"]*3-exon[0])+1)*relative_length
             if domain["end"]*3>=exon[0] and domain["end"]*3<=exon[1]:
-                pos_end=coding_exons["rel_pos"][index][0]+abs(domain["end"]*3-exon[0])*relative_length
+                pos_end=coding_exons["rel_pos"][index][0]+(abs(domain["end"]*3-exon[0])+1)*relative_length
 
         text_begin=pos_start+0.5*abs(pos_end-pos_start)-(0.5*len(domain["description"])/3)
         text_end=pos_start+0.5*abs(pos_end-pos_start)+(0.5*len(domain["description"])/3)
@@ -509,7 +520,7 @@ def get_domains(protein_id, coding_exons, relative_length, intron_relative_lengt
                 while index < nr_of_items:
                     pos=domains[index]
                     if domain["description"]==pos[2] or SequenceMatcher(None, domain["description"], pos[2]).ratio()>0.75:
-                        if abs(domain["start"]-pos[4])<=50 and abs(domain["end"]-pos[5])<=50 or (domain["start"]>pos[4] and domain["end"]<pos[5]):
+                        if abs(domain["start"]-pos[4])+1<=50 and abs(domain["end"]-pos[5])+1<=50 or (domain["start"]>pos[4] and domain["end"]<pos[5]):
                             if domain["start"]<pos[4]:
                                 domain_layers[layer][index][0]=pos_start
                                 domain_layers[layer][index][4]=domain["start"]
@@ -541,7 +552,7 @@ def get_domains(protein_id, coding_exons, relative_length, intron_relative_lengt
     return to_be_used_domains
 
 
-def visualisation(annotated_breakpoints, Record, pdf):
+def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     rowplots = 7
     colplots = 3
     xmin = 0
@@ -644,14 +655,14 @@ def visualisation(annotated_breakpoints, Record, pdf):
                         cds_exons["rel_pos"].append([exon_start+(abs(gene_info["CDS_start"]-exon["Start"])+1)*part, exon_start+exon_length])
                         cds_exons["pos"].append([0, abs(exon["End"]-gene_info["CDS_start"])+1])
                         cds_exons["introns"]+=1
-                        CDS_start=exon_start+abs(gene_info["CDS_start"]-exon["Start"])*part
-                        coding_length=abs((exon["End"]-gene_info["CDS_start"])+1)*part
+                        CDS_start=exon_start+(abs(gene_info["CDS_start"]-exon["Start"])+1)*part
+                        coding_length=(abs(exon["End"]-gene_info["CDS_start"])+1)*part
                         exon_list.append((exon_start, exon_length, None, False, origin, False))
                         exon_list.append((CDS_start, coding_length, label, True, origin, False))
                     elif exon["Contains_end_CDS"]:
                         cds_exons["rel_pos"].append([exon_start, exon_start+exon_length])
                         cds_exons["pos"].append([cds_end+1, abs(gene_info["CDS_end"]-exon["Start"])+1+cds_end])
-                        coding_length=abs(exon["Start"]-gene_info["CDS_end"])*part
+                        coding_length=(abs(exon["Start"]-gene_info["CDS_end"])+1)*part
                         exon_list.append((exon_start, exon_length, None, False, origin, False))
                         exon_list.append((exon_start, coding_length, label, True, origin, False))
                     else:
@@ -773,17 +784,17 @@ def visualisation(annotated_breakpoints, Record, pdf):
                 else:
                     exon_start=exon_start+exon_length+space
                 origin=exon["Origin"]
-                exon_length=abs(exon["End"]-exon["Start"])*part
+                exon_length=(abs(exon["End"]-exon["Start"])+1)*part
                 label=exon["Rank"]
                 if exon["CDS"]:
                     if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_start=abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])*part
-                        coding_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
+                        CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
+                        coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
                         fused_exons.append((CDS_start, coding_length, label, True,origin, False))
                     elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        coding_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
+                        coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
                     else:
                         fused_exons.append((exon_start, exon_length, label, True, origin, False))
                 else:
@@ -809,17 +820,17 @@ def visualisation(annotated_breakpoints, Record, pdf):
                     BND=exon_start+exon_length+(space/2)
                 origin=exon["Origin"]
                 exon_start=exon_start+exon_length+space
-                exon_length=abs(exon["End"]-exon["Start"])*part
+                exon_length=(abs(exon["End"]-exon["Start"])+1)*part
                 label=exon["Rank"]
                 if exon["CDS"]:
                     if exon["Contains_start_CDS"]:
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_start=abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])*part
-                        coding_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
+                        CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
+                        coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
                         fused_exons.append((CDS_start, coding_length, label, True,origin, False))
                     elif exon["Contains_end_CDS"]:
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        coding_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
+                        coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
                         fused_exons.append((exon_start, coding_length, label, True, origin, False))
                     else:
                         fused_exons.append((exon_start, exon_length, label, True, origin, False))
@@ -861,7 +872,7 @@ def visualisation(annotated_breakpoints, Record, pdf):
                     else:
                         BND=exon_start+exon_length+space
                         splicing_plot(exon_start+exon_length, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
-                        splicing_plot(exon_start+exon_length+2*space+abs(exon["End"]-exon["Start"])*part, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
+                        splicing_plot(exon_start+exon_length+2*space+(abs(exon["End"]-exon["Start"])+1)*part, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
                 origin=exon["Origin"]
                 exon_start=exon_start+exon_length+space
                 exon_length=abs(exon["End"]-exon["Start"])*part
@@ -869,12 +880,12 @@ def visualisation(annotated_breakpoints, Record, pdf):
                 if exon["CDS"]:
                     if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_start=exon_start+abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])*part
-                        coding_length=abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])*part
+                        CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
+                        coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
                         fused_exons.append((CDS_start, coding_length, label, True,origin, False))
                     elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
                         fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        coding_length=abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])*part
+                        coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
                         fused_exons.append((exon_start, coding_length, label, True, origin, False))
                     else:
                         fused_exons.append((exon_start, exon_length, label, True, origin, False))
@@ -896,17 +907,18 @@ def visualisation(annotated_breakpoints, Record, pdf):
     ax = fig.add_subplot(gs[6, :])
     ax.axhline(y=0, xmin=0, xmax=100, color="black", linewidth=1, linestyle="--")
     SV_ID=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
-
-    ax.text(0, 0.2, "Original SV_ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
+    ax.text(0, 0.2, "Original ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0, 0.5, SV_ID, horizontalalignment='left',verticalalignment='center', size=9)
-    ax.text(0.2, 0.2, "Fusion type:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.2, 0.5, annotated_breakpoints["Fusion_type"].split(" ")[0], horizontalalignment='left',verticalalignment='center', size=9)
-    ax.text(0.4, 0.2, "5' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.4, 0.5, annotated_breakpoints["5'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
-    ax.text(0.6, 0.2, "3' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.6, 0.5, annotated_breakpoints["3'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
-    ax.text(0.8, 0.2, "Consensus sequence:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.8, 0.5, SV_ID+"_wtdbg2.ctg.fa", horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.14, 0.2, "Fusion type:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
+    ax.text(0.14, 0.5, annotated_breakpoints["Fusion_type"].split(" ")[0], horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.3, 0.2, "5' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
+    ax.text(0.3, 0.5, annotated_breakpoints["5'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.46, 0.2, "3' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
+    ax.text(0.46, 0.5, annotated_breakpoints["3'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.62, 0.2, "Consensus sequence:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
+    ax.text(0.62, 0.5, SV_ID+"_wtdbg2.ctg.fa", horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.84, 0.2, "Supporting reads:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
+    ax.text(0.84, 0.5, str(supporting_reads[0])+"/"+str(supporting_reads[0]+supporting_reads[1]), horizontalalignment='left',verticalalignment='center', size=9)
 
     matplotlib.axes.Axes.invert_yaxis(ax)
     plt.axis('off')
@@ -920,7 +932,8 @@ print("Start:", datetime.datetime.now())
 VCF_IN=args.vcf
 VCF_OUTPUT=args.output
 INFO_OUTPUT=args.fusion_output
+ORIGINAL_VCF=args.original_vcf
 PDF=args.pdf
 EnsemblRestClient=EnsemblRestClient()
-parse_vcf(VCF_IN, VCF_OUTPUT, INFO_OUTPUT, PDF)
+parse_vcf(VCF_IN, VCF_OUTPUT, INFO_OUTPUT, PDF, ORIGINAL_VCF)
 print("End:", datetime.datetime.now())
