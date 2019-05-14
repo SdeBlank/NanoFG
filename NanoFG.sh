@@ -508,8 +508,8 @@ if [ -e $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
       -w $WTDBG2_DIR \
       -ws '$CONSENSUS_CALLING_WTDBG2_SETTINGS'
 
-      if [ -s \${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
-        ln -s \$FASTA \${FASTA/.fasta/no_ctg.fa}
+      if ! [ -s \${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
+        ln -s \$FASTA \${FASTA/.fasta/.no_ctg.fa}
       fi
     done
 
