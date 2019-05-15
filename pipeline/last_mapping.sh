@@ -92,15 +92,15 @@ LASTAL=${LAST_DIR}/src/lastal
 LAST_SPLIT=${LAST_DIR}/src/last-split
 LAST_PARAMS=${LAST_DIR}/last_params
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
-PREFIX=${FASTA/_wtdbg2.ctg.fa/_wtdbg2}
+PREFIX=${FASTA/.fa/}
 
 if [ -z $LAST_SETTINGS_OVERRIDE ];then
   LAST_SETTINGS=$(echo $LAST_SETTINGS | sed -e "s/-p [^ ]\+/-p ${LAST_PARAMS}/")
 fi
 
-LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin | \
-${SAMBAMBA} sort /dev/stdin -o ${PREFIX}.ctg.last.sorted.bam"
-SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.sorted.bam"
+LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin | \
+${SAMBAMBA} sort /dev/stdin -o ${PREFIX}.last.sorted.bam"
+SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.last.sorted.bam"
 
 #echo ${LAST_COMMAND}
 eval ${LAST_COMMAND}

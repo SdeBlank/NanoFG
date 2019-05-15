@@ -19,10 +19,10 @@ import re
 parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-v', '--vcf', type=str, help='Input NanoSV vcf file', required=True)
+parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file', required=True)
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
 parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', required=True)
-parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file', required=True)
 
 args = parser.parse_args()
 
@@ -906,7 +906,14 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     ############################################################################# Additional info visualisation
     ax = fig.add_subplot(gs[6, :])
     ax.axhline(y=0, xmin=0, xmax=100, color="black", linewidth=1, linestyle="--")
-    SV_ID=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
+    consensus="Not completed"
+    for alt_read in Record.INFO["ALT_READ_IDS"]:
+        if ".fasta_ctg1" in alt_read:
+            sv_id=re.findall("^\d+", alt_read)[0]
+            consensus=sv_id+"_wtdbg2.ctg.fa"
+            break
+    sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
+
     ax.text(0, 0.2, "Original ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0, 0.5, SV_ID, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.14, 0.2, "Fusion type:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
@@ -916,7 +923,7 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     ax.text(0.46, 0.2, "3' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.46, 0.5, annotated_breakpoints["3'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.62, 0.2, "Consensus sequence:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.62, 0.5, SV_ID+"_wtdbg2.ctg.fa", horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.62, 0.5, sv_id+source_suffix, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.84, 0.2, "Supporting reads:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.84, 0.5, str(supporting_reads[0])+"/"+str(supporting_reads[0]+supporting_reads[1]), horizontalalignment='left',verticalalignment='center', size=9)
 

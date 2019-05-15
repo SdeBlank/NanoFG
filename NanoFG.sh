@@ -567,6 +567,7 @@ if [ -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
         exit
       fi
     else
+      echo "$LAST_MAPPING_ERR should be empty. Possible error occurred" >&2
       exit
     fi
   fi
@@ -670,6 +671,7 @@ echo \`date\`: Running on \`uname -n\`
 if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ];then
   bash $PIPELINE_DIR/fusion_check.sh \
     -v $SV_CALLING_OUT \
+    -ov $VCF \
     -o $FUSION_CHECK_VCF_OUTPUT \
     -fo $FUSION_CHECK_INFO_OUTPUT \
     -p $FUSION_CHECK_PDF_OUTPUT \
@@ -765,6 +767,8 @@ if [ \$CHECK_BOOL = true ]; then
       rm -rf $CANDIDATE_DIR
       rm $BAM_MERGE_OUT
       rm $SV_CALLING_OUT
+      rm $LOG_DIR
+      rm $JOB_DIR
     fi
 else
   echo "NanoFG check: Fail" >> $CHECK_NANOFG_OUT

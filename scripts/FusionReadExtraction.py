@@ -15,6 +15,55 @@ parser.add_argument('-o', '--output_dir', required=True, type=str, help='Output 
 
 args = parser.parse_args()
 
+#############################################   Convert different vcf sv notations to bracket notations N[Chr:pos[   #############################################
+def alt_convert( record ):
+    orientation = None
+    remoteOrientation = None
+    if record.INFO['SVTYPE'] == 'DEL':
+        orientation = False
+        remoteOrientation = True
+    elif record.INFO['SVTYPE'] == 'DUP':
+        orientation = True
+        remoteOrientation = False
+    elif record.INFO['SVTYPE'] == 'TRA':
+        strands=record.INFO['STRANDS']
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "+-":
+            orientation = False
+            remoteOrientation = True
+        elif strands == "-+":
+            orientation = True
+            remoteOrientation = False
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
+    elif 'INV3' in record.INFO:
+    	orientation = False
+    	remoteOrientation = False
+    elif 'INV5' in record.INFO:
+        orientation = True
+        remoteOrientation = True
+
+    if 'CT' in record.INFO:
+        if record.INFO['CT'] == '3to5':
+            orientation = False
+            remoteOrientation = True
+        elif record.INFO['CT'] == '3to3':
+            orientation = False
+            remoteOrientation = False
+        elif record.INFO['CT'] == '5to3':
+            orientation = True
+            remoteOrientation = False
+        elif record.INFO['CT'] == '5to5':
+            orientation = True
+            remoteOrientation = True
+    if orientation is None or remoteOrientation is None:
+        sys.exit()
+    record.ALT = [ pyvcf.model._Breakend( record.CHROM, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
+    return( record )
+
 def get_gene_overlap( chr, pos, ori, bp ):
     SERVER='http://grch37.rest.ensembl.org'
     SPECIES="human"
@@ -58,7 +107,7 @@ def create_fasta( chr, start, end, svid, exclude ):
         #### No effect when testing on the truthset in recall, but see if it ever happens in real sets
         if read.query_name in exclude or read.seq == None or read.is_supplementary:
             continue
-        fasta.write( ">"+read.query_name+"\n")
+        fasta.write( ">"+svid+"."+read.query_name+"\n")
         fasta.write(read.seq+"\n")
         #exclude.append(read.query_name)
     fasta.close()
