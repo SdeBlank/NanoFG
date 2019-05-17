@@ -3,22 +3,23 @@
 usage() {
 echo "
 Required parameters:
-    -v|--vcf		                                                                  Path to vcf file
     -b|--bam                                                                      Path to bam file
 
 Optional parameters:
 
 GENERAL
+    -v|--vcf		                                                                  Path to vcf file
     -h|--help                                                                     Shows help
     -o|--outputdir                                                                Path to output directory
     -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
     -e|--venv                                                                     Path to virtual environment[${VENV}]
     -m|--mail                                                                     Email adress
+    -cc|--consensus_calling                                                       Perform consensus sequencing on the reads to decrease runtime
     -df|--dont_filter                                                             Don't filter out all non-PASS SVs
     -dc|--dont_clean                                                              Don't clean up the intermediate files
 
 REQUIRED TOOLS
-    -n|--nanosv                                                                   Path to NanoSV [${NANOSV}]
+    -sv|--sv_caller                                                               Path to SV caller (NanoSV or Sniffles) [${SV_CALLER}]
     -s|--sambamba                                                                 Path to sambamba|samtools [${SAMBAMBA}]
     -l|--last_dir                                                                 Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                               Path to wtdbg2 directory [${WTDBG2_DIR}]
@@ -30,7 +31,6 @@ FUSION READ EXTRACTION
     -freht|--fusion_read_extraction_h_rt                                          Fusion read extraction time [${FUSION_READ_EXTRACTION_TIME}]
 
 CONSENSUS MAPPING
-
     -ccws|--consensus_calling_wtdbg2_settings                                     wtdbg2 settings [${WTDBG2_SETTINGS}]
     -cct|--consensus_calling_threads                                              Number of threads [${CONSENSUS_CALLING_THREADS}]
     -cchv|--consensus_calling_h_vmem                                              Consensus mapping memory [${CONSENSUS_CALLING_MEMORY}]
@@ -45,14 +45,14 @@ LAST_MAPPING
     -lmht|--last_mapping_h_rt                                                     Last mapping runtime[$LAST_MAPPING_TIME]
 
 BAM MERGE
-    -bmt|--bam_merge_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
-    -bmhv|--bam_merge_h_vmem                                                        Bam merge memory [${VCF_SPLIT_MEMORY}]
-    -bmhr|--bam_merge_h_rt                                                          Bam merge time [${VCF_SPLIT_TIME}]
+    -bmt|--bam_merge_threads                                                      Number of threads [${BAM_MERGE_THREADS}]
+    -bmhv|--bam_merge_h_vmem                                                      Bam merge memory [${BAM_MERGE_MEMORY}]
+    -bmhr|--bam_merge_h_rt                                                        Bam merge time [${BAM_MERGE_TIME}]
 
 SV CALLING
-    -sct|--sv_calling_threads                                                       Number of threads [${SV_CALLING_THREADS}]
-    -schv|--sv_calling_h_vmem                                                       SV calling memory [${SV_CALLING_MEMORY}]
-    -schr|--sv_calling_h_rt                                                         SV calling time [${SV_CALLING_TIME}]
+    -sct|--sv_calling_threads                                                     Number of threads [${SV_CALLING_THREADS}]
+    -schv|--sv_calling_h_vmem                                                     SV calling memory [${SV_CALLING_MEMORY}]
+    -schr|--sv_calling_h_rt                                                       SV calling time [${SV_CALLING_TIME}]
 
 FUSION CHECK
     -fcio|--fusion_check_info_output                                              Path to the NanoFG output info file [_FusionGenesInfo.txt]
@@ -77,10 +77,14 @@ VENV=${NANOFG_DIR}/venv/bin/activate
 
 OUTPUTDIR=$(realpath ./)
 echo $OUTPUTDIR
+
+CONSENSUS_CALLING=false
 DONT_CLEAN=false
+DONT_FILTER=false
 
 #TOOL PATH DEFAULTS
 SAMBAMBA=$PATH_SAMBAMBA
+SV_CALLER=$PATH_SV_CALLER
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
 
@@ -168,6 +172,10 @@ do
     shift # past argument
     shift # past value
     ;;
+    -cc|--consensus_calling)
+    CONSENSUS_CALLING=true
+    shift # past argument
+    ;;
     -df|--dont_filter)
     DONT_FILTER=true
     shift # past argument
@@ -175,6 +183,11 @@ do
     -dc|--dont_clean)
     DONT_CLEAN=true
     shift # past argument
+    ;;
+    -sv|--sv_caller)
+    SV_CALLER="$2"
+    shift # past argument
+    shift # past value
     ;;
     -s|--sambamba)
     SAMBAMBA="$2"
@@ -261,17 +274,17 @@ do
     shift # past argument
     shift # past value
     ;;
-    -bmt|vcf_split_threads)
+    -bmt|bam_merge_threads)
     BAM_MERGE_THREADS="$2"
     shift # past argument
     shift # past value
     ;;
-    -bmhv|vcf_split_h_vmem)
+    -bmhv|bam_merge_h_vmem)
     BAM_MERGE_MEMORY="$2"
     shift # past argument
     shift # past value
     ;;
-    -bmhr|vcf_split_h_rt)
+    -bmhr|bam_merge_h_rt)
     BAM_MERGE_TIME="$2"
     shift # past argument
     shift # past value
@@ -360,6 +373,10 @@ if [ -z $FUSION_CHECK_PDF_OUTPUT ]; then
     FUSION_CHECK_PDF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_PDF_OUTPUT/.vcf/_FusionGenes.pdf}
 fi
 
+if [ $CONSENSUS_CALLING = true ]; then
+  SV_CALLING_CONFIG=$FILES_DIR/nanosv_last_config_1supportread.ini
+fi
+
 echo `date`: Running on `uname -n`
 
 VCF_NAME=$(basename $VCF)
@@ -444,7 +461,7 @@ echo \`date\`: Running on \`uname -n\`
 VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
 VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
 
-if [ -z $DONT_FILTER ];then
+if [ $DONT_FILTER = false ];then
   grep "^#" $VCF > \$VCF_NO_INS
   grep -v "^#" $VCF | awk '\$5!="<INS>"' | awk '\$7=="PASS"' >> \$VCF_NO_INS
 else
@@ -507,10 +524,6 @@ if [ -e $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
       -t $CONSENSUS_CALLING_THREADS \
       -w $WTDBG2_DIR \
       -ws '$CONSENSUS_CALLING_WTDBG2_SETTINGS'
-
-      if ! [ -s \${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
-        ln -s \$FASTA \${FASTA/.fasta/.no_ctg.fa}
-      fi
     done
 
     NUMBER_FASTA_INPUT=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
@@ -548,6 +561,13 @@ echo \`date\`: Running on \`uname -n\`
 
 if [ -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
   if [ ! -e $LOG_DIR/${LAST_MAPPING_JOBNAME}.done ]; then
+
+    for FASTA in $CANDIDATE_DIR/*.fasta; do
+      if ! [ -s \${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
+        ln -s \$FASTA \${FASTA/.fasta/.no_ctg.fa}
+      fi
+    done
+
     LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
 
     for FA in $CANDIDATE_DIR/*.fa; do
@@ -636,7 +656,7 @@ echo \`date\`: Running on \`uname -n\`
 if [ -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
     bash $PIPELINE_DIR/sv_calling.sh \
       -b $BAM_MERGE_OUT \
-      -n $NANOSV \
+      -sv $SV_CALLER \
       -t $SV_CALLING_THREADS \
       -s $SAMBAMBA \
       -v $VENV \
@@ -786,26 +806,30 @@ qsub $CHECK_NANOFG_SH
 }
 
 if [ ! -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
-    fusion_read_extraction
+  fusion_read_extraction
 fi
 if [ ! -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
+  if [ $CONSENSUS_CALLING = true ]; then
     consensus_calling
+  else
+    touch $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done
+  fi
 fi
 if [ ! -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
-    last_mapping
+  last_mapping
 fi
 
 if [ ! -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
-    bam_merge
+  bam_merge
 fi
 if [ ! -e $LOG_DIR/$SV_CALLING_JOBNAME.done ]; then
     sv_calling
 fi
 if [ ! -e $LOG_DIR/$FUSION_CHECK_JOBNAME.done ]; then
-    fusion_check
+  fusion_check
 fi
 if [ ! -e $LOG_DIR/$CHECK_NANOFG_JOBNAME.done ]; then
-    check_NanoFG
+  check_NanoFG
 fi
 
 echo `date`: Done

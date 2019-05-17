@@ -8,7 +8,7 @@ Required parameters:
 Optional parameters:
     -h|--help		     Shows help
     -t|--threads	   Number of threads [$THREADS]
-    -n|--nanosv      Path to NanoSV [$NANOSV]
+    -sv|--sv_caller  'NanoSV' or the path to Sniffles [$SV_CALLER]
     -s|--sambamba	   Path to sambamba [$SAMBAMBA]
     -v|--venv		     Path to virtual env of NanoSV [$VENV]
     -c|--config		   Path to config file [$CONFIG]
@@ -23,7 +23,7 @@ NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
 FILES_DIR=$NANOFG_DIR/files
 
 THREADS=1
-NANOSV='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
+SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
 SAMBAMBA='/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba'
 OUTPUT='/dev/stdout'
 VENV=$NANOFG_DIR/venv/bin/activate
@@ -51,6 +51,11 @@ do
     ;;
     -s|--sambamba)
     SAMBAMBA="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -sv|--sv_caller)
+    SV_CALLER="$2"
     shift # past argument
     shift # past value
     ;;
@@ -86,12 +91,25 @@ echo `date`: Running on `uname -n`
 
 . $VENV
 
-python $NANOSV  \
--s $SAMBAMBA \
--c $CONFIG \
--t $THREADS \
--o $OUTPUT \
-$BAM
+
+if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
+  #$SV_CALLER  \
+  python $SV_CALLER \
+  -s $SAMBAMBA \
+  -c $CONFIG \
+  -t $THREADS \
+  -o $OUTPUT \
+  $BAM
+fi
+
+if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  $SV_CALLER  \
+  -v $OUTPUT \
+  -m $BAM
+  -s 2
+  -n -1
+  --genotype
+fi
 
 deactivate
 

@@ -13,8 +13,10 @@ GENERAL
     -o|--outputdir                                                                Path to output directory
     -io|--info_output                                                             Path to the NanoFG output info file []
     -vo|--vcf_output                                                              Path to the NanoFG output vcf file []
+    -p|--pdf                                                                      Path to the NanoFG output pdf file []
     -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
     -t|--threads
+    -cc|--consensus_calling                                                       Perform consensus sequencing on the reads to decrease runtime
     -df|--dont_filter                                                             Don't filter out all non-PASS SVs
     -e|--venv                                                                     Path to virtual environment[${VENV}]
 
@@ -50,6 +52,8 @@ FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 THREADS=8
+CONSENSUS_CALLING=false
+DONT_FILTER=false
 
 OUTPUTDIR=$(realpath ./)
 
@@ -97,6 +101,21 @@ do
     shift # past argument
     shift # past value
     ;;
+    -io|--info_output)
+    FUSION_CHECK_INFO_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -vo|--vcf_output)
+    FUSION_CHECK_VCF_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -p|--pdf)
+    FUSION_CHECK_PDF_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -o|--outputdir)
     OUTPUTDIR="$2"
     shift # past argument
@@ -106,6 +125,10 @@ do
     NANOFG_DIR="$2"
     shift # past argument
     shift # past value
+    ;;
+    -cc|--consensus_calling)
+    CONSENSUS_CALLING=true
+    shift # past argument
     ;;
     -df|--dont_filter)
     DONT_FILTER=true
@@ -156,16 +179,6 @@ do
     shift # past argument
     shift # past value
     ;;
-    -fcio|--fusion_check_info_output)
-    FUSION_CHECK_INFO_OUTPUT="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -fcvo|--fusion_check_vcf_output)
-    FUSION_CHECK_VCF_OUTPUT="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -fcs|--fusion_check_script)
     FUSION_CHECK_SCRIPT="$2"
     shift # past argument
@@ -191,13 +204,18 @@ if [ -z $BAM ]; then
 fi
 
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
-    FUSION_CHECK_VCF_OUTPUT=./$(basename $VCF)
+    FUSION_CHECK_VCF_OUTPUT=$(basename $VCF)
     FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_VCF_OUTPUT/.vcf/_FusionGenes.vcf}
 fi
 
 if [ -z $FUSION_CHECK_INFO_OUTPUT ]; then
-    FUSION_CHECK_INFO_OUTPUT=./$(basename $VCF)
+    FUSION_CHECK_INFO_OUTPUT=$(basename $VCF)
     FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_INFO_OUTPUT/.vcf/_FusionGenesInfo.txt}
+fi
+
+if [ -z $FUSION_CHECK_PDF_OUTPUT ]; then
+    FUSION_CHECK_PDF_OUTPUT=$(basename $VCF)
+    FUSION_CHECK_PDF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_PDF_OUTPUT/.vcf/_FusionGenes.pdf}
 fi
 
 echo `date`: Running on `uname -n`
@@ -220,11 +238,12 @@ if [ ! -d $CANDIDATE_DIR ]; then
 fi
 
 ##################################################
+echo 'Step 1. Insertion removal and possible filtering'
 
 VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
 VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
 
-if [ -z $DONT_FILTER ];then
+if [ $DONT_FILTER = false ];then
   grep "^#" $VCF > $VCF_NO_INS
   grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_NO_INS
 else
@@ -232,8 +251,8 @@ else
   grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
 fi
 
-
 ##################################################
+echo 'Step 2. Candidate fusion read extraction'
 
 . $VENV
 
@@ -243,16 +262,24 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -o $CANDIDATE_DIR
 
 ##################################################
+echo 'Step 3. Producing consensus if possible'
 
 for FASTA in $CANDIDATE_DIR/*.fasta; do
-  bash $PIPELINE_DIR/consensus_calling.sh \
-    -f $FASTA \
-    -t $THREADS \
-    -w $WTDBG2_DIR \
-    -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
+  if [ $CONSENSUS_CALLING = true ]
+    bash $PIPELINE_DIR/consensus_calling.sh \
+      -f $FASTA \
+      -t $THREADS \
+      -w $WTDBG2_DIR \
+      -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
+  fi
+
+  if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
+    ln -s $FASTA ${FASTA/.fasta/.no_ctg.fa}
+  fi
 done
 
 ##################################################
+echo 'Step 4. Mapping consensus sequence (all reads if no consensus is reached)'
 
 LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
 
@@ -262,10 +289,11 @@ done | \
 xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
 
 ##################################################
-
+echo 'Step 5. Merging bams'
 $SAMBAMBA merge $MERGE_BAMS_OUT $CANDIDATE_DIR/*.last.sorted.bam
 
 ##################################################
+echo 'Step 6. Calling SVs'
 
 bash $PIPELINE_DIR/sv_calling.sh \
   -b $MERGE_BAMS_OUT \
@@ -277,12 +305,17 @@ bash $PIPELINE_DIR/sv_calling.sh \
   -o $SV_CALLING_OUT
 
 ###################################################
+echo 'Step 7. Checking fusion candidates'
 
 bash $PIPELINE_DIR/fusion_check.sh \
   -v $SV_CALLING_OUT \
+  -ov $VCF \
   -o $FUSION_CHECK_VCF_OUTPUT \
   -fo $FUSION_CHECK_INFO_OUTPUT \
+  -p $FUSION_CHECK_PDF_OUTPUT \
   -s $FUSION_CHECK_SCRIPT \
   -e $VENV
 
 ###################################################
+
+deactivate

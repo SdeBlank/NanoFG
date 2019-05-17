@@ -15,18 +15,28 @@ parser.add_argument('-o', '--output_dir', required=True, type=str, help='Output 
 
 args = parser.parse_args()
 
-#############################################   Convert different vcf sv notations to bracket notations N[Chr:pos[   #############################################
+#############################################   Convert sniffles vcf ALT field to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):
     orientation = None
     remoteOrientation = None
-    if record.INFO['SVTYPE'] == 'DEL':
+    if 'INS' in record.INFO['SVTYPE']:
+        return( record )
+    elif record.INFO['SVTYPE'] == 'DEL':
         orientation = False
         remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'DUP':
         orientation = True
         remoteOrientation = False
+    elif record.INFO['SVTYPE'] == 'INV':
+        strands=record.INFO['STRANDS'][0]
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'TRA':
-        strands=record.INFO['STRANDS']
+        strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
             remoteOrientation = False
@@ -39,29 +49,37 @@ def alt_convert( record ):
         elif strands == "--":
             orientation = True
             remoteOrientation = True
-    elif 'INV3' in record.INFO:
-    	orientation = False
-    	remoteOrientation = False
-    elif 'INV5' in record.INFO:
-        orientation = True
-        remoteOrientation = True
-
-    if 'CT' in record.INFO:
-        if record.INFO['CT'] == '3to5':
+    elif record.INFO['SVTYPE'] == 'INVDUP':
+        strands=record.INFO['STRANDS'][0]
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "+-":
             orientation = False
             remoteOrientation = True
-        elif record.INFO['CT'] == '3to3':
-            orientation = False
-            remoteOrientation = False
-        elif record.INFO['CT'] == '5to3':
+        elif strands == "-+":
             orientation = True
             remoteOrientation = False
-        elif record.INFO['CT'] == '5to5':
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
+    else:
+        strands=record.INFO['STRANDS'][0]
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "+-":
+            orientation = False
+            remoteOrientation = True
+        elif strands == "-+":
+            orientation = True
+            remoteOrientation = False
+        elif strands == "--":
             orientation = True
             remoteOrientation = True
     if orientation is None or remoteOrientation is None:
-        sys.exit()
-    record.ALT = [ pyvcf.model._Breakend( record.CHROM, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
+        sys.exit("Error in alt_convert; Unknown ALT field")
+    record.ALT = [ pyvcf.model._Breakend( record.INFO['CHR2'], record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
     return( record )
 
 def get_gene_overlap( chr, pos, ori, bp ):
@@ -97,18 +115,24 @@ def get_gene_overlap( chr, pos, ori, bp ):
 
     return( fusions )
 
-def create_fasta( chr, start, end, svid, exclude ):
+def create_fasta( chr, start, end, svid, exclude, include ):
     if end < start:
         end, start = start, end
     bamfile = pysam.AlignmentFile(args.bam, "rb" )
     fasta = open(args.output_dir+"/"+svid+".fasta", 'a+')
+
     for read in bamfile.fetch(chr, start, end):
         #### Breakpoints that only have supplementary reads and not a primary read spanning the breakpoint will be excluded
         #### No effect when testing on the truthset in recall, but see if it ever happens in real sets
-        if read.query_name in exclude or read.seq == None or read.is_supplementary:
-            continue
-        fasta.write( ">"+svid+"."+read.query_name+"\n")
-        fasta.write(read.seq+"\n")
+        if read.query_name in include and not read.seq == None and not read.is_supplementary:
+            fasta.write( ">"+svid+"."+read.query_name+"\n")
+            fasta.write(read.seq+"\n")
+
+        #### Uncomment to select all the reads supporting the breakpoint and adjacent regions of the gene to get full gene sequence back
+        # if read.query_name in exclude or read.seq == None or read.is_supplementary:
+        #     continue
+        # fasta.write( ">"+svid+"."+read.query_name+"\n")
+        # fasta.write(read.seq+"\n")
         #exclude.append(read.query_name)
     fasta.close()
     bamfile.close()
@@ -118,8 +142,10 @@ print("Start:", datetime.datetime.now())
 EnsemblRestClient=EnsemblRestClient()
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
+    print(record.ID)
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
-        #Possibility to add converter for different SV callers
+        record = alt_convert(record)
+    if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
     fusions={'donor':{}, 'acceptor':{}}
     bnd1_fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1')
@@ -139,7 +165,12 @@ for record in vcf_reader:
     if 'donor' in fusions and 'acceptor' in fusions:
         largest_donor_size=0
         largest_acceptor_size=0
-        REF_READ_IDS=record.INFO['REF_READ_IDS_1']+record.INFO['REF_READ_IDS_2']
+        if "ALT_READ_IDS" in record.INFO:
+            SUPP_READ_IDS=record.INFO['ALT_READ_IDS']
+            REF_READ_IDS=record.INFO['REF_READ_IDS_1']+record.INFO['REF_READ_IDS_2']
+        elif "RNAMES" in record.INFO:
+            SUPP_READ_IDS=record.INFO['RNAMES']
+            REF_READ_IDS=[]
         for donor in fusions['donor']:
             donor_gene, donor_bp = donor.split("\t")
             for acceptor in fusions['acceptor']:
@@ -179,8 +210,8 @@ for record in vcf_reader:
                             acceptor_start = fusions['acceptor'][acceptor]
                             acceptor_end = record.POS
     if good_fusion:
-        create_fasta(donor_chr, donor_start, donor_end, record.ID, REF_READ_IDS)
-        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, REF_READ_IDS)
+        create_fasta(donor_chr, donor_start, donor_end, record.ID, REF_READ_IDS, SUPP_READ_IDS)
+        create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, REF_READ_IDS, SUPP_READ_IDS)
 
 print("End:", datetime.datetime.now())
     #create_fasta(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].pos+1000, record.ID, record.INFO['REF_READ_IDS_2'])

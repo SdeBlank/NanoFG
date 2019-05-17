@@ -30,14 +30,39 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
     with open(original_vcf, "r") as original_vcf:
         supporting_reads={}
         original_vcf_reader=pyvcf.Reader(original_vcf)
+
+        if "ALT_READ_IDS" in original_vcf_reader.infos:
+            original_vcf_type="NanoSV"
+        elif "RNAMES" in original_vcf_reader.infos:
+            original_vcf_type="Sniffles"
+        else:
+            sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
+
         for original_record in original_vcf_reader:
-            supporting_reads[original_record.ID]=(len(original_record.INFO["ALT_READ_IDS"]), len(original_record.INFO["REF_READ_IDS_1"])+len(original_record.INFO["REF_READ_IDS_2"]))
+            if original_vcf_type=="NanoSV":
+                ### Use set() to get only unique reads. It is expected that the same read does not support the same breakpoint twice, but it does in WGA data
+                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"]))+len(set(original_record.INFO["REF_READ_IDS_2"])), original_record.FILTER)
+            elif original_vcf_type=="Sniffles":
+                supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
+
     with open(vcf, "r") as vcf, open(vcf_output, "w") as vcf_output, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
         vcf_reader=pyvcf.Reader(vcf)
         vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+
+        if "ALT_READ_IDS" in vcf_reader.infos:
+            vcf_type="NanoSV"
+        elif "RNAMES" in vcf_reader.infos:
+            vcf_type="Sniffles"
+        else:
+            sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
+
         vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for record in vcf_reader:
+            if not isinstance(record.ALT[0], pyvcf.model._Breakend):
+                record = alt_convert(record)
+            if not isinstance(record.ALT[0], pyvcf.model._Breakend):
+                continue
             chrom1=record.CHROM
             pos1=record.POS
             chrom2=record.ALT[0].chr
@@ -46,6 +71,18 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             pos2_orientation=record.ALT[0].remoteOrientation
 
             print(record.ID)
+
+            if vcf_type=="NanoSV":
+                compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
+            elif vcf_type=="Sniffles":
+                compared_id=re.findall("^\d+", record.INFO["RNAMES"][0])[0]
+            #compared_id=record.ID
+            if compared_id in supporting_reads:
+                original_vcf_info=supporting_reads[compared_id]
+                ### Only activate when no consensus calling is used
+                if original_vcf_info[0]<2:
+                    continue
+
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=ensembl_annotation(chrom1, pos1)
             if not breakend1_annotation:
@@ -61,24 +98,65 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             breakend2_info=breakend_annotation(chrom2, pos2, pos2_orientation, breakend2_annotation)
 
             #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
-            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, info_output)
-
-            compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
-
-            if compared_id in supporting_reads:
-                supporting_vs_reference=supporting_reads[compared_id]
+            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, original_vcf_info[2], info_output)
 
             #Produce output
             for fusion in fusions:
-                fusion_output.write("\t".join([str(record.ID), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["5'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
+                fusion_output.write("\t".join([str(record.ID), fusion["Fusion_type"], ";".join(fusion["Flags"])+";".join(original_vcf_info[2]), fusion["5'"]["Gene_id"]+"-"+fusion["5'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
-                str(fusion["3'"]["Original_CDS_length"])+str(supporting_vs_reference[0])+"/"+str(supporting_vs_reference[0]+supporting_vs_reference[1])])+"\n")
-                visualisation(fusion, record, supporting_vs_reference, output_pdf)
+                str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
+                visualisation(fusion, record, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
                 record.INFO["FUSION"]=vcf_fusion_info
             vcf_writer.write_record(record)
+
+def alt_convert( record ):
+    orientation = None
+    remoteOrientation = None
+    if 'INS' in record.INFO['SVTYPE']:
+        return( record )
+    elif record.INFO['SVTYPE'] == 'DEL':
+        orientation = False
+        remoteOrientation = True
+    elif record.INFO['SVTYPE'] == 'DUP':
+        orientation = True
+        remoteOrientation = False
+    elif record.INFO['SVTYPE'] == 'INV':
+        strands=record.INFO['STRANDS']
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
+    elif record.INFO['SVTYPE'] == 'TRA':
+        strands=record.INFO['STRANDS']
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "+-":
+            orientation = False
+            remoteOrientation = True
+        elif strands == "-+":
+            orientation = True
+            remoteOrientation = False
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
+    elif record.INFO['SVTYPE'] == 'INVDUP':
+        strands=record.INFO['STRANDS']
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
+    if orientation is None or remoteOrientation is None:
+        sys.exit("Error in alt_convert; Unknown ALT field")
+    record.ALT = [ pyvcf.model._Breakend( record.INFO['CHR2'], record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
+    return( record )
 
 # Gather all information about protein coding genes that overlap with a break-end, independent of the location of the breakend in the gene
 def ensembl_annotation(CHROM, POS):
@@ -214,7 +292,6 @@ def ensembl_annotation(CHROM, POS):
                                 intron_info["End"]=transcript["Exon"][rank+1]["end"]+1
                             intron_info["CDS"]=CDS
                             ensembl_info["Exons"].append(intron_info)
-                    #print(ensembl_info["Gene_id"],cds_length, transcript["Translation"]["length"]*3)
                     if cds_length-3!=transcript["Translation"]["length"]*3:
                         ensembl_info["Flags"].append("Possible-incomplete-CDS")             #as currently I am unable to request the given ENSEMBL Flags. Bias towards incomplete but bases%3=0
             HITS.append(ensembl_info)
@@ -314,7 +391,6 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                                 else:
                                     BND_INFO["Phase"]=(abs(POS-sequence["Start"])+1+sequence["Start_phase"])%3
                                     BND_INFO["CDS_length"]=abs(POS-sequence["Start"])+1
-                                # BND_INFO["Phase"]=(abs(POS-sequence["Start"])+1+sequence["Start_phase"])%3
 
                                 for rank in range(0, idx):
                                     if gene["Exons"][rank]["Type"]=="exon":
@@ -422,7 +498,7 @@ def FusionCheck(Annotation1, Annotation2):
 
     return (Fusion_type, Annotation1_CDS_length, Annotation2_CDS_length)
 
-def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Output):
+def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Original_vcf_filter ,Output):
     chrom1=Record.CHROM
     pos1=Record.POS
     chrom2=Record.ALT[0].chr
@@ -435,7 +511,7 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
             annotation2["BND"]=str(chrom2)+":"+str(pos2)
 
             #Add an extra flag based on both fused genes and produce a list of flags
-            FLAGS=annotation1["Flags"]+annotation2["Flags"]
+            FLAGS=Original_vcf_filter+annotation1["Flags"]+annotation2["Flags"]
 
             if (((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
                 annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
@@ -915,7 +991,7 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
 
     ax.text(0, 0.2, "Original ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0, 0.5, SV_ID, horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0, 0.5, sv_id, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.14, 0.2, "Fusion type:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.14, 0.5, annotated_breakpoints["Fusion_type"].split(" ")[0], horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.3, 0.2, "5' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
@@ -923,7 +999,7 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     ax.text(0.46, 0.2, "3' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.46, 0.5, annotated_breakpoints["3'"]["BND"], horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.62, 0.2, "Consensus sequence:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.62, 0.5, sv_id+source_suffix, horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.62, 0.5, consensus, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.84, 0.2, "Supporting reads:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.84, 0.5, str(supporting_reads[0])+"/"+str(supporting_reads[0]+supporting_reads[1]), horizontalalignment='left',verticalalignment='center', size=9)
 
