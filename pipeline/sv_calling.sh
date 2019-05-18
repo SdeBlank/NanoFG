@@ -6,13 +6,14 @@ Required parameters:
     -b|--bam		     Path to sorted bam file
 
 Optional parameters:
-    -h|--help		     Shows help
-    -t|--threads	   Number of threads [$THREADS]
-    -sv|--sv_caller  'NanoSV' or the path to Sniffles [$SV_CALLER]
-    -s|--sambamba	   Path to sambamba [$SAMBAMBA]
-    -v|--venv		     Path to virtual env of NanoSV [$VENV]
-    -c|--config		   Path to config file [$CONFIG]
-    -o|--output		   Path to vcf output file [$OUTPUT]
+    -h|--help		             Shows help
+    -t|--threads	           Number of threads [$THREADS]
+    -sv|--sv_caller          'NanoSV' or the path to Sniffles [$SV_CALLER]
+    -s|--sambamba	           Path to sambamba [$SAMBAMBA]
+    -v|--venv		             Path to virtual env of NanoSV [$VENV]
+    -c|--config		           Path to config file [$CONFIG]
+    -ss|--sniffles_settings  Settings for sniffles sv calling [$SNIFFLES_SETTINGS]
+    -o|--output		           Path to vcf output file [$OUTPUT]
 "
 }
 
@@ -28,6 +29,7 @@ SAMBAMBA='/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba'
 OUTPUT='/dev/stdout'
 VENV=$NANOFG_DIR/venv/bin/activate
 CONFIG=$FILES_DIR/nanosv_last_config.ini
+SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
 
 
 while [[ $# -gt 0 ]]
@@ -69,6 +71,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -ss|--sniffles_settings)
+    SNIFFLES_SETTINGS="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -o|--output)
     OUTPUT="$2"
     shift # past argument
@@ -91,7 +98,6 @@ echo `date`: Running on `uname -n`
 
 . $VENV
 
-
 if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
   #$SV_CALLER  \
   python $SV_CALLER \
@@ -105,10 +111,8 @@ fi
 if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
   $SV_CALLER  \
   -v $OUTPUT \
-  -m $BAM
-  -s 2
-  -n -1
-  --genotype
+  -m $BAM \
+  $SNIFFLES_SETTINGS
 fi
 
 deactivate

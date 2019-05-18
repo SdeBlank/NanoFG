@@ -2,27 +2,36 @@
 
 usage() {
 echo "
+
+NanoFG_singlejob.sh -b BAM [-v VCF] [-s SELECTED_GENES_OR_REGIONS] [-df]
+
 Required parameters:
-    -v|--vcf		                                                                  Path to vcf file
     -b|--bam                                                                      Path to bam file
 
 Optional parameters:
 
 GENERAL
-    -h|--help                                                                     Shows help
+    -h|--help                                                                     Shows help-v|--vcf
+    -v|--vcf		                                                                  Path to vcf file		                                                                  Path to vcf file
+    -t|--threads
+    -e|--venv                                                                     Path to virtual environment[${VENV}]
+
+SELECTION AND FILTERING
+    -s|--selection                                                     Select genes or areas to check for fusion genes.
+                                                                       Insert a list of genes or areas, separated by a comma
+                                                                       e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
+    -df|--dont_filter                                                  Don't filter out all non-PASS SVs
+    -cc|--consensus_calling                                            Perform consensus sequencing on the reads to decrease runtime
+
+OUTPUT
     -o|--outputdir                                                                Path to output directory
     -io|--info_output                                                             Path to the NanoFG output info file []
     -vo|--vcf_output                                                              Path to the NanoFG output vcf file []
     -p|--pdf                                                                      Path to the NanoFG output pdf file []
-    -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
-    -t|--threads
-    -cc|--consensus_calling                                                       Perform consensus sequencing on the reads to decrease runtime
-    -df|--dont_filter                                                             Don't filter out all non-PASS SVs
-    -e|--venv                                                                     Path to virtual environment[${VENV}]
 
 REQUIRED TOOLS
-    -n|--nanosv                                                                   Path to NanoSV [${NANOSV}]
-    -s|--sambamba                                                                 Path to sambamba|samtools [${SAMBAMBA}]
+    -sv|--sv_caller                                                               NanoSV or path to Sniffles [${SV_CALLER}]
+    -sa|--sambamba                                                                Path to sambamba|samtools [${SAMBAMBA}]
     -l|--last_dir                                                                 Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                               Path to wtdbg2 directory [${WTDBG2_DIR}]
 
@@ -32,6 +41,10 @@ SCRIPTS
 
 CONSENSUS CALLING
     -ccws|--consensus_calling_wtdbg2_settings                                     Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
+
+SV CALLING
+    -nsc|--nanosv_config                                               Path to config to use for nanosv [$NANOSV_CONFIG]
+    -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
 LAST MAPPING
     -lmr|--last_mapping_refgenome                                                 Reference genome [${LAST_MAPPING_REFGENOME}]
@@ -52,6 +65,8 @@ FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 THREADS=8
+
+SELECTION=""
 CONSENSUS_CALLING=false
 DONT_FILTER=false
 
@@ -61,6 +76,16 @@ OUTPUTDIR=$(realpath ./)
 SAMBAMBA=$PATH_SAMBAMBA
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
+
+SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
+NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
+NANOSV_LAST_CONFIG=$FILES_DIR/nanosv_last_config.ini
+SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
+
+#REGION SELECTION
+REGION_SELECTION_SCRIPT=$SCRIPT_DIR/RegionSelection.py
+REGION_SELECTION_BED_OUTPUT=$OUTPUTDIR/regions.bed
+REGION_SELECTION_BAM_OUTPUT=$OUTPUTDIR/regions.bam
 
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
@@ -98,6 +123,11 @@ do
     ;;
     -b|--bam)
     BAM="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -s|--selection)
+    SELECTION="$2"
     shift # past argument
     shift # past value
     ;;
@@ -139,7 +169,7 @@ do
     shift # past argument
     shift # past value
     ;;
-    -s|--sambamba)
+    -sa|--sambamba)
     SAMBAMBA="$2"
     shift # past argument
     shift # past value
@@ -151,6 +181,21 @@ do
     ;;
     -w|--wtdbg2_dir)
     WTDBG2_DIR="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -sv|--sv_caller)
+    SV_CALLER="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -nsc|--nanosv_config)
+    NANOSV_CONFIG="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -ss|--sniffles_settings)
+    SNIFFLES_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -192,11 +237,6 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-if [ -z $VCF ]; then
-    echo "Missing -v|--vcf parameter"
-    usage
-    exit
-fi
 if [ -z $BAM ]; then
     echo "Missing -b|--bam parameter"
     usage
@@ -237,8 +277,41 @@ if [ ! -d $CANDIDATE_DIR ]; then
     exit
 fi
 
+. $VENV
+
 ##################################################
-echo 'Step 1. Insertion removal and possible filtering'
+echo 'Step 1. (Optional) Selecting regions to check for fusion genes'
+
+if [ $SELECTION = "" ] && ! [ -z $VCF ];then
+  REGION_SELECTION_BAM_OUTPUT=$BAM
+  echo "No selection parameter given or vcf input given. Using all mapped reads or given vcf"
+else
+  python $REGION_SELECTION_SCRIPT \
+  -b $REGION_SELECTION_BED_OUTPUT \
+  -r $SELECTION
+
+  $SAMBAMBA view -h -f bam -L $REGION_SELECTION_BED_OUTPUT -o $REGION_SELECTION_BAM_OUTPUT $BAM
+fi
+
+##################################################
+echo 'Step 2. (Optional) SV calling'
+if [ -z $VCF ]; then
+  VCF=${BAM/.bam/.vcf}
+  bash $PIPELINE_DIR/sv_calling.sh \
+    -sv $SV_CALLER \
+    -b $REGION_SELECTION_BAM_OUTPUT \
+    -t $THREADS \
+    -s $SAMBAMBA \
+    -v $VENV \
+    -c $NANOSV_CONFIG \
+    -ss $SNIFFLES_SETTINGS \
+    -o $VCF
+else
+  echo "vcf already given. skipping step"
+fi
+
+##################################################
+echo 'Step 3. Insertion removal and possible filtering'
 
 VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
 VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
@@ -252,9 +325,7 @@ else
 fi
 
 ##################################################
-echo 'Step 2. Candidate fusion read extraction'
-
-. $VENV
+echo 'Step 4. Candidate fusion read extraction'
 
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
@@ -262,7 +333,7 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -o $CANDIDATE_DIR
 
 ##################################################
-echo 'Step 3. Producing consensus if possible'
+echo 'Step 5. Producing consensus if possible'
 
 for FASTA in $CANDIDATE_DIR/*.fasta; do
   if [ $CONSENSUS_CALLING = true ]
@@ -279,7 +350,7 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
 done
 
 ##################################################
-echo 'Step 4. Mapping consensus sequence (all reads if no consensus is reached)'
+echo 'Step 6. Mapping consensus sequence (all reads if no consensus is reached)'
 
 LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
 
@@ -289,23 +360,24 @@ done | \
 xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
 
 ##################################################
-echo 'Step 5. Merging bams'
+echo 'Step 7. Merging bams'
 $SAMBAMBA merge $MERGE_BAMS_OUT $CANDIDATE_DIR/*.last.sorted.bam
 
 ##################################################
-echo 'Step 6. Calling SVs'
+echo 'Step 8. Calling SVs'
 
 bash $PIPELINE_DIR/sv_calling.sh \
-  -b $MERGE_BAMS_OUT \
-  -n $NANOSV \
+  -sv $SV_CALLER \
+  -b $BAM_MERGE_OUT \
   -t $THREADS \
   -s $SAMBAMBA \
   -v $VENV \
-  -c $SV_CALLING_CONFIG \
+  -c $NANOSV_MINIMAP2_CONFIG \
+  -ss $SNIFFLES_SETTINGS \
   -o $SV_CALLING_OUT
 
 ###################################################
-echo 'Step 7. Checking fusion candidates'
+echo 'Step 9. Checking fusion candidates'
 
 bash $PIPELINE_DIR/fusion_check.sh \
   -v $SV_CALLING_OUT \
