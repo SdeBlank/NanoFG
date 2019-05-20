@@ -66,7 +66,7 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 THREADS=8
 
-SELECTION=""
+SELECTION="N"
 CONSENSUS_CALLING=false
 DONT_FILTER=false
 
@@ -243,33 +243,31 @@ if [ -z $BAM ]; then
     exit
 fi
 
+echo `date`: Running on `uname -n`
+
+SAMPLE=$(basename $BAM)
+SAMPLE=${SAMPLE/.bam/}
+
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
-    FUSION_CHECK_VCF_OUTPUT=$(basename $VCF)
-    FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_VCF_OUTPUT/.vcf/_FusionGenes.vcf}
+    FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.vcf
 fi
 
 if [ -z $FUSION_CHECK_INFO_OUTPUT ]; then
-    FUSION_CHECK_INFO_OUTPUT=$(basename $VCF)
-    FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_INFO_OUTPUT/.vcf/_FusionGenesInfo.txt}
+    FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenesInfo.txt
 fi
 
 if [ -z $FUSION_CHECK_PDF_OUTPUT ]; then
-    FUSION_CHECK_PDF_OUTPUT=$(basename $VCF)
-    FUSION_CHECK_PDF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_PDF_OUTPUT/.vcf/_FusionGenes.pdf}
+    FUSION_CHECK_PDF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.pdf
 fi
 
-echo `date`: Running on `uname -n`
-
-VCF_NAME=$(basename $VCF)
-VCF_NAME=${VCF_NAME/.vcf/}
-VCF_OUTPUT=$OUTPUTDIR/${VCF_NAME}_FusionGenes.vcf
-INFO_OUTPUT=$OUTPUTDIR/${VCF_NAME}_FusionGenesInfo.txt
+VCF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.vcf
+INFO_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenesInfo.txt
 
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 SCRIPT_DIR=$NANOFG_DIR/scripts
 CANDIDATE_DIR=$OUTPUTDIR/candidate_fusions
 
-MERGE_BAMS_OUT=$OUTPUTDIR/consensus_last.sorted.bam
+BAM_MERGE_OUT=$OUTPUTDIR/consensus_last.sorted.bam
 SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
 
 mkdir -p $CANDIDATE_DIR
@@ -282,7 +280,7 @@ fi
 ##################################################
 echo 'Step 1. (Optional) Selecting regions to check for fusion genes'
 
-if [ $SELECTION = "" ] && ! [ -z $VCF ];then
+if [ -z $SELECTION ] && [ ! -z $VCF ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "No selection parameter given or vcf input given. Using all mapped reads or given vcf"
 else
@@ -290,20 +288,24 @@ else
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
 
-  $SAMBAMBA view -h -f bam -L $REGION_SELECTION_BED_OUTPUT -o $REGION_SELECTION_BAM_OUTPUT $BAM
+  REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
+  $SAMBAMBA view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
+  for read in $($SAMBAMBA view -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1); do sambamba view $BAM | grep $read >> $REGION_SELECTION_SAM_OUTPUT;done
+  $SAMBAMBA view -h -S -f bam -o $REGION_SELECTION_BAM_OUTPUT $REGION_SELECTION_SAM_OUTPUT                                                                    !!!!!! WERKT NIET !!!!
+  #rm $REGION_SELECTION_SAM_OUTPUT
 fi
 
 ##################################################
 echo 'Step 2. (Optional) SV calling'
 if [ -z $VCF ]; then
-  VCF=${BAM/.bam/.vcf}
+  VCF=$OUTPUTDIR/${SAMPLE}.vcf
   bash $PIPELINE_DIR/sv_calling.sh \
     -sv $SV_CALLER \
     -b $REGION_SELECTION_BAM_OUTPUT \
     -t $THREADS \
     -s $SAMBAMBA \
     -v $VENV \
-    -c $NANOSV_CONFIG \
+    -c $NANOSV_MINIMAP2_CONFIG \
     -ss $SNIFFLES_SETTINGS \
     -o $VCF
 else
@@ -336,12 +338,14 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
 echo 'Step 5. Producing consensus if possible'
 
 for FASTA in $CANDIDATE_DIR/*.fasta; do
-  if [ $CONSENSUS_CALLING = true ]
+  if [ $CONSENSUS_CALLING = true ];then
     bash $PIPELINE_DIR/consensus_calling.sh \
       -f $FASTA \
       -t $THREADS \
       -w $WTDBG2_DIR \
       -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
+  else
+    echo "Consensus calling not activated. Use '-cc' to turn consensus calling on"
   fi
 
   if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
@@ -361,7 +365,7 @@ xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/las
 
 ##################################################
 echo 'Step 7. Merging bams'
-$SAMBAMBA merge $MERGE_BAMS_OUT $CANDIDATE_DIR/*.last.sorted.bam
+$SAMBAMBA merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
 
 ##################################################
 echo 'Step 8. Calling SVs'
@@ -372,7 +376,7 @@ bash $PIPELINE_DIR/sv_calling.sh \
   -t $THREADS \
   -s $SAMBAMBA \
   -v $VENV \
-  -c $NANOSV_MINIMAP2_CONFIG \
+  -c $NANOSV_LAST_CONFIG \
   -ss $SNIFFLES_SETTINGS \
   -o $SV_CALLING_OUT
 

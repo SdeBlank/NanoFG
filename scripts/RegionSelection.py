@@ -37,13 +37,14 @@ with open(bed, "w") as bed:
             params={"expand": "1"}
 
             ensembl_request=EnsemblRestClient.perform_rest_action(server, endpoint, headers, params)
-            chrom=ensembl_request["seq_region_name"]
-            pos1=ensembl_request["start"]
-            pos2=ensembl_request["end"]
+            chrom=str(ensembl_request["seq_region_name"])
+            pos1=str(ensembl_request["start"])
+            pos2=str(ensembl_request["end"])
+
         try:
             if pos1<pos2:
-                bed.write("\t".join([chrom, pos1, pos2]))
+                bed.write("\t".join([chrom, pos1, pos2])+"\n")
             else:
-                bed.write("\t".join([chrom, pos1, pos2]))
+                bed.write("\t".join([chrom, pos1, pos2])+"\n")
         except:
             sys.exit(item+" is not a valid selection. Use a valid ensembl id, gene name or region (e.g. 3:1234-2345)")
