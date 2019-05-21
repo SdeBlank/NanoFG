@@ -66,7 +66,6 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 THREADS=8
 
-SELECTION="N"
 CONSENSUS_CALLING=false
 DONT_FILTER=false
 
@@ -267,8 +266,8 @@ PIPELINE_DIR=$NANOFG_DIR/pipeline
 SCRIPT_DIR=$NANOFG_DIR/scripts
 CANDIDATE_DIR=$OUTPUTDIR/candidate_fusions
 
-BAM_MERGE_OUT=$OUTPUTDIR/consensus_last.sorted.bam
-SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
+BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
+SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
 mkdir -p $CANDIDATE_DIR
 if [ ! -d $CANDIDATE_DIR ]; then
@@ -278,26 +277,28 @@ fi
 . $VENV
 
 ##################################################
-echo 'Step 1. (Optional) Selecting regions to check for fusion genes'
-
 if [ -z $SELECTION ] && [ ! -z $VCF ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "No selection parameter given or vcf input given. Using all mapped reads or given vcf"
 else
+  echo 'Selecting regions to check for fusion genes...'
   python $REGION_SELECTION_SCRIPT \
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
 
   REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
   $SAMBAMBA view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
-  for read in $($SAMBAMBA view -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1); do sambamba view $BAM | grep $read >> $REGION_SELECTION_SAM_OUTPUT;done
-  $SAMBAMBA view -h -S -f bam -o $REGION_SELECTION_BAM_OUTPUT $REGION_SELECTION_SAM_OUTPUT                                                                    !!!!!! WERKT NIET !!!!
-  #rm $REGION_SELECTION_SAM_OUTPUT
+  $SAMBAMBA view -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
+  $SAMBAMBA view $BAM | grep -f reads.tmp >> $REGION_SELECTION_SAM_OUTPUT
+  $SAMBAMBA view -h -S -f bam $REGION_SELECTION_SAM_OUTPUT | $SAMBAMBA sort -o $REGION_SELECTION_BAM_OUTPUT /dev/stdin
+  $SAMBAMBA index $REGION_SELECTION_BAM_OUTPUT
+  rm reads.tmp
+  rm $REGION_SELECTION_SAM_OUTPUT
 fi
 
 ##################################################
-echo 'Step 2. (Optional) SV calling'
 if [ -z $VCF ]; then
+  echo 'SV calling...'
   VCF=$OUTPUTDIR/${SAMPLE}.vcf
   bash $PIPELINE_DIR/sv_calling.sh \
     -sv $SV_CALLER \
@@ -309,25 +310,26 @@ if [ -z $VCF ]; then
     -ss $SNIFFLES_SETTINGS \
     -o $VCF
 else
-  echo "vcf already given. skipping step"
+  echo "vcf already given with the -v parameter. skipping step"
 fi
 
 ##################################################
-echo 'Step 3. Insertion removal and possible filtering'
 
 VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
 VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
 
 if [ $DONT_FILTER = false ];then
+  echo 'Removing insertions and all variants without a PASS filter...'
   grep "^#" $VCF > $VCF_NO_INS
   grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_NO_INS
 else
+  echo 'Removing insertions...'
   grep "^#" $VCF > $VCF_NO_INS
   grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
 fi
 
 ##################################################
-echo 'Step 4. Candidate fusion read extraction'
+echo 'Extracting read that support candidate fusion genes...'
 
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
@@ -335,7 +337,7 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -o $CANDIDATE_DIR
 
 ##################################################
-echo 'Step 5. Producing consensus if possible'
+echo 'Producing consensus if possible...'
 
 for FASTA in $CANDIDATE_DIR/*.fasta; do
   if [ $CONSENSUS_CALLING = true ];then
@@ -354,7 +356,7 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
 done
 
 ##################################################
-echo 'Step 6. Mapping consensus sequence (all reads if no consensus is reached)'
+echo 'Mapping candidate fusion genes...'
 
 LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
 
@@ -364,11 +366,22 @@ done | \
 xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
 
 ##################################################
-echo 'Step 7. Merging bams'
-$SAMBAMBA merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
+echo 'Merging bams...'
+
+NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
+
+if [[ NUMBER_OF_BAMS -gt 1 ]];then
+  $SAMBAMBA merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
+elif [[ NUMBER_OF_BAMS -eq 1 ]];then
+  cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
+  cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
+
+else
+  echo "No candidate fusion genes found"
+fi
 
 ##################################################
-echo 'Step 8. Calling SVs'
+echo 'Calling SVs...'
 
 bash $PIPELINE_DIR/sv_calling.sh \
   -sv $SV_CALLER \
@@ -381,7 +394,7 @@ bash $PIPELINE_DIR/sv_calling.sh \
   -o $SV_CALLING_OUT
 
 ###################################################
-echo 'Step 9. Checking fusion candidates'
+echo 'Checking fusion candidates...'
 
 bash $PIPELINE_DIR/fusion_check.sh \
   -v $SV_CALLING_OUT \
