@@ -90,7 +90,7 @@ REGION_SELECTION_BAM_OUTPUT=$OUTPUTDIR/regions.bam
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
 
 #CONSENSUS CALLING DEFAULTS
-CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g'
+CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
 #LAST MAPPING DEFAULTS
 LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
@@ -337,7 +337,11 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -o $CANDIDATE_DIR
 
 ##################################################
-echo 'Producing consensus if possible...'
+if [ $CONSENSUS_CALLING = true ];then
+  echo 'Producing consensus if possible...'
+else
+  echo "Consensus calling not activated. Use '-cc' to turn consensus calling on"
+fi
 
 for FASTA in $CANDIDATE_DIR/*.fasta; do
   if [ $CONSENSUS_CALLING = true ];then
@@ -346,8 +350,6 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
       -t $THREADS \
       -w $WTDBG2_DIR \
       -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
-  else
-    echo "Consensus calling not activated. Use '-cc' to turn consensus calling on"
   fi
 
   if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
@@ -363,7 +365,8 @@ LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST
 for FA in $CANDIDATE_DIR/*.fa; do
   echo $FA;
 done | \
-xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
+xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; exit 1;"
+#xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
 
 ##################################################
 echo 'Merging bams...'
@@ -372,6 +375,9 @@ NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
 
 if [[ NUMBER_OF_BAMS -gt 1 ]];then
   $SAMBAMBA merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
+  if [[ $SV_CALLER == *"samtools"* ]] || [[ $SV_CALLER == *"Samtools"* ]]; then
+    $SAMBAMBA index $BAM_MERGE_OUT
+  fi
 elif [[ NUMBER_OF_BAMS -eq 1 ]];then
   cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
   cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
@@ -408,3 +414,5 @@ bash $PIPELINE_DIR/fusion_check.sh \
 ###################################################
 
 deactivate
+
+echo `date`: Done

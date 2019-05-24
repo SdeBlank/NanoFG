@@ -87,7 +87,7 @@ def get_gene_overlap( chr, pos, ori, bp ):
     SPECIES="human"
     ENDPOINT="/overlap/region/"+SPECIES+"/"+str(chr)+":"+str(pos)+"-"+str(pos)
     HEADERS={"Content-Type" : "application/json"}
-    PARAMS={"feature": "gene"}
+    PARAMS={"feature": "gene", "biotype": "protein_coding"}
 
     genes_data=EnsemblRestClient.perform_rest_action(SERVER, ENDPOINT, HEADERS, PARAMS)
 
@@ -142,7 +142,6 @@ print("Start:", datetime.datetime.now())
 EnsemblRestClient=EnsemblRestClient()
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 for record in vcf_reader:
-    print(record.ID)
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         record = alt_convert(record)
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
@@ -151,7 +150,7 @@ for record in vcf_reader:
     bnd1_fusions = get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, '1')
 
     ### Skip next request if the first BND already falls outside of a gene
-    if not fusions:
+    if len(fusions['donor'])==0 and len(fusions['acceptor'])==0:
         continue
     bnd2_fusions=get_gene_overlap(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, '2')
 

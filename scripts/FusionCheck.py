@@ -70,8 +70,6 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             pos1_orientation=record.ALT[0].orientation
             pos2_orientation=record.ALT[0].remoteOrientation
 
-            print(record.ID)
-
             if vcf_type=="NanoSV":
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
             elif vcf_type=="Sniffles":
@@ -85,11 +83,11 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
 
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=ensembl_annotation(chrom1, pos1)
-            if not breakend1_annotation:
+            if len(breakend1_annotation)==0:
                 vcf_writer.write_record(record)
                 continue
             breakend2_annotation=ensembl_annotation(chrom2, pos2)
-            if not breakend2_annotation:
+            if len(breakend2_annotation)==0:
                 vcf_writer.write_record(record)
                 continue
 
@@ -830,7 +828,6 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
 ############################################################################# FUSION GENE VISUALISATION
 
     fused_exons = []
-    print(annotated_breakpoints["Fusion_type"])
     if "exon-exon" in annotated_breakpoints["Fusion_type"]:
         fused_protein=annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2-1]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-2:]
         fused_length=0
