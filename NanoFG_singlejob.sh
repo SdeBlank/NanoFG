@@ -6,15 +6,15 @@ echo "
 NanoFG_singlejob.sh -b BAM [-v VCF] [-s SELECTED_GENES_OR_REGIONS] [-df]
 
 Required parameters:
-    -b|--bam                                                                      Path to bam file
+    -b|--bam                                                           Path to bam file
 
 Optional parameters:
 
 GENERAL
-    -h|--help                                                                     Shows help-v|--vcf
-    -v|--vcf		                                                                  Path to vcf file		                                                                  Path to vcf file
+    -h|--help                                                          Shows help-v|--vcf
+    -v|--vcf		                                                       Path to vcf file
     -t|--threads
-    -e|--venv                                                                     Path to virtual environment[${VENV}]
+    -e|--venv                                                          Path to virtual environment[${VENV}]
 
 SELECTION AND FILTERING
     -s|--selection                                                     Select genes or areas to check for fusion genes.
@@ -24,33 +24,33 @@ SELECTION AND FILTERING
     -cc|--consensus_calling                                            Perform consensus sequencing on the reads to decrease runtime
 
 OUTPUT
-    -o|--outputdir                                                                Path to output directory
-    -io|--info_output                                                             Path to the NanoFG output info file []
-    -vo|--vcf_output                                                              Path to the NanoFG output vcf file []
-    -p|--pdf                                                                      Path to the NanoFG output pdf file []
+    -o|--outputdir                                                     Path to output directory
+    -io|--info_output                                                  Path to the NanoFG output info file []
+    -vo|--vcf_output                                                   Path to the NanoFG output vcf file []
+    -p|--pdf                                                           Path to the NanoFG output pdf file []
 
 REQUIRED TOOLS
-    -sv|--sv_caller                                                               NanoSV or path to Sniffles [${SV_CALLER}]
-    -sa|--sambamba                                                                Path to sambamba|samtools [${SAMBAMBA}]
-    -l|--last_dir                                                                 Path to LAST directory [${LAST_DIR}]
-    -w|--wtdbg2_dir                                                               Path to wtdbg2 directory [${WTDBG2_DIR}]
+    -sv|--sv_caller                                                    NanoSV or path to Sniffles [${SV_CALLER}]
+    -sa|--sambamba                                                     Path to sambamba|samtools [${SAMBAMBA}]
+    -l|--last_dir                                                      Path to LAST directory [${LAST_DIR}]
+    -w|--wtdbg2_dir                                                    Path to wtdbg2 directory [${WTDBG2_DIR}]
 
 SCRIPTS
-    -fres|--fusion_read_extraction_script                                         Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
-    -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
+    -fres|--fusion_read_extraction_script                              Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
+    -fcs|--fusion_check_script                                         Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
 
 CONSENSUS CALLING
-    -ccws|--consensus_calling_wtdbg2_settings                                     Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
+    -ccws|--consensus_calling_wtdbg2_settings                          Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
 
 SV CALLING
     -nsc|--nanosv_config                                               Path to config to use for nanosv [$NANOSV_CONFIG]
     -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
 LAST MAPPING
-    -lmr|--last_mapping_refgenome                                                 Reference genome [${LAST_MAPPING_REFGENOME}]
-    -lmrd|--last_mapping_refdict                                                  Reference genome .dict file [${LAST_MAPPING_REFDICT}]
-    -lms|--last_mapping_settings                                                  LAST settings [${LAST_MAPPING_SETTINGS}]
-    -lmt|--last_mapping_threads                                                   Number of threads [${LAST_MAPPING_THREADS}]
+    -lmr|--last_mapping_refgenome                                      Reference genome [${LAST_MAPPING_REFGENOME}]
+    -lmrd|--last_mapping_refdict                                       Reference genome .dict file [${LAST_MAPPING_REFDICT}]
+    -lms|--last_mapping_settings                                       LAST settings [${LAST_MAPPING_SETTINGS}]
+    -lmt|--last_mapping_threads                                        Number of threads [${LAST_MAPPING_THREADS}]
 "
 }
 
@@ -79,6 +79,7 @@ WTDBG2_DIR=$PATH_WTDBG2_DIR
 SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
 NANOSV_LAST_CONFIG=$FILES_DIR/nanosv_last_config.ini
+NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
 SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
 
 #REGION SELECTION
@@ -97,8 +98,6 @@ LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
 LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
-
-SV_CALLING_CONFIG=$FILES_DIR/nanosv_last_config.ini
 
 #FUSION CHECK DEFAULTS
 FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
@@ -242,7 +241,7 @@ if [ -z $BAM ]; then
     exit
 fi
 
-echo `date`: Running on `uname -n`
+echo -e "`date` \t Running on `uname -n`"
 
 SAMPLE=$(basename $BAM)
 SAMPLE=${SAMPLE/.bam/}
@@ -277,11 +276,13 @@ fi
 . $VENV
 
 ##################################################
-if [ -z $SELECTION ] && [ ! -z $VCF ];then
+if [ ! -z $VCF ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
-  echo "No selection parameter given or vcf input given. Using all mapped reads or given vcf"
+  echo "### vcf (-v) already provided. Skipping selection and sv calling"
+elif [ -z $SELECTION ];then
+  echo "### No selection parameter (-s) provided. Using all mapped reads"
 else
-  echo 'Selecting regions to check for fusion genes...'
+  echo `date` - 'Selecting regions to check for fusion genes...'
   python $REGION_SELECTION_SCRIPT \
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
@@ -298,7 +299,7 @@ fi
 
 ##################################################
 if [ -z $VCF ]; then
-  echo 'SV calling...'
+  echo -e "`date` \t SV calling..."
   VCF=$OUTPUTDIR/${SAMPLE}.vcf
   bash $PIPELINE_DIR/sv_calling.sh \
     -sv $SV_CALLER \
@@ -309,38 +310,37 @@ if [ -z $VCF ]; then
     -c $NANOSV_MINIMAP2_CONFIG \
     -ss $SNIFFLES_SETTINGS \
     -o $VCF
-else
-  echo "vcf already given with the -v parameter. skipping step"
 fi
 
 ##################################################
 
-VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
-VCF_NO_INS=${OUTPUTDIR}/$(basename $VCF_NO_INS)
+VCF_FILTERED=${OUTPUTDIR}/$(basename $VCF)
 
 if [ $DONT_FILTER = false ];then
-  echo 'Removing insertions and all variants without a PASS filter...'
-  grep "^#" $VCF > $VCF_NO_INS
-  grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_NO_INS
+  echo -e "`date` \t Removing insertions and all variants without a PASS filter..."
+  VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS_PASS.vcf}
+  grep "^#" $VCF > $VCF_FILTERED
+  grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_FILTERED
 else
-  echo 'Removing insertions...'
-  grep "^#" $VCF > $VCF_NO_INS
-  grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_NO_INS
+  echo -e "`date` \t Removing insertions..."
+  VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS.vcf}
+  grep "^#" $VCF > $VCF_FILTERED
+  grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_FILTERED
 fi
 
 ##################################################
-echo 'Extracting read that support candidate fusion genes...'
+echo -e "`date` \t Extracting read that support candidate fusion genes..."
 
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
-  -v $VCF_NO_INS \
+  -v $VCF_FILTERED \
   -o $CANDIDATE_DIR
 
 ##################################################
 if [ $CONSENSUS_CALLING = true ];then
-  echo 'Producing consensus if possible...'
+  echo -e "`date` \t Producing consensus if possible..."
 else
-  echo "Consensus calling not activated. Use '-cc' to turn consensus calling on"
+  echo -e "`date` \t Consensus calling not activated. Use '-cc' to turn consensus calling on"
 fi
 
 for FASTA in $CANDIDATE_DIR/*.fasta; do
@@ -358,7 +358,7 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
 done
 
 ##################################################
-echo 'Mapping candidate fusion genes...'
+echo -e "`date` \t Mapping candidate fusion genes..."
 
 LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
 
@@ -369,41 +369,67 @@ xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {
 #xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
 
 ##################################################
-echo 'Merging bams...'
+echo -e "`date` \t Merging bams..."
 
 NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
 
 if [[ NUMBER_OF_BAMS -gt 1 ]];then
   $SAMBAMBA merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
-  if [[ $SV_CALLER == *"samtools"* ]] || [[ $SV_CALLER == *"Samtools"* ]]; then
+  if [[ $SAMBAMBA == *"samtools"* ]] || [[ $SAMBAMBA == *"Samtools"* ]]; then
     $SAMBAMBA index $BAM_MERGE_OUT
   fi
 elif [[ NUMBER_OF_BAMS -eq 1 ]];then
   cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
   cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
-
 else
-  echo "No candidate fusion genes found"
+  echo "NO CANDIDATE FUSION GENES FOUND"
+  exit
 fi
 
 ##################################################
-echo 'Calling SVs...'
+echo -e "`date` \t Calling SVs..."
 
-bash $PIPELINE_DIR/sv_calling.sh \
-  -sv $SV_CALLER \
-  -b $BAM_MERGE_OUT \
-  -t $THREADS \
-  -s $SAMBAMBA \
-  -v $VENV \
-  -c $NANOSV_LAST_CONFIG \
-  -ss $SNIFFLES_SETTINGS \
-  -o $SV_CALLING_OUT
+if [ $CONSENSUS_CALLING = true ];then
+  bash $PIPELINE_DIR/sv_calling.sh \
+    -sv $SV_CALLER \
+    -b $BAM_MERGE_OUT \
+    -t $THREADS \
+    -s $SAMBAMBA \
+    -v $VENV \
+    -c $NANOSV_LAST_CONSENSUS_CONFIG \
+    -ss $SNIFFLES_SETTINGS \
+    -o $SV_CALLING_OUT
+else
+  bash $PIPELINE_DIR/sv_calling.sh \
+    -sv $SV_CALLER \
+    -b $BAM_MERGE_OUT \
+    -t $THREADS \
+    -s $SAMBAMBA \
+    -v $VENV \
+    -c $NANOSV_LAST_CONFIG \
+    -ss $SNIFFLES_SETTINGS \
+    -o $SV_CALLING_OUT
+fi
+
+##################################################
+
+if [ $DONT_FILTER = false ];then
+  SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS_PASS.vcf}
+  echo -e "`date` \t Removing insertions and all variants without a PASS filter..."
+  grep "^#" $SV_CALLING_OUT > $SV_CALLING_OUT_FILTERED
+  grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $SV_CALLING_OUT_FILTERED
+else
+  SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS.vcf}
+  echo -e "`date` \t Removing insertions..."
+  grep "^#" $SV_CALLING_OUT > $SV_CALLING_OUT_FILTERED
+  grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' >> $SV_CALLING_OUT_FILTERED
+fi
 
 ###################################################
-echo 'Checking fusion candidates...'
+echo -e "`date` \t Checking fusion candidates..."
 
 bash $PIPELINE_DIR/fusion_check.sh \
-  -v $SV_CALLING_OUT \
+  -v $SV_CALLING_OUT_FILTERED \
   -ov $VCF \
   -o $FUSION_CHECK_VCF_OUTPUT \
   -fo $FUSION_CHECK_INFO_OUTPUT \
@@ -415,4 +441,4 @@ bash $PIPELINE_DIR/fusion_check.sh \
 
 deactivate
 
-echo `date`: Done
+echo -e "`date` \t Done"

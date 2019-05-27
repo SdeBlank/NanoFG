@@ -25,6 +25,10 @@ THREADS=1
 REF=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
 REF_DICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
 LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
+LASTAL=${LAST_DIR}/src/lastal
+LAST_SPLIT=${LAST_DIR}/src/last-split
+LAST_PARAMS=${LAST_DIR}/last_params
+MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
 LAST_SETTINGS="-Q 0 -p ${LAST_PARAMS}"
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
 SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
@@ -63,7 +67,7 @@ while [[ $# -gt 0 ]]; do
     ;;
     -ls|--last_settings)
     LAST_SETTINGS="$2"
-    LAST_SETTINGS_OVERRIDE=True                 ##### FIND BETTER WAY???
+    LAST_SETTINGS_OVERRIDE=True
     shift # past argument
     shift # past value
     ;;
@@ -92,6 +96,7 @@ LASTAL=${LAST_DIR}/src/lastal
 LAST_SPLIT=${LAST_DIR}/src/last-split
 LAST_PARAMS=${LAST_DIR}/last_params
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
+LAST_SETTINGS="-Q 0 -p ${LAST_PARAMS}"
 PREFIX=${FASTA/.fa/}
 
 if [ -z $LAST_SETTINGS_OVERRIDE ];then

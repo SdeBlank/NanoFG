@@ -22,12 +22,15 @@ def alt_convert( record ):
     if 'INS' in record.INFO['SVTYPE']:
         return( record )
     elif record.INFO['SVTYPE'] == 'DEL':
+        CHR2=record.CHROM
         orientation = False
         remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'DUP':
+        CHR2=record.CHROM
         orientation = True
         remoteOrientation = False
     elif record.INFO['SVTYPE'] == 'INV':
+        CHR2=record.CHROM
         strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
@@ -36,6 +39,7 @@ def alt_convert( record ):
             orientation = True
             remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'TRA':
+        CHR2=record.INFO['CHR2']
         strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
@@ -50,6 +54,7 @@ def alt_convert( record ):
             orientation = True
             remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'INVDUP':
+        CHR2=record.INFO['CHR2']
         strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
@@ -64,6 +69,7 @@ def alt_convert( record ):
             orientation = True
             remoteOrientation = True
     else:
+        CHR2=record.INFO['CHR2']
         strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
@@ -79,7 +85,7 @@ def alt_convert( record ):
             remoteOrientation = True
     if orientation is None or remoteOrientation is None:
         sys.exit("Error in alt_convert; Unknown ALT field")
-    record.ALT = [ pyvcf.model._Breakend( record.INFO['CHR2'], record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
+    record.ALT = [ pyvcf.model._Breakend( CHR2, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
     return( record )
 
 def get_gene_overlap( chr, pos, ori, bp ):

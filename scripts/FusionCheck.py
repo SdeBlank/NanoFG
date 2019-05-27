@@ -41,7 +41,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
         for original_record in original_vcf_reader:
             if original_vcf_type=="NanoSV":
                 ### Use set() to get only unique reads. It is expected that the same read does not support the same breakpoint twice, but it does in WGA data
-                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"]))+len(set(original_record.INFO["REF_READ_IDS_2"])), original_record.FILTER)
+                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"]+original_record.INFO["REF_READ_IDS_2"])), original_record.FILTER)
             elif original_vcf_type=="Sniffles":
                 supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
 
@@ -59,6 +59,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
         vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for record in vcf_reader:
+            print(record.ID)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
                 record = alt_convert(record)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
@@ -116,13 +117,16 @@ def alt_convert( record ):
     if 'INS' in record.INFO['SVTYPE']:
         return( record )
     elif record.INFO['SVTYPE'] == 'DEL':
+        CHR2=record.CHROM
         orientation = False
         remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'DUP':
+        CHR2=record.CHROM
         orientation = True
         remoteOrientation = False
     elif record.INFO['SVTYPE'] == 'INV':
-        strands=record.INFO['STRANDS']
+        CHR2=record.CHROM
+        strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
             remoteOrientation = False
@@ -130,7 +134,8 @@ def alt_convert( record ):
             orientation = True
             remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'TRA':
-        strands=record.INFO['STRANDS']
+        CHR2=record.INFO['CHR2']
+        strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
             remoteOrientation = False
@@ -144,16 +149,38 @@ def alt_convert( record ):
             orientation = True
             remoteOrientation = True
     elif record.INFO['SVTYPE'] == 'INVDUP':
-        strands=record.INFO['STRANDS']
+        CHR2=record.INFO['CHR2']
+        strands=record.INFO['STRANDS'][0]
         if strands == "++":
             orientation = False
+            remoteOrientation = False
+        elif strands == "+-":
+            orientation = False
+            remoteOrientation = True
+        elif strands == "-+":
+            orientation = True
+            remoteOrientation = False
+        elif strands == "--":
+            orientation = True
+            remoteOrientation = True
+    else:
+        CHR2=record.INFO['CHR2']
+        strands=record.INFO['STRANDS'][0]
+        if strands == "++":
+            orientation = False
+            remoteOrientation = False
+        elif strands == "+-":
+            orientation = False
+            remoteOrientation = True
+        elif strands == "-+":
+            orientation = True
             remoteOrientation = False
         elif strands == "--":
             orientation = True
             remoteOrientation = True
     if orientation is None or remoteOrientation is None:
         sys.exit("Error in alt_convert; Unknown ALT field")
-    record.ALT = [ pyvcf.model._Breakend( record.INFO['CHR2'], record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
+    record.ALT = [ pyvcf.model._Breakend( CHR2, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
     return( record )
 
 # Gather all information about protein coding genes that overlap with a break-end, independent of the location of the breakend in the gene
@@ -197,7 +224,6 @@ def ensembl_annotation(CHROM, POS):
                     ensembl_info["Flags"].append("fusion-with-readthrough")
 
             ##### FLAG for CTC-...  and RP..... proteins (Often not well characterized or readthrough genes)
-
 
             for transcript in gene_info["Transcript"]:
                 if transcript["is_canonical"]==1:
