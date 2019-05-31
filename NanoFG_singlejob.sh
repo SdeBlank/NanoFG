@@ -20,6 +20,7 @@ SELECTION AND FILTERING
     -s|--selection                                                     Select genes or areas to check for fusion genes.
                                                                        Insert a list of genes or areas, separated by a comma
                                                                        e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
+    -dc|--dont_clean                                                   Don't clean up the intermediate files
     -df|--dont_filter                                                  Don't filter out all non-PASS SVs
     -cc|--consensus_calling                                            Perform consensus sequencing on the reads to decrease runtime
 
@@ -68,6 +69,7 @@ VENV=${NANOFG_DIR}/venv/bin/activate
 
 THREADS=8
 CONSENSUS_CALLING=false
+DONT_CLEAN=false
 DONT_FILTER=false
 
 OUTPUTDIR=$(realpath ./)
@@ -158,6 +160,10 @@ do
     ;;
     -cc|--consensus_calling)
     CONSENSUS_CALLING=true
+    shift # past argument
+    ;;
+    -dc|--dont_clean)
+    DONT_CLEAN=true
     shift # past argument
     ;;
     -df|--dont_filter)
@@ -356,7 +362,7 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
       -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
   fi
 
-  if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ];then
+  if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ] && [ $CONSENSUS_CALLING = false ];then
     ln -s $FASTA ${FASTA/.fasta/.no_ctg.fa}
   fi
 done
@@ -448,6 +454,16 @@ bash $PIPELINE_DIR/fusion_check.sh \
   -e $VENV
 
 ###################################################
+
+if [ $DONT_CLEAN = false ];then
+  rm $VCF_FILTERED
+  rm $CANDIDATE_DIR/*
+  rmdir $CANDIDATE_DIR
+  rm $BAM_MERGE_OUT
+  rm $BAM_MERGE_OUT.bai
+  rm $SV_CALLING_OUT
+  rm $SV_CALLING_OUT_FILTERED
+fi
 
 deactivate
 

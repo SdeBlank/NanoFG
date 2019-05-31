@@ -13,7 +13,6 @@ parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-b', '--bam', required=True, type=str, help='Input bam file')
 parser.add_argument('-v', '--vcf', required=True, type=str, help='Input NanoSV vcf file')
-parser.add_argument('-e', '--ensembl', required=True, type=str, help='Ensembl gene file')
 parser.add_argument('-o', '--output_dir', required=True, type=str, help='Output directory for fasta files')
 
 args = parser.parse_args()
@@ -176,7 +175,6 @@ for record in vcf_reader:
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
 
-    print(record.ID)
     fusions={'donor':{}, 'acceptor':{}}
 
     fusions=get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, regions)

@@ -228,7 +228,7 @@ def ensembl_annotation(CHROM, POS):
             for transcript in gene_info["Transcript"]:
                 if transcript["is_canonical"]==1:
                     if transcript["id"] in transcript_ccds:
-                        if transcript_ccds[transcript["id"]] is None:
+                        if transcript_ccds[transcript["id"]] is None and "No-CCDS" not in ensembl_info["Flags"]:
                             ensembl_info["Flags"].append("No-CCDS")
                     cds_length=0
                     CDS=False
@@ -535,7 +535,7 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
             annotation2["BND"]=str(chrom2)+":"+str(pos2)
 
             #Add an extra flag based on both fused genes and produce a list of flags
-            FLAGS=Original_vcf_filter+annotation1["Flags"]+annotation2["Flags"]
+            FLAGS=Original_vcf_filter+Record.FILTER+annotation1["Flags"]+annotation2["Flags"]
 
             if (((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
                 annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
