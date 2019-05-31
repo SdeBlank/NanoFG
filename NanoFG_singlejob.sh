@@ -31,7 +31,7 @@ OUTPUT
 
 REQUIRED TOOLS
     -sv|--sv_caller                                                    NanoSV or path to Sniffles [${SV_CALLER}]
-    -sa|--sambamba                                                     Path to sambamba|samtools [${SAMBAMBA}]
+    -sa|--samtools                                                     Path to sambamba|samtools [${SAMTOOLS}]
     -l|--last_dir                                                      Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                    Path to wtdbg2 directory [${WTDBG2_DIR}]
 
@@ -58,21 +58,22 @@ POSITIONAL=()
 
 #GENERAL DEFAULTS
 NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
+
 source $NANOFG_DIR/paths.ini
 
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
-THREADS=8
 
+THREADS=8
 CONSENSUS_CALLING=false
 DONT_FILTER=false
 
 OUTPUTDIR=$(realpath ./)
 
 #TOOL PATH DEFAULTS
-SAMBAMBA=$PATH_SAMBAMBA
+SAMTOOLS=$PATH_SAMTOOLS
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
 
@@ -94,6 +95,7 @@ FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
 #LAST MAPPING DEFAULTS
+LAST_MAPPING_REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
 LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
 LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
@@ -167,8 +169,8 @@ do
     shift # past argument
     shift # past value
     ;;
-    -sa|--sambamba)
-    SAMBAMBA="$2"
+    -sa|--samtools)
+    SAMTOOLS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -275,29 +277,29 @@ fi
 
 . $VENV
 
-##################################################
+################################################## REGION SELECTION (OPTIONAL)
 if [ ! -z $VCF ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "### vcf (-v) already provided. Skipping selection and sv calling"
 elif [ -z $SELECTION ];then
   echo "### No selection parameter (-s) provided. Using all mapped reads"
 else
-  echo `date` - 'Selecting regions to check for fusion genes...'
+  echo -e "`date` \t 'Selecting regions to check for fusion genes..."
   python $REGION_SELECTION_SCRIPT \
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
 
   REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
-  $SAMBAMBA view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
-  $SAMBAMBA view -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
-  $SAMBAMBA view $BAM | grep -f reads.tmp >> $REGION_SELECTION_SAM_OUTPUT
-  $SAMBAMBA view -h -S -f bam $REGION_SELECTION_SAM_OUTPUT | $SAMBAMBA sort -o $REGION_SELECTION_BAM_OUTPUT /dev/stdin
-  $SAMBAMBA index $REGION_SELECTION_BAM_OUTPUT
+  $SAMTOOLS view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
+  $SAMTOOLS view -@ $THREADS -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
+  $SAMTOOLS view  -@ $THREADS $BAM | grep -f reads.tmp >> $REGION_SELECTION_SAM_OUTPUT
+  $SAMTOOLS view  -@ $THREADS -h -S -f bam $REGION_SELECTION_SAM_OUTPUT | $SAMTOOLS sort -o $REGION_SELECTION_BAM_OUTPUT /dev/stdin
+  $SAMTOOLS index $REGION_SELECTION_BAM_OUTPUT
   rm reads.tmp
   rm $REGION_SELECTION_SAM_OUTPUT
 fi
 
-##################################################
+################################################## SV CALLING (OPTIONAL)
 if [ -z $VCF ]; then
   echo -e "`date` \t SV calling..."
   VCF=$OUTPUTDIR/${SAMPLE}.vcf
@@ -305,14 +307,14 @@ if [ -z $VCF ]; then
     -sv $SV_CALLER \
     -b $REGION_SELECTION_BAM_OUTPUT \
     -t $THREADS \
-    -s $SAMBAMBA \
+    -s $SAMTOOLS \
     -v $VENV \
     -c $NANOSV_MINIMAP2_CONFIG \
-    -ss $SNIFFLES_SETTINGS \
+    -ss "$SNIFFLES_SETTINGS" \
     -o $VCF
 fi
 
-##################################################
+################################################## SV FILTERING (always remove INS, filtering on PASS optional)
 
 VCF_FILTERED=${OUTPUTDIR}/$(basename $VCF)
 
@@ -328,15 +330,17 @@ else
   grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_FILTERED
 fi
 
-##################################################
-echo -e "`date` \t Extracting read that support candidate fusion genes..."
+##################################################  CANDIDATE FUSION GENES READ EXTRACTION
+echo -e "`date` \t Extracting reads that support candidate fusion genes..."
+
+rm $CANDIDATE_DIR/*
 
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
   -v $VCF_FILTERED \
   -o $CANDIDATE_DIR
 
-##################################################
+################################################## CREATE A CONSENSUS OF ALL SUPPORTING READS (optional)
 if [ $CONSENSUS_CALLING = true ];then
   echo -e "`date` \t Producing consensus if possible..."
 else
@@ -357,26 +361,27 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
   fi
 done
 
-##################################################
+################################################## MAPPING THE FUSION GENE CANDIDATES
 echo -e "`date` \t Mapping candidate fusion genes..."
 
-LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
+LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
 
-for FA in $CANDIDATE_DIR/*.fa; do
-  echo $FA;
-done | \
-xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; exit 1;"
-#xargs -I{} --max-procs $THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
+if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
+  for FA in $CANDIDATE_DIR/*.fa; do
+    echo $FA;
+  done | \
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; exit 1;"
+fi
 
-##################################################
+################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES
 echo -e "`date` \t Merging bams..."
 
 NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
 
 if [[ NUMBER_OF_BAMS -gt 1 ]];then
-  $SAMBAMBA merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
-  if [[ $SAMBAMBA == *"samtools"* ]] || [[ $SAMBAMBA == *"Samtools"* ]]; then
-    $SAMBAMBA index $BAM_MERGE_OUT
+  $SAMTOOLS merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
+  if [[ $SAMTOOLS == *"samtools"* ]] || [[ $SAMTOOLS == *"Samtools"* ]]; then
+    $SAMTOOLS index $BAM_MERGE_OUT
   fi
 elif [[ NUMBER_OF_BAMS -eq 1 ]];then
   cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
@@ -386,7 +391,12 @@ else
   exit
 fi
 
-##################################################
+if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  $SAMTOOLS calmd $BAM_MERGE_OUT $LAST_MAPPING_REFFASTA -b > temp.bam
+  mv temp.bam $BAM_MERGE_OUT
+  $SAMTOOLS index $BAM_MERGE_OUT
+fi
+################################################## CALLING SVS USING LAST ON ALL READS THAT SUPPORT FUSION GENES
 echo -e "`date` \t Calling SVs..."
 
 if [ $CONSENSUS_CALLING = true ];then
@@ -394,24 +404,24 @@ if [ $CONSENSUS_CALLING = true ];then
     -sv $SV_CALLER \
     -b $BAM_MERGE_OUT \
     -t $THREADS \
-    -s $SAMBAMBA \
+    -s $SAMTOOLS \
     -v $VENV \
     -c $NANOSV_LAST_CONSENSUS_CONFIG \
-    -ss $SNIFFLES_SETTINGS \
+    -ss "$SNIFFLES_SETTINGS" \
     -o $SV_CALLING_OUT
 else
   bash $PIPELINE_DIR/sv_calling.sh \
     -sv $SV_CALLER \
     -b $BAM_MERGE_OUT \
     -t $THREADS \
-    -s $SAMBAMBA \
+    -s $SAMTOOLS \
     -v $VENV \
     -c $NANOSV_LAST_CONFIG \
-    -ss $SNIFFLES_SETTINGS \
+    -ss "$SNIFFLES_SETTINGS" \
     -o $SV_CALLING_OUT
 fi
 
-##################################################
+################################################## SV FILTERING (always remove INS, filtering on PASS optional)
 
 if [ $DONT_FILTER = false ];then
   SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS_PASS.vcf}
@@ -425,7 +435,7 @@ else
   grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' >> $SV_CALLING_OUT_FILTERED
 fi
 
-###################################################
+################################################### CHECKING THE FUSION GENE CANDIDATES
 echo -e "`date` \t Checking fusion candidates..."
 
 bash $PIPELINE_DIR/fusion_check.sh \

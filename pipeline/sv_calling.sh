@@ -112,6 +112,7 @@ if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
   $SV_CALLER  \
   -v $OUTPUT \
   -m $BAM \
+  -t $THREADS \
   $SNIFFLES_SETTINGS
 fi
 
