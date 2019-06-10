@@ -288,6 +288,7 @@ if [ ! -z $VCF ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "### vcf (-v) already provided. Skipping selection and sv calling"
 elif [ -z $SELECTION ];then
+  REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "### No selection parameter (-s) provided. Using all mapped reads"
 else
   echo -e "`date` \t 'Selecting regions to check for fusion genes..."
