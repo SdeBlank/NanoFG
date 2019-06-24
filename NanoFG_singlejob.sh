@@ -33,6 +33,7 @@ OUTPUT
 REQUIRED TOOLS
     -sv|--sv_caller                                                    NanoSV or path to Sniffles [${SV_CALLER}]
     -sa|--samtools                                                     Path to sambamba|samtools [${SAMTOOLS}]
+    -mm2|--minimap2                                                    Path to minimap2 [${MINIMAP2}]
     -l|--last_dir                                                      Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                    Path to wtdbg2 directory [${WTDBG2_DIR}]
 
@@ -44,7 +45,7 @@ CONSENSUS CALLING
     -ccws|--consensus_calling_wtdbg2_settings                          Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
 
 SV CALLING
-    -nsc|--nanosv_config                                               Path to config to use for nanosv [$NANOSV_CONFIG]
+    -nmc|--nanosv_minimap2_config                                               Path to config to use for nanosv [$NANOSV_MINIMAP2_CONFIG]
     -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
 LAST MAPPING
@@ -76,6 +77,7 @@ OUTPUTDIR=$(realpath ./)
 
 #TOOL PATH DEFAULTS
 SAMTOOLS=$PATH_SAMTOOLS
+MINIMAP2=$PATH_MINIMAP2
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
 
@@ -180,6 +182,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -mm2|--minimap2)
+    MINIMAP2="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -l|--last_dir)
     LAST_DIR="$2"
     shift # past argument
@@ -195,8 +202,8 @@ do
     shift # past argument
     shift # past value
     ;;
-    -nsc|--nanosv_config)
-    NANOSV_CONFIG="$2"
+    -nmc|--nanosv_minimap2_config)                                           #### NOT USED
+    NANOSV_MINIMAP2_CONFIG="$2"
     shift # past argument
     shift # past value
     ;;
@@ -340,7 +347,9 @@ fi
 ##################################################  CANDIDATE FUSION GENES READ EXTRACTION
 echo -e "`date` \t Extracting reads that support candidate fusion genes..."
 
-rm $CANDIDATE_DIR/*
+if [ -d $CANDIDATE_DIR ]; then
+  rm $CANDIDATE_DIR/*
+fi
 
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
@@ -371,13 +380,20 @@ done
 ################################################## MAPPING THE FUSION GENE CANDIDATES
 echo -e "`date` \t Mapping candidate fusion genes..."
 
-LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
 
 if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
+  MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
   for FA in $CANDIDATE_DIR/*.fa; do
     echo $FA;
   done | \
-  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $LAST_MAPPING_ARGS; exit 1;"
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
+
+elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  MAPPING_ARGS="-mm2 $MINIMAP2 -r $LAST_MAPPING_REFFASTA -t $THREADS -s $SAMTOOLS"
+  for FA in $CANDIDATE_DIR/*.fa; do
+    echo $FA;
+  done | \
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
 fi
 
 ################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES

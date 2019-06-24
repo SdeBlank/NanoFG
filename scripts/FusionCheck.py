@@ -17,7 +17,7 @@ import copy
 import re
 
 parser = argparse.ArgumentParser()
-parser = argparse.ArgumentParser(description='Put here a description.')
+parser = argparse.ArgumentParser(description='Input parameters for NanoFG.')
 parser.add_argument('-v', '--vcf', type=str, help='Input NanoSV vcf file', required=True)
 parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file', required=True)
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
@@ -31,10 +31,16 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
         supporting_reads={}
         original_vcf_reader=pyvcf.Reader(original_vcf)
 
-        if "ALT_READ_IDS" in original_vcf_reader.infos:
-            original_vcf_type="NanoSV"
-        elif "RNAMES" in original_vcf_reader.infos:
-            original_vcf_type="Sniffles"
+        if "source" in original_vcf_reader.metadata:
+            if vcf_reader.metadata["source"][0].lower()=="sniffles":
+                sv_caller="Sniffles"
+        elif "cmdline" in original_vcf_reader.metadata:
+            if "nanosv" in original_vcf_reader.metadata["cmdline"].lower():
+                sv_caller="NanoSV"
+        # if "ALT_READ_IDS" in original_vcf_reader.infos:
+        #     original_vcf_type="NanoSV"
+        # elif "RNAMES" in original_vcf_reader.infos:
+        #     original_vcf_type="Sniffles"
         else:
             sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
 
@@ -49,10 +55,16 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
         vcf_reader=pyvcf.Reader(vcf)
         vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
 
-        if "ALT_READ_IDS" in vcf_reader.infos:
-            vcf_type="NanoSV"
-        elif "RNAMES" in vcf_reader.infos:
-            vcf_type="Sniffles"
+        if "source" in vcf_reader.metadata:
+            if vcf_reader.metadata["source"][0].lower()=="sniffles":
+                vcf_type="Sniffles"
+        elif "cmdline" in vcf_reader.metadata:
+            if "nanosv" in vcf_reader.metadata["cmdline"].lower():
+                vcf_type="NanoSV"
+        # if "ALT_READ_IDS" in vcf_reader.infos:
+        #     vcf_type="NanoSV"
+        # elif "RNAMES" in vcf_reader.infos:
+        #     vcf_type="Sniffles"
         else:
             sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
 
@@ -68,13 +80,22 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             pos1=record.POS
             chrom2=record.ALT[0].chr
             pos2=record.ALT[0].pos
-            pos1_orientation=record.ALT[0].orientation
-            pos2_orientation=record.ALT[0].remoteOrientation
+
 
             if vcf_type=="NanoSV":
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
+                pos1_orientation=record.ALT[0].orientation
+                pos2_orientation=record.ALT[0].remoteOrientation
             elif vcf_type=="Sniffles":
                 compared_id=re.findall("^\d+", record.INFO["RNAMES"][0])[0]
+                if record.INFO["STRANDS"][0]=="+":
+                    pos1_orientation=False
+                else:
+                    pos2_orientation=True
+                if record.INFO["STRANDS"][1]=="+":
+                    pos1_orientation=False
+                else:
+                    pos2_orientation=True
             #compared_id=record.ID
             if compared_id in supporting_reads:
                 original_vcf_info=supporting_reads[compared_id]
@@ -1006,7 +1027,7 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     ax = fig.add_subplot(gs[6, :])
     ax.axhline(y=0, xmin=0, xmax=100, color="black", linewidth=1, linestyle="--")
     consensus="Not completed"
-    for alt_read in Record.INFO["ALT_READ_IDS"]:
+    for alt_read in Record.INFO["ALT_READ_IDS"]:                                    # DOESNT WORK IN SNIFFLES
         if ".fasta_ctg1" in alt_read:
             sv_id=re.findall("^\d+", alt_read)[0]
             consensus=sv_id+"_wtdbg2.ctg.fa"

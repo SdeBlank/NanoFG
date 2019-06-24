@@ -169,6 +169,14 @@ for line in ensembl_genes.iterrows():
     regions.append({'id':columns[0], 'chromosome':columns[1], 'start':int(columns[2]), 'end':int(columns[3]), 'strand':int(columns[4]), 'biotype':columns[5]})
 
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
+
+if "source" in vcf_reader.metadata:
+    if vcf_reader.metadata["source"][0].lower()=="sniffles":
+        vcf_type="Sniffles"
+elif "cmdline" in vcf_reader.metadata:
+    if "nanosv" in vcf_reader.metadata["cmdline"].lower():
+        vcf_type="NanoSV"
+
 for record in vcf_reader:
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         record = alt_convert(record)
@@ -177,7 +185,21 @@ for record in vcf_reader:
 
     fusions={'donor':{}, 'acceptor':{}}
 
-    fusions=get_gene_overlap(record.CHROM, record.POS, record.ALT[0].orientation, record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].remoteOrientation, regions)
+    if vcf_type=="Sniffles":
+        if record.INFO["STRANDS"][0][0]=="+":
+            strand1=False
+        else:
+            strand2=True
+        if record.INFO["STRANDS"][0][1]=="+":
+            strand1=False
+        else:
+            strand2=True
+
+    if vcf_type=="NanoSV":
+        strand1=record.ALT[0].orientation
+        strand2=record.ALT[0].remoteOrientation
+
+    fusions=get_gene_overlap(record.CHROM, record.POS, strand1, record.ALT[0].chr, record.ALT[0].pos, strand2, regions)
 
     good_fusion=False
     if 'donor' in fusions and 'acceptor' in fusions:
