@@ -189,9 +189,9 @@ for record in vcf_reader:
         if record.INFO["STRANDS"][0][0]=="+":
             strand1=False
         else:
-            strand2=True
+            strand1=True
         if record.INFO["STRANDS"][0][1]=="+":
-            strand1=False
+            strand2=False
         else:
             strand2=True
 

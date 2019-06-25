@@ -26,21 +26,17 @@ parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', requir
 
 args = parser.parse_args()
 
-def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
-    with open(original_vcf, "r") as original_vcf:
+def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
+    with open(full_vcf, "r") as original_vcf:
         supporting_reads={}
         original_vcf_reader=pyvcf.Reader(original_vcf)
 
         if "source" in original_vcf_reader.metadata:
-            if vcf_reader.metadata["source"][0].lower()=="sniffles":
-                sv_caller="Sniffles"
+            if original_vcf_reader.metadata["source"][0].lower()=="sniffles":
+                original_vcf_type="Sniffles"
         elif "cmdline" in original_vcf_reader.metadata:
-            if "nanosv" in original_vcf_reader.metadata["cmdline"].lower():
-                sv_caller="NanoSV"
-        # if "ALT_READ_IDS" in original_vcf_reader.infos:
-        #     original_vcf_type="NanoSV"
-        # elif "RNAMES" in original_vcf_reader.infos:
-        #     original_vcf_type="Sniffles"
+            if "nanosv" in original_vcf_reader.metadata["cmdline"][0].lower():
+                original_vcf_type="NanoSV"
         else:
             sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
 
@@ -51,24 +47,18 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             elif original_vcf_type=="Sniffles":
                 supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
 
-    with open(vcf, "r") as vcf, open(vcf_output, "w") as vcf_output, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
+    all_fusions={}
+    with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
         vcf_reader=pyvcf.Reader(vcf)
-        vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
-
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
                 vcf_type="Sniffles"
         elif "cmdline" in vcf_reader.metadata:
-            if "nanosv" in vcf_reader.metadata["cmdline"].lower():
+            if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
                 vcf_type="NanoSV"
-        # if "ALT_READ_IDS" in vcf_reader.infos:
-        #     vcf_type="NanoSV"
-        # elif "RNAMES" in vcf_reader.infos:
-        #     vcf_type="Sniffles"
         else:
             sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
 
-        vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for record in vcf_reader:
             print(record.ID)
@@ -81,22 +71,21 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             chrom2=record.ALT[0].chr
             pos2=record.ALT[0].pos
 
-
             if vcf_type=="NanoSV":
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
                 pos1_orientation=record.ALT[0].orientation
                 pos2_orientation=record.ALT[0].remoteOrientation
             elif vcf_type=="Sniffles":
                 compared_id=re.findall("^\d+", record.INFO["RNAMES"][0])[0]
-                if record.INFO["STRANDS"][0]=="+":
+                if record.INFO["STRANDS"][0][0]=="+":
                     pos1_orientation=False
                 else:
-                    pos2_orientation=True
-                if record.INFO["STRANDS"][1]=="+":
-                    pos1_orientation=False
+                    pos1_orientation=True
+                if record.INFO["STRANDS"][0][1]=="+":
+                    pos2_orientation=False
                 else:
                     pos2_orientation=True
-            #compared_id=record.ID
+
             if compared_id in supporting_reads:
                 original_vcf_info=supporting_reads[compared_id]
                 ### Only activate when no consensus calling is used
@@ -106,11 +95,9 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=ensembl_annotation(chrom1, pos1)
             if len(breakend1_annotation)==0:
-                vcf_writer.write_record(record)
                 continue
             breakend2_annotation=ensembl_annotation(chrom2, pos2)
             if len(breakend2_annotation)==0:
-                vcf_writer.write_record(record)
                 continue
 
             #Use requested information to calculate BND specific features
@@ -126,11 +113,21 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, original_vcf):
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
                 str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
+
                 visualisation(fusion, record, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
-                record.INFO["FUSION"]=vcf_fusion_info
-            vcf_writer.write_record(record)
+                all_fusions[compared_id]=vcf_fusion_info
+
+    with open(full_vcf, "r") as original_vcf, open(vcf_output, "w") as vcf_output:
+        original_vcf_reader=pyvcf.Reader(original_vcf)
+        original_vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+        vcf_writer=pyvcf.Writer(vcf_output, original_vcf_reader, lineterminator='\n')
+
+        for original_record in original_vcf_reader:
+            if original_record.ID in all_fusions:
+                original_record.INFO["FUSION"]=all_fusions[original_record.ID]
+            vcf_writer.write_record(original_record)
 
 def alt_convert( record ):
     orientation = None
@@ -1027,12 +1024,20 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     ax = fig.add_subplot(gs[6, :])
     ax.axhline(y=0, xmin=0, xmax=100, color="black", linewidth=1, linestyle="--")
     consensus="Not completed"
-    for alt_read in Record.INFO["ALT_READ_IDS"]:                                    # DOESNT WORK IN SNIFFLES
-        if ".fasta_ctg1" in alt_read:
-            sv_id=re.findall("^\d+", alt_read)[0]
-            consensus=sv_id+"_wtdbg2.ctg.fa"
-            break
-    sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
+    if "ALT_READ_IDS" in Record.INFO:
+        for alt_read in Record.INFO["ALT_READ_IDS"]:                                    # DOESNT WORK IN SNIFFLES
+            if ".fasta_ctg1" in alt_read:
+                sv_id=re.findall("^\d+", alt_read)[0]
+                consensus=sv_id+"_wtdbg2.ctg.fa"
+                break
+        sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
+    elif "RNAMES" in Record.INFO:
+        for alt_read in Record.INFO["RNAMES"]:                                    # DOESNT WORK IN SNIFFLES
+            if ".fasta_ctg1" in alt_read:
+                sv_id=re.findall("^\d+", alt_read)[0]
+                consensus=sv_id+"_wtdbg2.ctg.fa"
+                break
+        sv_id=re.findall("^\d+", Record.INFO["RNAMES"][0])[0]
 
     ax.text(0, 0.2, "Original ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0, 0.5, sv_id, horizontalalignment='left',verticalalignment='center', size=9)

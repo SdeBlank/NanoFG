@@ -76,8 +76,8 @@ fi
 echo `date`: Running on `uname -n`
 
 $MINIMAP2 -t $THREADS -ax map-ont $REF $FASTA\
-| $SAMTOOLS view -h -S --format=bam -t $THREADS /dev/stdin \
-| $SAMTOOLS sort /dev/stdin -o ${bam/.bam/.sorted.bam} -t $THREADS --memory-limit=10G --tmpdir=./
+| $SAMTOOLS view -h -S -b -t $THREADS /dev/stdin \
+| $SAMTOOLS sort /dev/stdin -o ${bam/.bam/.sorted.bam} -t $THREADS
 
 $SAMTOOLS index ${bam/.bam/.sorted.bam} -t $THREADS
 

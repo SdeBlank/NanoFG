@@ -22,7 +22,7 @@ SELECTION AND FILTERING
                                                                        e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
     -dc|--dont_clean                                                   Don't clean up the intermediate files
     -df|--dont_filter                                                  Don't filter out all non-PASS SVs
-    -cc|--consensus_calling                                            Perform consensus sequencing on the reads to decrease runtime
+    -cc|--consensus_calling                                            Create a consensus sequence of the fusion-supporting reads. Not recommended on low-coverage data.
 
 OUTPUT
     -o|--outputdir                                                     Path to output directory
@@ -279,6 +279,7 @@ INFO_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenesInfo.txt
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 SCRIPT_DIR=$NANOFG_DIR/scripts
 CANDIDATE_DIR=$OUTPUTDIR/candidate_fusions
+PRIMER_DIR=$OUTPUTDIR/primers
 
 BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
 SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
@@ -290,7 +291,7 @@ fi
 
 . $VENV
 
-################################################## REGION SELECTION (OPTIONAL)
+################################################## SELECTION OF REGIONS THAT ARE SPECIFIED BY THE USER (OPTIONAL)
 if [ ! -z $VCF ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "### vcf (-v) already provided. Skipping selection and sv calling"
@@ -313,7 +314,7 @@ else
   rm $REGION_SELECTION_SAM_OUTPUT
 fi
 
-################################################## SV CALLING (OPTIONAL)
+################################################## CALLING OF SVS ON GIVEN BAM FILE (OPTIONAL)
 if [ -z $VCF ]; then
   echo -e "`date` \t SV calling..."
   VCF=$OUTPUTDIR/${SAMPLE}.vcf
@@ -328,7 +329,7 @@ if [ -z $VCF ]; then
     -o $VCF
 fi
 
-################################################## SV FILTERING (always remove INS, filtering on PASS optional)
+################################################## REMOVAL OF INSERTIONS (MANDATORY) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
 VCF_FILTERED=${OUTPUTDIR}/$(basename $VCF)
 
@@ -344,7 +345,7 @@ else
   grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_FILTERED
 fi
 
-##################################################  CANDIDATE FUSION GENES READ EXTRACTION
+##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
 echo -e "`date` \t Extracting reads that support candidate fusion genes..."
 
 if [ -d $CANDIDATE_DIR ]; then
@@ -356,7 +357,7 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -v $VCF_FILTERED \
   -o $CANDIDATE_DIR
 
-################################################## CREATE A CONSENSUS OF ALL SUPPORTING READS (optional)
+################################################## CREATION OF A CONSENSUS SEQUENCE OF THE READS THAT SUPPORT A SV (OPTIONAL, NOT RECOMMENDED IF LOW COVERAGE DATA)
 if [ $CONSENSUS_CALLING = true ];then
   echo -e "`date` \t Producing consensus if possible..."
 else
@@ -377,9 +378,9 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
   fi
 done
 
-################################################## MAPPING THE FUSION GENE CANDIDATES
+################################################## MAPPING OF THE READS (OR CONSENSUS) USING LAST FOR NANOSV AND MINIMAP2 FOR SNIFFLES.
+################################################## LAST IS PREFERRED FOR ACCURATE EXON-EXON FUSION DETECTION
 echo -e "`date` \t Mapping candidate fusion genes..."
-
 
 if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
   MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
@@ -396,7 +397,7 @@ elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
   xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
 fi
 
-################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES
+################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES INTO A SINGLE BAM FILE
 echo -e "`date` \t Merging bams..."
 
 NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
@@ -419,7 +420,7 @@ if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
   mv temp.bam $BAM_MERGE_OUT
   $SAMTOOLS index $BAM_MERGE_OUT
 fi
-################################################## CALLING SVS USING LAST ON ALL READS THAT SUPPORT FUSION GENES
+################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
 echo -e "`date` \t Calling SVs..."
 
 if [ $CONSENSUS_CALLING = true ];then
@@ -444,7 +445,7 @@ else
     -o $SV_CALLING_OUT
 fi
 
-################################################## SV FILTERING (always remove INS, filtering on PASS optional)
+################################################## REMOVAL OF INSERTIONS (MANDATORY) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
 if [ $DONT_FILTER = false ];then
   SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS_PASS.vcf}
@@ -458,7 +459,7 @@ else
   grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' >> $SV_CALLING_OUT_FILTERED
 fi
 
-################################################### CHECKING THE FUSION GENE CANDIDATES
+################################################### CHECKING THE FUSION GENE FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
 echo -e "`date` \t Checking fusion candidates..."
 
 bash $PIPELINE_DIR/fusion_check.sh \
@@ -470,7 +471,14 @@ bash $PIPELINE_DIR/fusion_check.sh \
   -s $FUSION_CHECK_SCRIPT \
   -e $VENV
 
-###################################################
+################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
+mkdir -p $PRIMER_DIR
+if [ ! -d $PRIMER_DIR ]; then
+    exit
+fi
+
+# bash $PIPELINE_DIR/primer_design.sh \
+################################################### IF -DC IS SPECIFIED, ALL FILES EXCEPT THE FINAL FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
 
 if [ $DONT_CLEAN = false ];then
   rm $VCF_FILTERED
