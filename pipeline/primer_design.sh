@@ -4,6 +4,7 @@ usage() {
 echo "
 Required parameters:
     -f|--fasta		Path to fasta file
+    -o|--output
 
 Optional parameters:
     -h|--help     Shows help
@@ -14,6 +15,7 @@ Optional parameters:
     -pdgp|--guix_profile   GUIX profile [$GUIX_PROFILE]
     -pdpc|--primer3_core   Primer3 core [$PRIMER3_CORE]
     -pdm|--mispriming     Mispriming [$MISPRIMING]
+    -pde|--primer_design_error
 "
 }
 
@@ -40,6 +42,11 @@ do
     ;;
     -f|--fasta)
     FASTA="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -o|--output)
+    OUTPUT="$2"
     shift # past argument
     shift # past value
     ;;
@@ -78,6 +85,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -pde|--primer_design_error)
+    PRIMER_DESIGN_ERR="$2"
+    shift # past argument
+    shift # past value
+    ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift # past argument
@@ -91,11 +103,10 @@ if [ -z $FASTA ]; then
     exit
 fi
 
-echo `date`: Running on `uname -n`
+#echo `date`: Running on `uname -n`
 
-python $SCRIPT_DIR/Primerseq.py -v $VCF -o $OUTPUT -f $FLANK
 
-cat 625_wtdbg2.ctg.fa | tr -d '\n' | grep -oP "\w{90}TTCCACTGGT\w{100}"           !!!!!!!!!!! Find a way to get sequence from BAM??
+# cat 625_wtdbg2.ctg.fa | tr -d '\n' | grep -oP "\w{90}TTCCACTGGT\w{100}"           !!!!!!!!!!! Find a way to get sequence from BAM??
 # input=$VCF
 # while IFS= read -r line
 # do
@@ -109,13 +120,14 @@ cat 625_wtdbg2.ctg.fa | tr -d '\n' | grep -oP "\w{90}TTCCACTGGT\w{100}"         
 #   !!!! PRODUCE REVERSE COMPLEMENT IF NEEDED FROM
 # done < "$VCF"
 
-samtools mpileup 44116_wtdbg2.ctg.last.sorted.bam -r 22:29684440-29684444 | cut -f 5 | grep -oP "\w" | tr -d '\n' > TEST
+# samtools mpileup 44116_wtdbg2.ctg.last.sorted.bam -r 22:29684440-29684444 | cut -f 5 | grep -oP "\w" | tr -d '\n' > TEST
 # echo "$BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA"
 
 guixr load-profile $GUIX_PROFILE --<<EOF
 
 export EMBOSS_PRIMER3_CORE=$PRIMER3_CORE
 $BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA
-EOF
-
-echo `date`: Done
+EOF |\
+grep -v "FAILED" ./primers.txt > $OUTPUT
+paste <(cat $OUTPUT) <(grep "PRODUCT SIZE" $PRIMER_DESIGN_ERR | grep -oP "\d+$") > $OUTPUT.tmp && mv $OUTPUT.tmp $OUTPUT
+#echo `date`: Done

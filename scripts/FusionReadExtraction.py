@@ -144,6 +144,11 @@ def create_fasta( chr, start, end, svid, exclude, include ):
             fasta.write( ">"+svid+"."+read.query_name+"\n")
             fasta.write(read.seq+"\n")
 
+        # if read.query_name in include and not read.seq == None and read.query_name not in exclude: #and not read.is_supplementary:
+        #     fasta.write( ">"+svid+"."+read.query_name+"\n")
+        #     fasta.write(read.seq+"\n")
+        #     exclude.append(read.query_name)
+
         #### Uncomment to select all the reads supporting the breakpoint and adjacent regions of the gene to get full gene sequence back
         # if read.query_name in exclude or read.seq == None or read.is_supplementary:
         #     continue

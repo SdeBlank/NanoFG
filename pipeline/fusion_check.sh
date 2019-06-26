@@ -102,10 +102,10 @@ if [ -z $PDF ]; then
     PDF=${PDF/.vcf/_FusionGenes.pdf}
 fi
 
-echo `date`: Running on `uname -n`
+#echo `date`: Running on `uname -n`
 
 . $VENV
 
 python $SCRIPT -v $VCF -o $OUTPUT -ov $ORIGINAL_VCF -fo $FUSION_OUTPUT -p $PDF
 
-echo `date`: Done
+#echo `date`: Done

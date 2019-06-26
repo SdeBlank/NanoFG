@@ -94,7 +94,7 @@ if [ -z $BAM ]; then
     exit
 fi
 
-echo `date`: Running on `uname -n`
+#echo `date`: Running on `uname -n`
 
 . $VENV
 
@@ -118,4 +118,4 @@ fi
 
 deactivate
 
-echo `date`: Done
+#echo `date`: Done

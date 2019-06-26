@@ -65,7 +65,7 @@ if [ -z ${FASTA} ]; then
   usage
 fi
 
-echo `date`: Running on `uname -n`
+#echo `date`: Running on `uname -n`
 
 WTDBG2=${WTDBG2_DIR}/wtdbg2
 WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
@@ -84,4 +84,4 @@ eval ${WTPOA_CNS_COMMAND}
 #echo ${SED_COMMAND}
 eval ${SED_COMMAND}
 
-echo `date`: Done
+#echo `date`: Done

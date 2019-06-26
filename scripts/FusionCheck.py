@@ -85,7 +85,6 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                     pos2_orientation=False
                 else:
                     pos2_orientation=True
-
             if compared_id in supporting_reads:
                 original_vcf_info=supporting_reads[compared_id]
                 ### Only activate when no consensus calling is used
@@ -109,12 +108,12 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
             #Produce output
             for fusion in fusions:
-                fusion_output.write("\t".join([str(record.ID), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["5'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
+                fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["5'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
                 str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
 
-                visualisation(fusion, record, original_vcf_info, output_pdf)
+                visualisation(fusion, compared_id, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
                 all_fusions[compared_id]=vcf_fusion_info
@@ -592,11 +591,11 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
                     (Orientation1 and not Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (not Orientation1 and Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (not Orientation1 and not Orientation2 and annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"])):
-                        FUSION_TYPE, annotation1["CDS_length"], annotation2["CDS_length"] = FusionCheck(annotation1, annotation2)
+                        fusion_type, annotation1["CDS_length"], annotation2["CDS_length"] = FusionCheck(annotation1, annotation2)
                         if len(FLAGS)==0:
                             FLAGS=["None"]
-                        Fusion_output.append({"5'": five_prime_gene, "3'": three_prime_gene, "Fusion_type": FUSION_TYPE, "Flags":FLAGS})
-                        Vcf_output.append(five_prime_gene["Gene_id"]+"-"+three_prime_gene["Gene_id"])
+                        Fusion_output.append({"5'": five_prime_gene, "3'": three_prime_gene, "Fusion_type": fusion_type, "Flags":FLAGS})
+                        Vcf_output.append(five_prime_gene["Gene_name"]+"-"+three_prime_gene["Gene_name"])
 
     return (Fusion_output, Vcf_output)
 
@@ -670,7 +669,7 @@ def get_domains(protein_id, coding_exons, relative_length, intron_relative_lengt
     return to_be_used_domains
 
 
-def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
+def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     rowplots = 7
     colplots = 3
     xmin = 0
@@ -807,12 +806,12 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
 
     ax = fig.add_subplot(gs[0,:])
     if "OUT OF FRAME" in annotated_breakpoints["Fusion_type"]:
-        ax.text(0.5*xmax, 0, Record.ID+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
+        ax.text(0.5*xmax, 0, original_svid+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
         ax.text(0.5*xmax, 0.35, "(OUT OF FRAME)", horizontalalignment='center',verticalalignment='bottom', size=14, color="red")
         ax.text(0.5*xmax, 0.6, annotated_breakpoints["5'"]["Gene_id"]+"-"+annotated_breakpoints["3'"]["Gene_id"], horizontalalignment='center',verticalalignment='bottom', size=9)
         ax.axhline(y=0.7, xmin=0, xmax=100, color="black", linewidth=1)
     else:
-        ax.text(0.5*xmax, 0, Record.ID+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
+        ax.text(0.5*xmax, 0, original_svid+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
         ax.text(0.5*xmax, 0.3, annotated_breakpoints["5'"]["Gene_id"]+"-"+annotated_breakpoints["3'"]["Gene_id"], horizontalalignment='center',verticalalignment='bottom', size=9)
         ax.axhline(y=0.4, xmin=0, xmax=100, color="black", linewidth=1)
 
@@ -1023,24 +1022,24 @@ def visualisation(annotated_breakpoints, Record, supporting_reads, pdf):
     ############################################################################# Additional info visualisation
     ax = fig.add_subplot(gs[6, :])
     ax.axhline(y=0, xmin=0, xmax=100, color="black", linewidth=1, linestyle="--")
-    consensus="Not completed"
-    if "ALT_READ_IDS" in Record.INFO:
-        for alt_read in Record.INFO["ALT_READ_IDS"]:                                    # DOESNT WORK IN SNIFFLES
-            if ".fasta_ctg1" in alt_read:
-                sv_id=re.findall("^\d+", alt_read)[0]
-                consensus=sv_id+"_wtdbg2.ctg.fa"
-                break
-        sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
-    elif "RNAMES" in Record.INFO:
-        for alt_read in Record.INFO["RNAMES"]:                                    # DOESNT WORK IN SNIFFLES
-            if ".fasta_ctg1" in alt_read:
-                sv_id=re.findall("^\d+", alt_read)[0]
-                consensus=sv_id+"_wtdbg2.ctg.fa"
-                break
-        sv_id=re.findall("^\d+", Record.INFO["RNAMES"][0])[0]
-
+    # consensus="Not completed"
+    # if "ALT_READ_IDS" in Record.INFO:
+    #     for alt_read in Record.INFO["ALT_READ_IDS"]:                                    # DOESNT WORK IN SNIFFLES
+    #         if ".fasta_ctg1" in alt_read:
+    #             sv_id=re.findall("^\d+", alt_read)[0]
+    #             consensus=sv_id+"_wtdbg2.ctg.fa"
+    #             break
+    #     sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
+    # elif "RNAMES" in Record.INFO:
+    #     for alt_read in Record.INFO["RNAMES"]:                                    # DOESNT WORK IN SNIFFLES
+    #         if ".fasta_ctg1" in alt_read:
+    #             sv_id=re.findall("^\d+", alt_read)[0]
+    #             consensus=sv_id+"_wtdbg2.ctg.fa"
+    #             break
+    #     sv_id=re.findall("^\d+", Record.INFO["RNAMES"][0])[0]
+    consensus=original_svid+"_wtdbg2.ctg.fa"
     ax.text(0, 0.2, "Original ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0, 0.5, sv_id, horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0, 0.5, original_svid, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.14, 0.2, "Fusion type:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.14, 0.5, annotated_breakpoints["Fusion_type"].split(" ")[0], horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.3, 0.2, "5' Breakpoint:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')

@@ -73,7 +73,7 @@ if [ -z ${FASTA} ]; then
 fi
 
 
-echo `date`: Running on `uname -n`
+#echo `date`: Running on `uname -n`
 
 $MINIMAP2 -t $THREADS -ax map-ont $REF $FASTA\
 | $SAMTOOLS view -h -S -b -t $THREADS /dev/stdin \
@@ -81,4 +81,4 @@ $MINIMAP2 -t $THREADS -ax map-ont $REF $FASTA\
 
 $SAMTOOLS index ${bam/.bam/.sorted.bam} -t $THREADS
 
-echo `date`: Done
+#echo `date`: Done

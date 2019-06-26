@@ -53,6 +53,18 @@ LAST MAPPING
     -lmrd|--last_mapping_refdict                                       Reference genome .dict file [${LAST_MAPPING_REFDICT}]
     -lms|--last_mapping_settings                                       LAST settings [${LAST_MAPPING_SETTINGS}]
     -lmt|--last_mapping_threads                                        Number of threads [${LAST_MAPPING_THREADS}]
+
+PRIMER DESIGN
+    -pdhv|--primer_design_h_vmem                                       Primer design memory [$PRIMER_DESIGN_MEM]
+    -pdhr|--primer_design_h_rt                                         Primer design time [$PRIMER_DESIGN_TIME]
+    -pdd|--primer_design_dir                                           Path to primer3 directory [$PRIMER_DESIGN_DIR]
+    -pdb|--primer_design_bindir                                        Path to primer3 bin dir [$PRIMER_DESIGN_BINDIR]
+    -pdpt|--primer_design_pcr_type                                     PCR type [$PRIMER_DESIGN_PCR_TYPE]
+    -pdtp|--primer_design_tilling_params                               Tilling params [$PRIMER_DESIGN_TILLING_PARAMS]
+    -pdp|--primer_design_psr                                           PSR [$PRIMER_DESIGN_PSR]
+    -pdgp|--primer_design_guix_profile                                 Path to guix profile [$PRIMER_DESIGN_GUIX_PROFILE]
+    -pdpc|--primer_design_primer3_core                                 Path to primer3_core [$PRIMER_DESIGN_PRIMER3_CORE]
+    -pdm|--primer_design_mispriming                                    Path to mispriming [$PRIMER_DESIGN_MISPRIMING]
 "
 }
 
@@ -86,6 +98,7 @@ NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
 NANOSV_LAST_CONFIG=$FILES_DIR/nanosv_last_config.ini
 NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
 SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
+#SNIFFLES_SETTINGS='-s 2 -n -1 --genotype -d 1'     SETTINGS TO DETECT RECIPROCAL TRANSLOCATIONS
 
 #REGION SELECTION
 REGION_SELECTION_SCRIPT=$SCRIPT_DIR/RegionSelection.py
@@ -108,6 +121,15 @@ LAST_MAPPING_THREADS=1
 #FUSION CHECK DEFAULTS
 FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 
+#PRIMER DESIGN DEFAULTS
+PRIMER_DESIGN_DIR=$PATH_PRIMER_DESIGN_DIR
+PRIMER_DESIGN_BINDIR=$PRIMER_DESIGN_DIR/primers
+PRIMER_DESIGN_GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
+PRIMER_DESIGN_PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
+PRIMER_DESIGN_MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
+PRIMER_DESIGN_PCR_TYPE='single'
+PRIMER_DESIGN_TILLING_PARAMS=''
+PRIMER_DESIGN_PSR='60-200'
 
 
 while [[ $# -gt 0 ]]
@@ -284,7 +306,12 @@ PRIMER_DIR=$OUTPUTDIR/primers
 BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
 SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
-mkdir -p $CANDIDATE_DIR
+if [ -d $CANDIDATE_DIR ]; then
+  rm $CANDIDATE_DIR/*
+else
+  mkdir -p $CANDIDATE_DIR
+fi
+
 if [ ! -d $CANDIDATE_DIR ]; then
     exit
 fi
@@ -348,10 +375,6 @@ fi
 ##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
 echo -e "`date` \t Extracting reads that support candidate fusion genes..."
 
-if [ -d $CANDIDATE_DIR ]; then
-  rm $CANDIDATE_DIR/*
-fi
-
 python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
   -v $VCF_FILTERED \
@@ -403,15 +426,15 @@ echo -e "`date` \t Merging bams..."
 NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
 
 if [[ NUMBER_OF_BAMS -gt 1 ]];then
-  $SAMTOOLS merge $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
+  $SAMTOOLS merge -f $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
   if [[ $SAMTOOLS == *"samtools"* ]] || [[ $SAMTOOLS == *"Samtools"* ]]; then
     $SAMTOOLS index $BAM_MERGE_OUT
   fi
 elif [[ NUMBER_OF_BAMS -eq 1 ]];then
   cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
   cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
-else
   echo "NO CANDIDATE FUSION GENES FOUND"
+else
   exit
 fi
 
@@ -445,6 +468,22 @@ else
     -o $SV_CALLING_OUT
 fi
 
+# if [ $CONSENSUS_CALLING = true ];then
+#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
+# else
+#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
+# fi
+#
+# for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
+#   echo ${CANDIDATE_BAM/.bam/};
+# done | \
+# xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/sv_calling.sh -b {}.bam -o {}.vcf $SV_CALLING_SETTINGS; exit 1;"
+#
+# grep "^#" $(ls $CANDIDATE_DIR/*.last.sorted.vcf | head -n 1) > $SV_CALLING_OUT
+# for CANDIDATE_VCF in $CANDIDATE_DIR/*.last.sorted.vcf; do
+#   grep -v "^#" $CANDIDATE_VCF >> $SV_CALLING_OUT
+# done
+
 ################################################## REMOVAL OF INSERTIONS (MANDATORY) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
 if [ $DONT_FILTER = false ];then
@@ -472,12 +511,57 @@ bash $PIPELINE_DIR/fusion_check.sh \
   -e $VENV
 
 ################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
+echo -e "`date` \t Designing primers around fusion breakpoints..."
 mkdir -p $PRIMER_DIR
 if [ ! -d $PRIMER_DIR ]; then
-    exit
+  exit
 fi
 
-# bash $PIPELINE_DIR/primer_design.sh \
+python $SCRIPT_DIR/Primerseq.py \
+ -v $FUSION_CHECK_VCF_OUTPUT \
+ -d $PRIMER_DIR \
+ -f 200
+
+mkdir -p $PRIMER_DIR/tmp
+if [ ! -d $PRIMER_DIR/tmp ]; then
+ exit
+fi
+
+if [ -d $PRIMER_DESIGN_DIR ];then
+  cd $PRIMER_DIR/tmp
+  for FUSION_FASTA in $PRIMER_DIR/*.fasta; do
+    if [ -z $PRIMER_DESIGN_TILLING_PARAMS ]; then
+      bash $PIPELINE_DIR/primer_design.sh \
+       -f $FUSION_FASTA \
+       -o ${FUSION_FASTA/.fasta/.primers} \
+       -pdb $PRIMER_DESIGN_BINDIR \
+       -pdpt $PRIMER_DESIGN_PCR_TYPE \
+       -pdp $PRIMER_DESIGN_PSR \
+       -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
+       -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
+       -pdm $PRIMER_DESIGN_MISPRIMING
+    else
+      bash $PIPELINE_DIR/primer_design.sh \
+       -f $FUSION_FASTA \
+       -o ${FUSION_FASTA/.fasta/.primers} \
+       -pdb $PRIMER_DESIGN_BINDIR \
+       -pdpt $PRIMER_DESIGN_PCR_TYPE \
+       -pdtp $PRIMER_DESIGN_TILLING_PARAMS \
+       -pdp $PRIMER_DESIGN_PSR \
+       -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
+       -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
+       -pdm $PRIMER_DESIGN_MISPRIMING
+    fi
+    rm $PRIMER_DIR/tmp/*
+  done
+  rmdir $PRIMER_DIR/tmp/
+  cat $PRIMER_DIR/*.primers > $OUTPUTDIR/${SAMPLE}_FusionGenes.primers
+  cd $OUTPUTDIR
+else
+  echo "Path to primer3 does not exist. Giving only breakpoint sequences"
+  cat $PRIMER_DIR/*.fasta > $OUTPUTDIR/${SAMPLE}_FusionGenesBNDseq.fasta
+fi
+
 ################################################### IF -DC IS SPECIFIED, ALL FILES EXCEPT THE FINAL FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
 
 if [ $DONT_CLEAN = false ];then
@@ -488,6 +572,7 @@ if [ $DONT_CLEAN = false ];then
   rm $BAM_MERGE_OUT.bai
   rm $SV_CALLING_OUT
   rm $SV_CALLING_OUT_FILTERED
+  rm $PRIMER_DIR/*.fasta
 fi
 
 deactivate
