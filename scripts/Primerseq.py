@@ -186,4 +186,4 @@ with open(vcf, "r") as fusion_vcf:
 
             with open(directory+"/"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+".fasta", "w") as primer_output:
                 primer_output.write(">"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+"\n")
-                primer_output.write(seq1+"[]"+seq2)
+                primer_output.write(seq1+"[]"+seq2+"\n")

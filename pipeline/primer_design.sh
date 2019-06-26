@@ -105,29 +105,11 @@ fi
 
 #echo `date`: Running on `uname -n`
 
-
-# cat 625_wtdbg2.ctg.fa | tr -d '\n' | grep -oP "\w{90}TTCCACTGGT\w{100}"           !!!!!!!!!!! Find a way to get sequence from BAM??
-# input=$VCF
-# while IFS= read -r line
-# do
-#   ID=$(cut -f 1 $line | grep -oP "\d+" )
-#   REGION1=$(cut -f 2 $line | grep -oP ".+:\d+-\d+" )
-#   REGION2=$(cut -f 3 $line | grep -oP ".+:\d+-\d+")
-#
-#   SEQ1=samtools mpileup ${CANDIDATE_DIR}/${ID}_wtdbg2.ctg.last.sorted.bam -r $REGION1 | cut -f 5 | grep -oP "\w" | tr -d '\n'
-#   SEQ2=samtools mpileup ${CANDIDATE_DIR}/${ID}_wtdbg2.ctg.last.sorted.bam -r $REGION2 | cut -f 5 | grep -oP "\w" | tr -d '\n'
-#
-#   !!!! PRODUCE REVERSE COMPLEMENT IF NEEDED FROM
-# done < "$VCF"
-
-# samtools mpileup 44116_wtdbg2.ctg.last.sorted.bam -r 22:29684440-29684444 | cut -f 5 | grep -oP "\w" | tr -d '\n' > TEST
-# echo "$BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA"
-
 guixr load-profile $GUIX_PROFILE --<<EOF
 
 export EMBOSS_PRIMER3_CORE=$PRIMER3_CORE
 $BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA
 EOF |\
-grep -v "FAILED" ./primers.txt > $OUTPUT
-paste <(cat $OUTPUT) <(grep "PRODUCT SIZE" $PRIMER_DESIGN_ERR | grep -oP "\d+$") > $OUTPUT.tmp && mv $OUTPUT.tmp $OUTPUT
+grep -v "FAILED" ./primers.txt > ${OUTPUT}_info.txt
+paste <(cat ${OUTPUT}_info.txt) <(grep "PRODUCT SIZE" $PRIMER_DESIGN_ERR | grep -oP "\d+$") > $OUTPUT
 #echo `date`: Done

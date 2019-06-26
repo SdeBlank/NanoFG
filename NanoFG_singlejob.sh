@@ -572,7 +572,8 @@ if [ $DONT_CLEAN = false ];then
   rm $BAM_MERGE_OUT.bai
   rm $SV_CALLING_OUT
   rm $SV_CALLING_OUT_FILTERED
-  rm $PRIMER_DIR/*.fasta
+  rm $PRIMER_DIR/*
+  rmdir $PRIMER_DIR
 fi
 
 deactivate
