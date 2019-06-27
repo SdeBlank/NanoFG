@@ -3,64 +3,71 @@
 usage() {
 echo "
 Required parameters:
-    -v|--vcf		                                                                  Path to vcf file
-    -b|--bam                                                                      Path to bam file
+    -v|--vcf		                                                       Path to vcf file
+    -b|--bam                                                           Path to bam file
 
 Optional parameters:
 
+SELECTION
+    -s|--selection                                                     Select genes or areas to check for fusion genes.
+                                                                       Insert a list of genes or areas, separated by a comma
+                                                                       e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
+
 GENERAL
-    -h|--help                                                                     Shows help
-    -o|--outputdir                                                                Path to output directory
-    -d|--nanofg_dir                                                               Directory that contains NanoFG [${NANOFG_DIR}]
-    -e|--venv                                                                     Path to virtual environment[${VENV}]
-    -m|--mail                                                                     Email adress
-    -df|--dont_filter                                                             Don't filter out all non-PASS SVs
-    -dc|--dont_clean                                                              Don't clean up the intermediate files
+    -h|--help                                                          Shows help
+    -o|--outputdir                                                     Path to output directory
+    -d|--nanofg_dir                                                    Directory that contains NanoFG [${NANOFG_DIR}]
+    -e|--venv                                                          Path to virtual environment[${VENV}]
+    -m|--mail                                                          Email adress
+    -df|--dont_filter                                                  Don't filter out all non-PASS SVs
+    -dc|--dont_clean                                                   Don't clean up the intermediate files
 
 REQUIRED TOOLS
-    -n|--nanosv                                                                   Path to NanoSV [${NANOSV}]
-    -s|--sambamba                                                                 Path to sambamba|samtools [${SAMBAMBA}]
-    -l|--last_dir                                                                 Path to LAST directory [${LAST_DIR}]
-    -w|--wtdbg2_dir                                                               Path to wtdbg2 directory [${WTDBG2_DIR}]
+    -sv|--sv_caller                                                    NanoSV or path to Sniffles [${SV_CALLER}]
+    -nsc|--nanosv_config                                               Path to config to use for nanosv [$NANOSV_CONFIG]
+    -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
+    -sa|--sambamba                                                     Path to sambamba|samtools [${SAMBAMBA}]
+    -l|--last_dir                                                      Path to LAST directory [${LAST_DIR}]
+    -w|--wtdbg2_dir                                                    Path to wtdbg2 directory [${WTDBG2_DIR}]
 
 FUSION READ EXTRACTION
-    -fres|--fusion_read_extraction_script                                         Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
-    -fret|--fusion_read_extraction_threads                                        Number of threads [${FUSION_READ_EXTRACTION_THREADS}]
-    -frehv|--fusion_read_extraction_h_vmem                                        Fusion read extraction memory [${FUSION_READ_EXTRACTION_MEMORY}]
-    -freht|--fusion_read_extraction_h_rt                                          Fusion read extraction time [${FUSION_READ_EXTRACTION_TIME}]
+    -fres|--fusion_read_extraction_script                              Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
+    -fret|--fusion_read_extraction_threads                             Number of threads [${FUSION_READ_EXTRACTION_THREADS}]
+    -frehv|--fusion_read_extraction_h_vmem                             Fusion read extraction memory [${FUSION_READ_EXTRACTION_MEMORY}]
+    -freht|--fusion_read_extraction_h_rt                               Fusion read extraction time [${FUSION_READ_EXTRACTION_TIME}]
 
 CONSENSUS MAPPING
 
-    -ccws|--consensus_calling_wtdbg2_settings                                     wtdbg2 settings [${WTDBG2_SETTINGS}]
-    -cct|--consensus_calling_threads                                              Number of threads [${CONSENSUS_CALLING_THREADS}]
-    -cchv|--consensus_calling_h_vmem                                              Consensus mapping memory [${CONSENSUS_CALLING_MEMORY}]
-    -cchr|--consensus_calling_h_rt                                                Consensus mapping time [${CONSENSUS_CALLING_TIME}]
+    -ccws|--consensus_calling_wtdbg2_settings                          wtdbg2 settings [${WTDBG2_SETTINGS}]
+    -cct|--consensus_calling_threads                                   Number of threads [${CONSENSUS_CALLING_THREADS}]
+    -cchv|--consensus_calling_h_vmem                                   Consensus mapping memory [${CONSENSUS_CALLING_MEMORY}]
+    -cchr|--consensus_calling_h_rt                                     Consensus mapping time [${CONSENSUS_CALLING_TIME}]
 
 LAST_MAPPING
-    -lmr|--last_mapping_refgenome                                                 Reference genome [${REF}]
-    -lmrd|--last_mapping_refdict                                                  Reference genome .dict file [${REF_DICT}]
-    -lms|--last_mapping_settings                                                  LAST settings [${LAST_SETTINGS}]
-    -lmt|--last_mapping_threads                                                   Number of threads[$LAST_MAPPING_THREADS]
-    -lmhv|--last_mapping_h_vmem                                                   Last mapping memory[$LAST_MAPPING_MEMORY]
-    -lmht|--last_mapping_h_rt                                                     Last mapping runtime[$LAST_MAPPING_TIME]
+    -lmr|--last_mapping_refgenome                                      Reference genome [${REF}]
+    -lmrd|--last_mapping_refdict                                       Reference genome .dict file [${REF_DICT}]
+    -lms|--last_mapping_settings                                       LAST settings [${LAST_SETTINGS}]
+    -lmt|--last_mapping_threads                                        Number of threads[$LAST_MAPPING_THREADS]
+    -lmhv|--last_mapping_h_vmem                                        Last mapping memory[$LAST_MAPPING_MEMORY]
+    -lmht|--last_mapping_h_rt                                          Last mapping runtime[$LAST_MAPPING_TIME]
 
 BAM MERGE
-    -bmt|--bam_merge_threads                                                        Number of threads [${VCF_SPLIT_THREADS}]
-    -bmhv|--bam_merge_h_vmem                                                        Bam merge memory [${VCF_SPLIT_MEMORY}]
-    -bmhr|--bam_merge_h_rt                                                          Bam merge time [${VCF_SPLIT_TIME}]
+    -bmt|--bam_merge_threads                                           Number of threads [${VCF_SPLIT_THREADS}]
+    -bmhv|--bam_merge_h_vmem                                           Bam merge memory [${VCF_SPLIT_MEMORY}]
+    -bmhr|--bam_merge_h_rt                                             Bam merge time [${VCF_SPLIT_TIME}]
 
 SV CALLING
-    -sct|--sv_calling_threads                                                       Number of threads [${SV_CALLING_THREADS}]
-    -schv|--sv_calling_h_vmem                                                       SV calling memory [${SV_CALLING_MEMORY}]
-    -schr|--sv_calling_h_rt                                                         SV calling time [${SV_CALLING_TIME}]
+    -sct|--sv_calling_threads                                          Number of threads [${SV_CALLING_THREADS}]
+    -schv|--sv_calling_h_vmem                                          SV calling memory [${SV_CALLING_MEMORY}]
+    -schr|--sv_calling_h_rt                                            SV calling time [${SV_CALLING_TIME}]
 
 FUSION CHECK
-    -fcio|--fusion_check_info_output                                              Path to the NanoFG output info file []
-    -fcvo|--fusion_check_vcf_output                                               Path to the NanoFG output vcf file []
-    -fcs|--fusion_check_script                                                    Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
-    -fct|--fusion_check_threads                                                   VCF output file [$FUSION_CHECK_THREADS]
-    -fchv|--fusion_check_h_vmem                                                   VCF output file [$FUSION_CHECK_MEMORY]
-    -fcht|--fusion_check_h_rt                                                     VCF output file [$FUSION_CHECK_TIME]
+    -fcio|--fusion_check_info_output                                   Path to the NanoFG output info file []
+    -fcvo|--fusion_check_vcf_output                                    Path to the NanoFG output vcf file []
+    -fcs|--fusion_check_script                                         Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
+    -fct|--fusion_check_threads                                        VCF output file [$FUSION_CHECK_THREADS]
+    -fchv|--fusion_check_h_vmem                                        VCF output file [$FUSION_CHECK_MEMORY]
+    -fcht|--fusion_check_h_rt                                          VCF output file [$FUSION_CHECK_TIME]
 "
 }
 
@@ -82,6 +89,24 @@ DONT_CLEAN=false
 SAMBAMBA=$PATH_SAMBAMBA
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
+
+#SV_CALLER='NanoSV'
+SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
+NANOSV_CONFIG=$FILES_DIR/nanosv_last_config.ini
+SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
+
+#REGION SELECTION DEFAULTS
+REGION_SELECTION_SCRIPT=$SCRIPT_DIR/RegionSelection.py
+REGION_SELECTION_BED_OUTPUT=$OUTPUTDIR/regions.bed
+REGION_SELECTION_BAM_OUTPUT=$OUTPUTDIR/regions.bam
+REGION_SELECTION_THREADS=8
+REGION_SELECTION_TIME=0:10:0
+REGION_SELECTION_MEMORY=10G
+
+#REGION SV CALLING
+REGION_SELECTION_THREADS=8
+REGION_SELECTION_TIME=0:10:0
+REGION_SELECTION_MEMORY=10G
 
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
@@ -112,7 +137,6 @@ BAM_MERGE_MEMORY=30G
 SV_CALLING_THREADS=1
 SV_CALLING_TIME=0:5:0
 SV_CALLING_MEMORY=10G
-SV_CALLING_CONFIG=$FILES_DIR/nanosv_last_config.ini
 
 #FUSION CHECK DEFAULTS
 FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
@@ -146,6 +170,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -s|--selection)
+    SELECTION="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -o|--outputdir)
     OUTPUTDIR="$2"
     shift # past argument
@@ -174,7 +203,7 @@ do
     DONT_CLEAN=true
     shift # past argument
     ;;
-    -s|--sambamba)
+    -sa|--sambamba)
     SAMBAMBA="$2"
     shift # past argument
     shift # past value
@@ -186,6 +215,21 @@ do
     ;;
     -w|--wtdbg2_dir)
     WTDBG2_DIR="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -sv|--sv_caller)
+    SV_CALLER="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -nsc|--nanosv_config)
+    NANOSV_CONFIG="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -ss|--sniffles_settings)
+    SNIFFLES_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -327,15 +371,15 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-if [ -z $VCF ]; then
-    echo "Missing -v|--vcf parameter"
-    usage
-    exit
-fi
 if [ -z $BAM ]; then
     echo "Missing -b|--bam parameter"
     usage
     exit
+fi
+
+if [ -z $VCF ]; then
+    VCF=./$(basename $BAM)
+    VCF=$OUTPUTDIR/${BAM/.bam/.vcf}
 fi
 
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
@@ -360,6 +404,11 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 JOB_DIR=$OUTPUTDIR/jobs
 LOG_DIR=$OUTPUTDIR/logs
 CANDIDATE_DIR=$OUTPUTDIR/candidate_fusions
+
+REGION_SELECTION_JOBNAME=${VCF_NAME}_REGION_SELECTION
+REGION_SELECTION_SH=$JOB_DIR/$REGION_SELECTION_JOBNAME.sh
+REGION_SELECTION_ERR=$LOG_DIR/$REGION_SELECTION_JOBNAME.err
+REGION_SELECTION_LOG=$LOG_DIR/$REGION_SELECTION_JOBNAME.log
 
 FUSION_READ_EXTRACTION_JOBNAME=${VCF_NAME}_FUSION_READ_EXTRACTION
 FUSION_READ_EXTRACTION_SH=$JOB_DIR/$FUSION_READ_EXTRACTION_JOBNAME.sh
@@ -413,6 +462,34 @@ mkdir -p $LOG_DIR
 if [ ! -d $LOG_DIR ]; then
     exit
 fi
+
+region_selection(){
+
+cat << EOF > $REGION_SELECTION_SH
+#!/bin/bash
+
+#$ -N $REGION_SELECTION_JOBNAME
+#$ -cwd
+#$ -pe threaded $REGION_SELECTION_THREADS
+#$ -l h_vmem=$REGION_SELECTION_MEMORY
+#$ -l h_rt=$REGION_SELECTION_TIME
+#$ -e $REGION_SELECTION_ERR
+#$ -o $REGION_SELECTION_LOG
+
+echo \`date\`: Running on \`uname -n\`
+
+if [ ! -e $LOG_DIR/${REGION_SELECTION_JOBNAME}.done ]; then
+  python $REGION_SELECTION_SCRIPT \
+  -b $REGION_SELECTION_BED_OUTPUT \
+  -r $SELECTION
+
+  $SAMBAMBA view -h -f bam -L $REGION_SELECTION_BED_OUTPUT -o $REGION_SELECTION_BAM_OUTPUT $BAM
+fi
+
+echo \`date\`: Done
+EOF
+qsub $FUSION_READ_EXTRACTION_SH
+}
 
 fusion_read_extraction(){
 
@@ -618,12 +695,13 @@ cat << EOF >> $SV_CALLING_SH
 echo \`date\`: Running on \`uname -n\`
 if [ -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
     bash $PIPELINE_DIR/sv_calling.sh \
+      -sv $SV_CALLER \
       -b $BAM_MERGE_OUT \
-      -n $NANOSV \
       -t $SV_CALLING_THREADS \
       -s $SAMBAMBA \
       -v $VENV \
-      -c $SV_CALLING_CONFIG \
+      -c $NANOSV_CONFIG \
+      -ss $SNIFFLES_SETTINGS \
       -o $SV_CALLING_OUT
     NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
     if [ \$NUMBER_OF_LINES_VCF -ne 0 ]; then

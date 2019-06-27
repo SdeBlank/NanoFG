@@ -13,7 +13,7 @@ Optional parameters:
 -rd|--refdict             Reference genome .dict file [${REF_DICT}]
 -l|--last_dir             Path to LAST directory [${LAST_DIR}]
 -ls|--last_settings       LAST settings [${LAST_SETTINGS}]
--s|--sambamba             Path to sambamba|samtools [${SAMBAMBA}]
+-s|--sambamba             Path to sambamba|samtools [${SAMTOOLS}]
 "
 exit
 }
@@ -24,10 +24,14 @@ POSITIONAL=()
 THREADS=1
 REF=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
 REF_DICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
+LASTAL=${LAST_DIR}/src/lastal
 LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
+LAST_SPLIT=${LAST_DIR}/src/last-split
+LAST_PARAMS=${LAST_DIR}/last_params
+MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
 LAST_SETTINGS="-Q 0 -p ${LAST_PARAMS}"
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
-SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
+SAMTOOLS=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
 
 while [[ $# -gt 0 ]]; do
   KEY="$1"
@@ -63,12 +67,12 @@ while [[ $# -gt 0 ]]; do
     ;;
     -ls|--last_settings)
     LAST_SETTINGS="$2"
-    LAST_SETTINGS_OVERRIDE=True                 ##### FIND BETTER WAY???
+    LAST_SETTINGS_OVERRIDE=True
     shift # past argument
     shift # past value
     ;;
     -s|--sambamba)
-    SAMBAMBA="$2"
+    SAMTOOLS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -86,23 +90,22 @@ if [ -z ${FASTA} ]; then
   usage
 fi
 
-echo `date`: Running on `uname -n`
-
 LASTAL=${LAST_DIR}/src/lastal
 LAST_SPLIT=${LAST_DIR}/src/last-split
 LAST_PARAMS=${LAST_DIR}/last_params
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
-PREFIX=${FASTA/_wtdbg2.ctg.fa/_wtdbg2}
+LAST_SETTINGS="-Q 0 -p ${LAST_PARAMS}"
+PREFIX=${FASTA/.fa/}
 
 if [ -z $LAST_SETTINGS_OVERRIDE ];then
   LAST_SETTINGS=$(echo $LAST_SETTINGS | sed -e "s/-p [^ ]\+/-p ${LAST_PARAMS}/")
 fi
 
-LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.ctg.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMBAMBA} view -S -f bam /dev/stdin | \
-${SAMBAMBA} sort /dev/stdin -o ${PREFIX}.ctg.last.sorted.bam"
-SAMBAMBA_INDEX_COMMAND="${SAMBAMBA} index ${PREFIX}.ctg.last.sorted.bam"
+LAST_COMMAND="${LASTAL} ${LAST_SETTINGS} ${REF} ${PREFIX}.fa | ${LAST_SPLIT} | ${MAF_CONVERT} -f ${REF_DICT} sam /dev/stdin | ${SAMTOOLS} view /dev/stdin -b | \
+${SAMTOOLS} sort /dev/stdin -o ${PREFIX}.last.sorted.bam"
+SAMTOOLS_INDEX_COMMAND="${SAMTOOLS} index ${PREFIX}.last.sorted.bam"
 
 #echo ${LAST_COMMAND}
 eval ${LAST_COMMAND}
-#echo ${SAMBAMBA_INDEX_COMMAND}
-eval ${SAMBAMBA_INDEX_COMMAND}
+#echo ${SAMTOOLS_INDEX_COMMAND}
+eval ${SAMTOOLS_INDEX_COMMAND}

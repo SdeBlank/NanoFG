@@ -8,9 +8,13 @@ Required parameters:
 
 Optional parameters:
 -h|--help                 Shows help
+-mm2|--minimap2             Path to minimap2
 -t|--threads              Number of threads [${THREADS}]
--w|--wtdbg2_dir           Path to wtdbg2 directory [${WTDBG2_DIR}]
--ws|--wtdbg2_settings     wtdbg2 settings [${WTDBG2_SETTINGS}]
+-r|--refgenome            Reference genome [${REF}]
+-rd|--refdict             Reference genome .dict file [${REF_DICT}]
+-l|--last_dir             Path to LAST directory [${LAST_DIR}]
+-ls|--last_settings       LAST settings [${LAST_SETTINGS}]
+-s|--sambamba             Path to sambamba|samtools [${SAMTOOLS}]
 "
 exit
 }
@@ -19,10 +23,9 @@ POSITIONAL=()
 
 # DEFAULT SETTINGS
 THREADS=1
-WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
-WTDBG2=${WTDBG2_DIR}/wtdbg2
-WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
-WTDBG2_SETTINGS='-x ont -g 3g'
+REF=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
+SAMTOOLS=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
+MINIMAP2=
 
 while [[ $# -gt 0 ]]; do
   KEY="$1"
@@ -36,18 +39,22 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
+    -mm2|--minimap2)
+    MINIMAP2="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -t|--threads)
     THREADS="$2"
     shift # past argument
     shift # past value
     ;;
-    -w|--wtdbg2_dir)
-    WTDBG2_DIR="$2"
+    -r|--refgenome)
+    REF="$2"
     shift # past argument
     shift # past value
-    ;;
-    -ws|--wtdbg2_settings)
-    WTDBG2_SETTINGS="$2"
+    -s|--samtools)
+    SAMTOOLS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -65,23 +72,13 @@ if [ -z ${FASTA} ]; then
   usage
 fi
 
+
 #echo `date`: Running on `uname -n`
 
-WTDBG2=${WTDBG2_DIR}/wtdbg2
-WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
+$MINIMAP2 -t $THREADS -ax map-ont $REF $FASTA\
+| $SAMTOOLS view -h -S -b -t $THREADS /dev/stdin \
+| $SAMTOOLS sort /dev/stdin -o ${bam/.bam/.sorted.bam} -t $THREADS
 
-PREFIX=${FASTA/.fasta/_wtdbg2}
-SVID=`echo $(basename $FASTA) | cut -f 1 -d '_'`
-
-WTDBG2_COMMAND="${WTDBG2} ${WTDBG2_SETTINGS} -i ${FASTA} -t ${THREADS} -fo ${PREFIX}"
-WTPOA_CNS_COMMAND="${WTPOA_CNS} -t ${THREADS} -i ${PREFIX}.ctg.lay.gz -fo ${PREFIX}.ctg.fa"
-SED_COMMAND="sed -i \"s/>ctg/>${SVID}_ctg/g\" ${PREFIX}.ctg.fa"
-
-#echo ${WTDBG2_COMMAND}
-eval ${WTDBG2_COMMAND}
-#echo ${WTPOA_CNS_COMMAND}
-eval ${WTPOA_CNS_COMMAND}
-#echo ${SED_COMMAND}
-eval ${SED_COMMAND}
+$SAMTOOLS index ${bam/.bam/.sorted.bam} -t $THREADS
 
 #echo `date`: Done

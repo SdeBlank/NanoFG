@@ -13,6 +13,10 @@ class EnsemblRestClient(object):
         self.req_times=[]
 
     def perform_rest_action(self, server, endpoint, hdrs=None, parameters=None):
+        self.repeat += 1
+        if self.repeat > 5:
+            sys.exit("Too many tries to connect to the Ensembl database or database not accessible")
+
         if hdrs is None:
             hdrs = {}
 
@@ -58,10 +62,8 @@ class EnsemblRestClient(object):
                 sys.stderr.write('Request failed for {0}: Status code: {1.response.status_code} Reason: {1.response.reason}\n'.format(server+endpoint, error))
 
         if data is None:
-            self.repeat += 1
-            if self.repeat <= 5:
-                time.sleep(4)
-                data=self.perform_rest_action(server, endpoint, hdrs, parameters)
-            else:
-                sys.stderr.write("Too many tries to connect to the Ensembl database\n")
+            time.sleep(4)
+            data=self.perform_rest_action(server, endpoint, hdrs, parameters)
+
+        self.repeat = 0
         return data
