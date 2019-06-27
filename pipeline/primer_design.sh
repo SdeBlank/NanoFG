@@ -110,7 +110,9 @@ guixr load-profile $GUIX_PROFILE --<<EOF
 export EMBOSS_PRIMER3_CORE=$PRIMER3_CORE
 $BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA
 EOF
-grep -v "FAILED" ./primers.txt > ${OUTPUT}_info.txt
-#paste <(cat ${OUTPUT}_info.txt) <(grep "PRODUCT SIZE" ${OUTPUT}.err | grep -oP "\d+$") > $OUTPUT
+
+grep -v "FAILED" ./primers.txt > ${OUTPUT}.tmp
+paste <(cat ${OUTPUT}.tmp) <(grep "PRODUCT SIZE" ./primer3.out | grep -oP "\d+$") > $OUTPUT
+rm ${OUTPUT}.tmp
 
 #echo `date`: Done

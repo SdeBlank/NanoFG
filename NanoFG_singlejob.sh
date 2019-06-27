@@ -55,6 +55,7 @@ LAST MAPPING
     -lmt|--last_mapping_threads                                        Number of threads [${LAST_MAPPING_THREADS}]
 
 PRIMER DESIGN
+    -pdf|--primer_design_flank                                         Flanking distance around to breakpoint to extract [$PRIMER_DESIGN_FLANK]
     -pdhv|--primer_design_h_vmem                                       Primer design memory [$PRIMER_DESIGN_MEM]
     -pdhr|--primer_design_h_rt                                         Primer design time [$PRIMER_DESIGN_TIME]
     -pdd|--primer_design_dir                                           Path to primer3 directory [$PRIMER_DESIGN_DIR]
@@ -130,6 +131,7 @@ PRIMER_DESIGN_MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
 PRIMER_DESIGN_PCR_TYPE='single'
 PRIMER_DESIGN_TILLING_PARAMS=''
 PRIMER_DESIGN_PSR='60-200'
+PRIMER_DESIGN_FLANK=200
 
 
 while [[ $# -gt 0 ]]
@@ -520,7 +522,7 @@ fi
 python $SCRIPT_DIR/Primerseq.py \
  -v $FUSION_CHECK_VCF_OUTPUT \
  -d $PRIMER_DIR \
- -f 200
+ -f $PRIMER_DESIGN_FLANK
 
 mkdir -p $PRIMER_DIR/tmp
 if [ ! -d $PRIMER_DIR/tmp ]; then
@@ -552,6 +554,7 @@ if [ -d $PRIMER_DESIGN_DIR ];then
        -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
        -pdm $PRIMER_DESIGN_MISPRIMING
     fi
+    mv $PRIMER_DIR/tmp/primer3.out ${FUSION_FASTA/.fasta/_primerinfo.txt}
     rm $PRIMER_DIR/tmp/*
   done
   rmdir $PRIMER_DIR/tmp/
