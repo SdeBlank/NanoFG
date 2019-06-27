@@ -21,14 +21,15 @@ Optional parameters:
 
 POSITIONAL=()
 
+PRIMER_DESIGN_DIR="/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3/"
 # DEFAULTS
-BINDIR='/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3primers'
+BINDIR=$PRIMER_DESIGN_DIR/primers
 PCR_TYPE='single'
 TILLING_PARAMS=' '
-PSR='30-230'
-GUIX_PROFILE='/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3emboss/.guix-profile'
-PRIMER3_CORE='/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3primer3/src/primer3_core'
-MISPRIMING='/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3repbase/current/empty.ref'
+PSR='60-200'
+GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
+PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
+MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
 #MISPRIMING='/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3repbase/current/humrep.ref'
 
 while [[ $# -gt 0 ]]
@@ -106,10 +107,10 @@ fi
 #echo `date`: Running on `uname -n`
 
 guixr load-profile $GUIX_PROFILE --<<EOF
-
 export EMBOSS_PRIMER3_CORE=$PRIMER3_CORE
 $BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA
-EOF |\
+EOF
 grep -v "FAILED" ./primers.txt > ${OUTPUT}_info.txt
-paste <(cat ${OUTPUT}_info.txt) <(grep "PRODUCT SIZE" $PRIMER_DESIGN_ERR | grep -oP "\d+$") > $OUTPUT
+#paste <(cat ${OUTPUT}_info.txt) <(grep "PRODUCT SIZE" ${OUTPUT}.err | grep -oP "\d+$") > $OUTPUT
+
 #echo `date`: Done

@@ -179,7 +179,7 @@ if "source" in vcf_reader.metadata:
     if vcf_reader.metadata["source"][0].lower()=="sniffles":
         vcf_type="Sniffles"
 elif "cmdline" in vcf_reader.metadata:
-    if "nanosv" in vcf_reader.metadata["cmdline"].lower():
+    if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
         vcf_type="NanoSV"
 
 for record in vcf_reader:
