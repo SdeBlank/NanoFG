@@ -1,4 +1,6 @@
 # NanoFG
+
+## *--WORK IN PROGRESS--*
 Third-generation fusion gene detection
 
 STEP 1  DETECTION OF CANDIDATE FUSION GENES

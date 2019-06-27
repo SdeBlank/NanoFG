@@ -106,7 +106,6 @@ def get_gene_overlap( bnd1_chr, bnd1_pos, bnd1_ori, bnd2_chr, bnd2_pos, bnd2_ori
     fusions = dict()
     for gene in overlap:
         if gene["biotype"]=="protein_coding":
-
             if gene['bnd']=="1":
                 ori=bnd1_ori
             elif gene['bnd']=="2":
@@ -187,7 +186,7 @@ for record in vcf_reader:
         record = alt_convert(record)
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
-
+        
     fusions={'donor':{}, 'acceptor':{}}
 
     if vcf_type=="Sniffles":
