@@ -45,7 +45,8 @@ CONSENSUS CALLING
     -ccws|--consensus_calling_wtdbg2_settings                          Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
 
 SV CALLING
-    -nmc|--nanosv_minimap2_config                                               Path to config to use for nanosv [$NANOSV_MINIMAP2_CONFIG]
+    -nmc|--nanosv_minimap2_config                                      Path to config to use for nanosv [$NANOSV_MINIMAP2_CONFIG]
+    -nlc|--nanosv_last_config                                          NanoSV config to detect SVs in the LAST mapped fusion candidates [${NANOSV_LAST_NOCONSENSUS_CONFIG}]
     -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
 LAST MAPPING
@@ -96,7 +97,7 @@ WTDBG2_DIR=$PATH_WTDBG2_DIR
 
 SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
-NANOSV_LAST_CONFIG=$FILES_DIR/nanosv_last_config.ini
+NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
 NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
 SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
 #SNIFFLES_SETTINGS='-s 2 -n -1 --genotype -d 1'     SETTINGS TO DETECT RECIPROCAL TRANSLOCATIONS
@@ -226,8 +227,13 @@ do
     shift # past argument
     shift # past value
     ;;
-    -nmc|--nanosv_minimap2_config)                                           #### NOT USED
+    -nmc|--nanosv_minimap2_config)
     NANOSV_MINIMAP2_CONFIG="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -nlc|--nanosv_last_config)
+    NANOSV_LAST_CONFIG="$2"
     shift # past argument
     shift # past value
     ;;
@@ -435,8 +441,8 @@ if [[ NUMBER_OF_BAMS -gt 1 ]];then
 elif [[ NUMBER_OF_BAMS -eq 1 ]];then
   cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
   cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
-  echo "NO CANDIDATE FUSION GENES FOUND"
 else
+  echo "NO CANDIDATE FUSION GENES FOUND"
   exit
 fi
 
@@ -447,6 +453,13 @@ if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
 fi
 ################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
 echo -e "`date` \t Calling SVs..."
+if [ -z $NANOSV_LAST_CONFIG ]; then
+  if [ $CONSENSUS_CALLING = true ];then
+    NANOSV_LAST_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
+  else
+    NANOSV_LAST_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
+  fi
+fi
 
 if [ $CONSENSUS_CALLING = true ];then
   bash $PIPELINE_DIR/sv_calling.sh \
@@ -455,7 +468,7 @@ if [ $CONSENSUS_CALLING = true ];then
     -t $THREADS \
     -s $SAMTOOLS \
     -v $VENV \
-    -c $NANOSV_LAST_CONSENSUS_CONFIG \
+    -c $NANOSV_LAST_CONFIG \
     -ss "$SNIFFLES_SETTINGS" \
     -o $SV_CALLING_OUT
 else

@@ -61,7 +61,6 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for record in vcf_reader:
-            print(record.ID)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
                 record = alt_convert(record)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
@@ -70,7 +69,6 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             pos1=record.POS
             chrom2=record.ALT[0].chr
             pos2=record.ALT[0].pos
-
             if vcf_type=="NanoSV":
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
                 pos1_orientation=record.ALT[0].orientation
@@ -87,9 +85,6 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                     pos2_orientation=True
             if compared_id in supporting_reads:
                 original_vcf_info=supporting_reads[compared_id]
-                ### Only activate when no consensus calling is used
-                if original_vcf_info[0]<2:
-                    continue
 
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=ensembl_annotation(chrom1, pos1)
@@ -98,7 +93,6 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             breakend2_annotation=ensembl_annotation(chrom2, pos2)
             if len(breakend2_annotation)==0:
                 continue
-
             #Use requested information to calculate BND specific features
             breakend1_info=breakend_annotation(chrom1, pos1, pos1_orientation, breakend1_annotation)
             breakend2_info=breakend_annotation(chrom2, pos2, pos2_orientation, breakend2_annotation)
@@ -586,7 +580,6 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
                     three_prime_gene=annotation1
                 else:
                     continue
-
                 if ((Orientation1 and Orientation2 and annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (Orientation1 and not Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (not Orientation1 and Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
@@ -625,7 +618,6 @@ def get_domains(protein_id, coding_exons, relative_length, intron_relative_lengt
         text_begin=pos_start+0.5*abs(pos_end-pos_start)-(0.5*len(domain["description"])/3)
         text_end=pos_start+0.5*abs(pos_end-pos_start)+(0.5*len(domain["description"])/3)
 
-        #print(domain["description"])
         for layer, domains in enumerate(domain_layers):
             next_layer=False
             nr_of_items=len(domains)
