@@ -37,14 +37,10 @@ REQUIRED TOOLS
     -l|--last_dir                                                      Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                    Path to wtdbg2 directory [${WTDBG2_DIR}]
 
-SCRIPTS
-    -fres|--fusion_read_extraction_script                              Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
-    -fcs|--fusion_check_script                                         Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
-
 CONSENSUS CALLING
     -ccws|--consensus_calling_wtdbg2_settings                          Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
 
-SV CALLING
+SV CALLING SETTINGS
     -nmc|--nanosv_minimap2_config                                      Path to config to use for nanosv [$NANOSV_MINIMAP2_CONFIG]
     -nlc|--nanosv_last_config                                          NanoSV config to detect SVs in the LAST mapped fusion candidates [${NANOSV_LAST_NOCONSENSUS_CONFIG}]
     -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
@@ -109,6 +105,7 @@ REGION_SELECTION_BAM_OUTPUT=$OUTPUTDIR/regions.bam
 
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
+FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 
 #CONSENSUS CALLING DEFAULTS
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
@@ -121,7 +118,7 @@ LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
 #FUSION CHECK DEFAULTS
-FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
+
 
 #PRIMER DESIGN DEFAULTS
 PRIMER_DESIGN_DIR=$PATH_PRIMER_DESIGN_DIR
@@ -239,11 +236,6 @@ do
     ;;
     -ss|--sniffles_settings)
     SNIFFLES_SETTINGS="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -fres|--fusion_read_extraction_script)
-    FUSION_READ_EXTRACTION_SCRIPT="$2"
     shift # past argument
     shift # past value
     ;;
@@ -383,7 +375,7 @@ fi
 ##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
 echo -e "`date` \t Extracting reads that support candidate fusion genes..."
 
-python $FUSION_READ_EXTRACTION_SCRIPT \
+python $SCRIPT_DIR/FusionReadExtraction.py \
   -b $BAM \
   -v $VCF_FILTERED \
   -o $CANDIDATE_DIR
@@ -478,7 +470,7 @@ else
     -t $THREADS \
     -s $SAMTOOLS \
     -v $VENV \
-    -c $NANOSV_LAST_CONFIG \
+    -c $NANOSV_MINIMAP2_CONFIG \
     -ss "$SNIFFLES_SETTINGS" \
     -o $SV_CALLING_OUT
 fi
@@ -516,14 +508,12 @@ fi
 ################################################### CHECKING THE FUSION GENE FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
 echo -e "`date` \t Checking fusion candidates..."
 
-bash $PIPELINE_DIR/fusion_check.sh \
+python $SCRIPT_DIR/FusionReadExtraction.py \
   -v $SV_CALLING_OUT_FILTERED \
   -ov $VCF \
   -o $FUSION_CHECK_VCF_OUTPUT \
   -fo $FUSION_CHECK_INFO_OUTPUT \
-  -p $FUSION_CHECK_PDF_OUTPUT \
-  -s $FUSION_CHECK_SCRIPT \
-  -e $VENV
+  -p $FUSION_CHECK_PDF_OUTPUT
 
 ################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
 echo -e "`date` \t Designing primers around fusion breakpoints..."
