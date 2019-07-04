@@ -17,7 +17,7 @@ parser.add_argument('-o', '--output_dir', required=True, type=str, help='Output 
 
 args = parser.parse_args()
 
-#############################################   Convert sniffles vcf ALT field to bracket notations N[Chr:pos[   #############################################
+#############################################   Convert unknown ALT fields to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):
     orientation = None
     remoteOrientation = None
@@ -90,18 +90,16 @@ def alt_convert( record ):
     record.ALT = [ pyvcf.model._Breakend( CHR2, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
     return( record )
 
+#############################################   Get the overlap of a breakpoint with genes from ensembl and extract information of the gene   #############################################
 def get_gene_overlap( bnd1_chr, bnd1_pos, bnd1_ori, bnd2_chr, bnd2_pos, bnd2_ori, ensembl_gene_regions):
     overlap=[]
     for region in ensembl_gene_regions:
-
         if bnd1_chr==region['chromosome'] and bnd1_pos>region['start'] and bnd1_pos<region['end']:
             region["bnd"]="1"
             overlap.append(copy.deepcopy(region))
         if bnd2_chr==region['chromosome'] and bnd2_pos>region['start'] and bnd2_pos<region['end']:
             region["bnd"]="2"
             overlap.append(copy.deepcopy(region))
-
-    #print(overlap)
 
     fusions = dict()
     for gene in overlap:
@@ -128,6 +126,7 @@ def get_gene_overlap( bnd1_chr, bnd1_pos, bnd1_ori, bnd2_chr, bnd2_pos, bnd2_ori
                 fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['end']
     return( fusions )
 
+########################################   Obtain all reads from the bam file that support a breakpoint, excluding reference or non-overlapping reads   ########################################
 def create_fasta( chr, start, end, svid, exclude, include ):
     if end < start:
         end, start = start, end
@@ -143,11 +142,6 @@ def create_fasta( chr, start, end, svid, exclude, include ):
             fasta.write( ">"+svid+"."+read.query_name+"\n")
             fasta.write(read.seq+"\n")
 
-        # if read.query_name in include and not read.seq == None and read.query_name not in exclude: #and not read.is_supplementary:
-        #     fasta.write( ">"+svid+"."+read.query_name+"\n")
-        #     fasta.write(read.seq+"\n")
-        #     exclude.append(read.query_name)
-
         #### Uncomment to select all the reads supporting the breakpoint and adjacent regions of the gene to get full gene sequence back
         # if read.query_name in exclude or read.seq == None or read.is_supplementary:
         #     continue
@@ -157,10 +151,16 @@ def create_fasta( chr, start, end, svid, exclude, include ):
     fasta.close()
     bamfile.close()
 
+
+
+
+########################################   Main code   ########################################
+
 print("Start:", datetime.datetime.now())
 
 EnsemblRestClient=EnsemblRestClient()
 
+### DOWNLOAD BASIC GENE INFORMATION FROM ENSEMBL (ID, CHROMOSOME, POSITION, STRAND, BIOTYPE)
 dataset = Dataset(name='hsapiens_gene_ensembl', host='http://grch37.ensembl.org')
 ensembl_genes = dataset.query(attributes=['ensembl_gene_id', 'chromosome_name','start_position', 'end_position', 'strand', 'gene_biotype'],
                 filters={'chromosome_name': ['1','2','3','4','5','6','7','8','9','10','11','12','13','14',
@@ -174,6 +174,7 @@ for line in ensembl_genes.iterrows():
 
 vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 
+### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
 if "source" in vcf_reader.metadata:
     if vcf_reader.metadata["source"][0].lower()=="sniffles":
         vcf_type="Sniffles"
@@ -181,14 +182,17 @@ elif "cmdline" in vcf_reader.metadata:
     if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
         vcf_type="NanoSV"
 
+### GO THROUGH EVERY SV IN THE VCF AND DETERMINE IF THE SV PRODUCES A VALID FUSION BETWEEN 2 GENES
 for record in vcf_reader:
+    #CONVERT THE ALT FIELD IN THE VCF TO A BND 'N]]' structure'
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         record = alt_convert(record)
     if not isinstance(record.ALT[0], pyvcf.model._Breakend):
         continue
-        
+
     fusions={'donor':{}, 'acceptor':{}}
 
+    #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
     if vcf_type=="Sniffles":
         if record.INFO["STRANDS"][0][0]=="+":
             strand1=False
@@ -205,6 +209,7 @@ for record in vcf_reader:
 
     fusions=get_gene_overlap(record.CHROM, record.POS, strand1, record.ALT[0].chr, record.ALT[0].pos, strand2, regions)
 
+    #CHECK IF A BREAKPOINT CONTAIN THE CORRECT ORIENTATION TO PRODUCE A FUSION GENE
     good_fusion=False
     if 'donor' in fusions and 'acceptor' in fusions:
         largest_donor_size=0
@@ -215,8 +220,7 @@ for record in vcf_reader:
         elif "RNAMES" in record.INFO:
             SUPP_READ_IDS=record.INFO['RNAMES']
             REF_READ_IDS=[]
-
-        # Go through all possible fusions and check the orientation
+        # GO THROUGH ALL POSSIBLE FUSIONS FOR EACH BREAKPOINT TO CHECK THE ORIENTATION
         for donor in fusions['donor']:
             donor_gene, donor_bp = donor.split("\t")
             for acceptor in fusions['acceptor']:
@@ -225,7 +229,8 @@ for record in vcf_reader:
                 if donor_gene != acceptor_gene:
                     if donor_bp == '1' and acceptor_bp == '2':
                         good_fusion=True
-                        # Optional to select all reads for the whole gene
+
+                        ### OPTIONAL CODE TO SELECT ALL THE READS FOR A WHOLE GENE (CURRENTLY NOT USED)
                         donor_size=abs(record.POS-fusions['donor'][donor])
                         if donor_size>largest_donor_size:
                             largest_donor_size=donor_size
@@ -243,7 +248,6 @@ for record in vcf_reader:
                     elif donor_bp == '2' and acceptor_bp == '1':
                         good_fusion=True
 
-                        # Optional to select all reads for the whole gene
                         donor_size=abs(record.ALT[0].pos-fusions['donor'][donor])
                         if donor_size>largest_donor_size:
                             largest_donor_size=donor_size
@@ -259,9 +263,8 @@ for record in vcf_reader:
                             acceptor_start = fusions['acceptor'][acceptor]
                             acceptor_end = record.POS
     if good_fusion:
+        #EXTRACT ALL THE READS THAT SUPPORT THE BREAKPOINT FOR LATER REMAPPING WITH MORE ACCURATE PARAMETERS
         create_fasta(donor_chr, donor_start, donor_end, record.ID, REF_READ_IDS, SUPP_READ_IDS)
         create_fasta(acceptor_chr, acceptor_start, acceptor_end, record.ID, REF_READ_IDS, SUPP_READ_IDS)
 
 print("End:", datetime.datetime.now())
-    #create_fasta(record.ALT[0].chr, record.ALT[0].pos, record.ALT[0].pos+1000, record.ID, record.INFO['REF_READ_IDS_2'])
-    #break

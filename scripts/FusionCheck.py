@@ -26,6 +26,7 @@ parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', requir
 
 args = parser.parse_args()
 
+########################################   Read in the vcf and perform all fusion check steps for each record in the vcf   ########################################
 def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
     with open(full_vcf, "r") as original_vcf:
         supporting_reads={}
@@ -50,6 +51,8 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
     all_fusions={}
     with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
         vcf_reader=pyvcf.Reader(vcf)
+
+        ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
                 vcf_type="Sniffles"
@@ -73,6 +76,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
                 pos1_orientation=record.ALT[0].orientation
                 pos2_orientation=record.ALT[0].remoteOrientation
+            #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
             elif vcf_type=="Sniffles":
                 compared_id=re.findall("^\d+", record.INFO["RNAMES"][0])[0]
                 if record.INFO["STRANDS"][0][0]=="+":
@@ -107,7 +111,8 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
                 str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
 
-                visualisation(fusion, compared_id, original_vcf_info, output_pdf)
+                current_fusion=copy.deepcopy(fusion)
+                visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
                 all_fusions[compared_id]=vcf_fusion_info
@@ -122,6 +127,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 original_record.INFO["FUSION"]=all_fusions[original_record.ID]
             vcf_writer.write_record(original_record)
 
+#############################################   Convert unknown ALT fields to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):
     orientation = None
     remoteOrientation = None
@@ -194,7 +200,7 @@ def alt_convert( record ):
     record.ALT = [ pyvcf.model._Breakend( CHR2, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
     return( record )
 
-# Gather all information about protein coding genes that overlap with a break-end, independent of the location of the breakend in the gene
+#############################################   Gather all information about genes that overlap with a single breakend   #############################################
 def ensembl_annotation(CHROM, POS):
     server='http://grch37.rest.ensembl.org'
     endpoint="/overlap/region/human/"+str(CHROM)+":"+str(POS)+"-"+str(POS)
@@ -332,7 +338,7 @@ def ensembl_annotation(CHROM, POS):
             HITS.append(ensembl_info)
     return HITS
 
-# Use the gene information gathered in ensembl_annotation and add specific breakend information (e.g. what exon, what frame is created etc.)
+#################################   Use the ensembl gene information and add specific breakend information (e.g. exon, frame)   #########################################
 def breakend_annotation(CHROM, POS, orientation, Info):
     HITS=[]
     for gene in Info:
@@ -448,8 +454,8 @@ def breakend_annotation(CHROM, POS, orientation, Info):
         HITS.append(BND_INFO)
     return HITS
 
-#Takes the information from two breakend gathered by breakend_annotation and what type of fusion is present and if it is in phase
-def FusionCheck(Annotation1, Annotation2):
+#################################   Uses information for both breakends to detect fusion type and frame #########################################
+def fusion_check(Annotation1, Annotation2):
     if Annotation1["Breakpoint_location"]=="CDS" and Annotation1["Type"]==Annotation2["Type"]:
         Annotation1_CDS_length=Annotation1["CDS_length"]
         Annotation2_CDS_length=Annotation2["CDS_length"]
@@ -533,6 +539,7 @@ def FusionCheck(Annotation1, Annotation2):
 
     return (Fusion_type, Annotation1_CDS_length, Annotation2_CDS_length)
 
+#################################   Checks each breakpoint for inaccurate mapping and flags all fusions   #########################################
 def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Original_vcf_filter ,Output):
     chrom1=Record.CHROM
     pos1=Record.POS
@@ -584,7 +591,7 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
                     (Orientation1 and not Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (not Orientation1 and Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
                     (not Orientation1 and not Orientation2 and annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"])):
-                        fusion_type, annotation1["CDS_length"], annotation2["CDS_length"] = FusionCheck(annotation1, annotation2)
+                        fusion_type, annotation1["CDS_length"], annotation2["CDS_length"] = fusion_check(annotation1, annotation2)
                         if len(FLAGS)==0:
                             FLAGS=["None"]
                         Fusion_output.append({"5'": five_prime_gene, "3'": three_prime_gene, "Fusion_type": fusion_type, "Flags":FLAGS})
@@ -592,6 +599,7 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
 
     return (Fusion_output, Vcf_output)
 
+#################################   Gather information about the domains of the genes involved in the fusion   #########################################
 def get_domains(protein_id, coding_exons, relative_length, intron_relative_length):
     server='http://grch37.rest.ensembl.org'
     endpoint="/overlap/translation/"+protein_id
@@ -660,7 +668,7 @@ def get_domains(protein_id, coding_exons, relative_length, intron_relative_lengt
                 to_be_used_domains[domain[2]].append(domain)
     return to_be_used_domains
 
-
+#################################   Visualisation of the fusion genes   #########################################
 def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     rowplots = 7
     colplots = 3
@@ -734,6 +742,7 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
         plt.xlim( (xmin,xmax) )
         plt.axis('off')
 
+    ### Visualiation
     def gene_visualisation(gene_info, order):
         exon_list=[]
         domain_list=[]
@@ -791,11 +800,10 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
 
         return (exon_list, domain_list, breakpoint)
 
-############################################################################# Plot Title and flags
+############################################################################# Plotting of the title and possible flags
 
     fig = plt.figure(figsize=(11.7,8.3), edgecolor="black")
     gs  = gridspec.GridSpec(rowplots, colplots, hspace=0,height_ratios=[0.5,2, 0.5 ,0.5, 0.5, 2,1], width_ratios=[1,99, 0.1])
-
     ax = fig.add_subplot(gs[0,:])
     if "OUT OF FRAME" in annotated_breakpoints["Fusion_type"]:
         ax.text(0.5*xmax, 0, original_svid+". " + annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=16, fontweight='bold')
@@ -817,7 +825,7 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     matplotlib.axes.Axes.invert_yaxis(ax)
 
 
-############################################################################# DONOR GENE VISUALISATION
+############################################################################# Visualisation of the donor gene (5')
     donor_exons, donor_domains, breakpoint = gene_visualisation(annotated_breakpoints["5'"], "5'")
 
     ax = fig.add_subplot(gs[2, 0])
@@ -838,7 +846,7 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
 
     breakpoint_plot(breakpoint, 2)
 
-############################################################################# ACCEPTOR GENE VISUALISATION
+############################################################################# Visualisation of the acceptor gene (3')
 
     acceptor_exons, acceptor_domains, breakpoint = gene_visualisation(annotated_breakpoints["3'"], "3'")
 
@@ -860,7 +868,7 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     breakpoint_plot(breakpoint, 4)
     domains_plot( acceptor_domains, 5 , "red", "3'")
 
-############################################################################# FUSION GENE VISUALISATION
+############################################################################# Visualisation of the fusion gene
 
     fused_exons = []
     if "exon-exon" in annotated_breakpoints["Fusion_type"]:
@@ -1011,24 +1019,10 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     introns_plot( 0, BND, 3, "blue")
     introns_plot( BND, 100, 3, "red" )
 
-    ############################################################################# Additional info visualisation
+    ############################################################################# Visualisation of additional info
     ax = fig.add_subplot(gs[6, :])
     ax.axhline(y=0, xmin=0, xmax=100, color="black", linewidth=1, linestyle="--")
-    # consensus="Not completed"
-    # if "ALT_READ_IDS" in Record.INFO:
-    #     for alt_read in Record.INFO["ALT_READ_IDS"]:                                    # DOESNT WORK IN SNIFFLES
-    #         if ".fasta_ctg1" in alt_read:
-    #             sv_id=re.findall("^\d+", alt_read)[0]
-    #             consensus=sv_id+"_wtdbg2.ctg.fa"
-    #             break
-    #     sv_id=re.findall("^\d+", Record.INFO["ALT_READ_IDS"][0])[0]
-    # elif "RNAMES" in Record.INFO:
-    #     for alt_read in Record.INFO["RNAMES"]:                                    # DOESNT WORK IN SNIFFLES
-    #         if ".fasta_ctg1" in alt_read:
-    #             sv_id=re.findall("^\d+", alt_read)[0]
-    #             consensus=sv_id+"_wtdbg2.ctg.fa"
-    #             break
-    #     sv_id=re.findall("^\d+", Record.INFO["RNAMES"][0])[0]
+
     consensus=original_svid+"_wtdbg2.ctg.fa"
     ax.text(0, 0.2, "Original ID:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0, 0.5, original_svid, horizontalalignment='left',verticalalignment='center', size=9)
@@ -1049,8 +1043,7 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     pdf.savefig()
     plt.close()
 
-#####################################################
-
+#############################################   RUNNING CODE  #############################################
 print("Start:", datetime.datetime.now())
 VCF_IN=args.vcf
 VCF_OUTPUT=args.output

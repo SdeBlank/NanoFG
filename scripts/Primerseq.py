@@ -21,6 +21,7 @@ offset = args.offset
 flank = args.flank
 mask = args.mask
 
+#############################################   Mask common variation locations in the sequence  #############################################
 def mask_seq( chr, start, end, strand, seq ):
     ext = "/overlap/region/human/"+str(chr)+":"+str(start)+"-"+str(end)+":"+str(strand)+"?feature=variation"
     headers={ "Content-Type" : "application/json"}
@@ -34,7 +35,7 @@ def mask_seq( chr, start, end, strand, seq ):
         masked_seq = masked_seq[:snp_pos]+'n'+masked_seq[snp_pos+1:];
     return( masked_seq )
 
-
+#############################################   Gather the reference sequence of a specific area in the genome  #############################################
 def get_seq(chr, start, end, strand):
     ext = "/info/assembly/homo_sapiens/"+str(chr)
     headers={ "Content-Type" : "application/json"}
@@ -55,13 +56,7 @@ def get_seq(chr, start, end, strand):
             seq = mask_seq(chr, start, end, strand, seq )
     return( seq )
 
-# def reverse_complement( seq ):
-#     reverse_seq = seq[::-1]
-#     complement = {'A':'T', 'C':'G', 'G':'C','T':'A'}
-#     bases = list(reverse_seq)
-#     bases = [complement.get(base,'n') for base in bases]
-#     return( ''.join(bases) )
-
+#############################################   Convert unknown ALT fields to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):
     orientation = None
     remoteOrientation = None
@@ -134,13 +129,14 @@ def alt_convert( record ):
     record.ALT = [ pyvcf.model._Breakend( CHR2, record.INFO['END'], orientation, remoteOrientation, record.REF, True ) ]
     return( record )
 
-########################################### MAIN CODE
+#############################################   RUNNING CODE   #############################################
 EnsemblRestClient=EnsemblRestClient()
 server = "http://grch37.rest.ensembl.org"
 
 with open(vcf, "r") as fusion_vcf:
     vcf_reader = pyvcf.Reader(open(vcf, 'r'))
 
+    ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
     if "source" in vcf_reader.metadata:
         if vcf_reader.metadata["source"][0].lower()=="sniffles":
             vcf_type="Sniffles"
@@ -148,6 +144,7 @@ with open(vcf, "r") as fusion_vcf:
         if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
             vcf_type="NanoSV"
 
+    ### GATHER THE SEQUENCE AROUND BREAKPOINTS THAT PRODUCE A VALID FUSION GENE
     for record in vcf_reader:
         if "FUSION" in record.INFO:
             if isinstance(record.ALT[0], pyvcf.model._SV) or isinstance( record.ALT[0], pyvcf.model._Substitution ):
@@ -158,6 +155,8 @@ with open(vcf, "r") as fusion_vcf:
             if vcf_type=="NanoSV":
                 pos1_orientation=record.ALT[0].orientation
                 pos2_orientation=record.ALT[0].remoteOrientation
+
+            #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
             elif vcf_type=="Sniffles":
                 if record.INFO["STRANDS"][0][0]=="+":
                     pos1_orientation=False
@@ -167,7 +166,6 @@ with open(vcf, "r") as fusion_vcf:
                     pos2_orientation=False
                 else:
                     pos2_orientation=True
-
 
             seq1 = ''
             seq2 = ''
