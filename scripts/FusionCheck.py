@@ -404,6 +404,10 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                 if POS>=CHRON_START and POS<=CHRON_END:
                     BND_INFO["Type"]=sequence["Type"]
 
+                    if abs(sequence["Start"]-POS)<5 or abs(sequence["End"]-POS)<5:
+                        if "Close_to_exon_junction" not in BND_INFO["Flags"]:
+                            BND_INFO["Flags"].append("Close_to_exon_boundary")
+
                     if BND_INFO["Type"]=="exon":
                         BND_INFO["Rank"]=sequence["Rank"]
                         BND_INFO["Exon_start_phase"]=sequence["Start_phase"]

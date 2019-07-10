@@ -121,7 +121,7 @@ PRIMER_DESIGN_PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
 PRIMER_DESIGN_MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
 PRIMER_DESIGN_PCR_TYPE='single'
 PRIMER_DESIGN_TILLING_PARAMS=''
-PRIMER_DESIGN_PSR='60-200'
+PRIMER_DESIGN_PSR='100-200'
 PRIMER_DESIGN_FLANK='200'
 
 
@@ -471,27 +471,15 @@ if [ -z $NANOSV_LAST_CONFIG ]; then
   fi
 fi
 
-if [ $CONSENSUS_CALLING = true ];then
-  bash $PIPELINE_DIR/sv_calling.sh \
-    -sv $SV_CALLER \
-    -b $BAM_MERGE_OUT \
-    -t $THREADS \
-    -s $SAMTOOLS \
-    -v $VENV \
-    -c $NANOSV_LAST_CONFIG \
-    -ss "$SNIFFLES_SETTINGS" \
-    -o $SV_CALLING_OUT
-else
-  bash $PIPELINE_DIR/sv_calling.sh \
-    -sv $SV_CALLER \
-    -b $BAM_MERGE_OUT \
-    -t $THREADS \
-    -s $SAMTOOLS \
-    -v $VENV \
-    -c $NANOSV_MINIMAP2_CONFIG \
-    -ss "$SNIFFLES_SETTINGS" \
-    -o $SV_CALLING_OUT
-fi
+bash $PIPELINE_DIR/sv_calling.sh \
+  -sv $SV_CALLER \
+  -b $BAM_MERGE_OUT \
+  -t $THREADS \
+  -s $SAMTOOLS \
+  -v $VENV \
+  -c $NANOSV_LAST_CONFIG \
+  -ss "$SNIFFLES_SETTINGS" \
+  -o $SV_CALLING_OUT
 
 # if [ $CONSENSUS_CALLING = true ];then
 #   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
@@ -559,7 +547,7 @@ if [ -d $PRIMER_DESIGN_DIR ];then
        -o ${FUSION_FASTA/.fasta/.primers} \
        -pdb $PRIMER_DESIGN_BINDIR \
        -pdpt $PRIMER_DESIGN_PCR_TYPE \
-       -pdp $PRIMER_DESIGN_PSR \
+       -psr $PRIMER_DESIGN_PSR \
        -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
        -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
        -pdm $PRIMER_DESIGN_MISPRIMING
@@ -570,7 +558,7 @@ if [ -d $PRIMER_DESIGN_DIR ];then
        -pdb $PRIMER_DESIGN_BINDIR \
        -pdpt $PRIMER_DESIGN_PCR_TYPE \
        -pdtp $PRIMER_DESIGN_TILLING_PARAMS \
-       -pdp $PRIMER_DESIGN_PSR \
+       -psr $PRIMER_DESIGN_PSR \
        -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
        -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
        -pdm $PRIMER_DESIGN_MISPRIMING
