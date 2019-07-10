@@ -6,6 +6,8 @@ echo "
 NanoFG_singlejob.sh -b BAM [-v VCF] [-s SELECTED_GENES_OR_REGIONS] [-df]
 
 Required parameters:
+    -f|--fastq                                                         Path to fastq file
+    OR
     -b|--bam                                                           Path to bam file
 
 Optional parameters:
@@ -45,9 +47,9 @@ SV CALLING SETTINGS
     -nlc|--nanosv_last_config                                          NanoSV config to detect SVs in the LAST mapped fusion candidates [${NANOSV_LAST_NOCONSENSUS_CONFIG}]
     -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
-LAST MAPPING
-    -lmr|--last_mapping_refgenome                                      Reference genome [${LAST_MAPPING_REFGENOME}]
-    -lmrd|--last_mapping_refdict                                       Reference genome .dict file [${LAST_MAPPING_REFDICT}]
+MAPPING
+    -rg|--refgenome                                                    Reference genome [${REFGENOME}]
+    -rd|--refdict                                                      Reference genome .dict file [${REFDICT}]
     -lms|--last_mapping_settings                                       LAST settings [${LAST_MAPPING_SETTINGS}]
     -lmt|--last_mapping_threads                                        Number of threads [${LAST_MAPPING_THREADS}]
 
@@ -106,9 +108,9 @@ FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
 #LAST MAPPING DEFAULTS
-LAST_MAPPING_REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
-LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
-LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
+REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
+REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
@@ -135,13 +137,18 @@ do
     exit
     shift # past argument
     ;;
-    -v|--vcf)
-    VCF="$2"
+    -f|--fastq)
+    FASTQ="$2"
     shift # past argument
     shift # past value
     ;;
     -b|--bam)
     BAM="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -v|--vcf)
+    VCF="$2"
     shift # past argument
     shift # past value
     ;;
@@ -237,13 +244,18 @@ do
     shift # past argument
     shift # past value
     ;;
-    -lmr|--last_mapping_refgenome)
-    LAST_MAPPING_REFGENOME="$2"
+    -rf|--reffasta)
+    REFFASTA="$2"
     shift # past argument
     shift # past value
     ;;
-    -lmrd|--last_mapping_refdict)
-    LAST_MAPPING_REFDICT="$2"
+    -rg|--refgenome)
+    REFGENOME="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -rd|--refdict)
+    REFDICT="$2"
     shift # past argument
     shift # past value
     ;;
@@ -290,16 +302,21 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-if [ -z $BAM ]; then
-    echo "Missing -b|--bam parameter"
+if [ -z $BAM ] && [ -z $FASTQ ]; then
+    echo "Missing -f|--fastq OR -b|--bam parameter"
     usage
     exit
 fi
 
 echo -e "`date` \t Running on `uname -n`"
 
-SAMPLE=$(basename $BAM)
-SAMPLE=${SAMPLE/.bam/}
+if [ -z $BAM ]; then
+  SAMPLE=$(basename $FASTQ)
+  SAMPLE=${SAMPLE/.fastq/}
+else
+  SAMPLE=$(basename $BAM)
+  SAMPLE=${SAMPLE/.bam/}
+fi
 
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
     FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.vcf
@@ -335,6 +352,21 @@ if [ ! -d $CANDIDATE_DIR ]; then
 fi
 
 . $VENV
+
+################################################## MAPPING OF THE NANOPORE READS USING MINIMAP2
+if [ ! -z $BAM ];then
+  echo "### bam (-b) already provided. Skipping minimap2 mapping"
+else
+  echo -e "`date` \t 'Mapping all reads using minimap2..."
+  BAM=${SAMPLE}.bam
+  bash $PIPELINE_DIR/minimap2_mapping.sh \
+    -f $FASTQ \
+    -o $BAM \
+    -mm2 $MINIMAP2 \
+    -r $REFFASTA \
+    -t $THREADS \
+    -s $SAMTOOLS
+fi
 
 ################################################## SELECTION OF REGIONS THAT ARE SPECIFIED BY THE USER (OPTIONAL)
 if [ ! -z $VCF ];then
@@ -424,14 +456,14 @@ done
 echo -e "`date` \t Mapping candidate fusion genes..."
 
 if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
-  MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
+  MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $REFGENOME -rd $REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
   for FA in $CANDIDATE_DIR/*.fa; do
     echo $FA;
   done | \
   xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
 
 elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
-  MAPPING_ARGS="-mm2 $MINIMAP2 -r $LAST_MAPPING_REFFASTA -t $THREADS -s $SAMTOOLS"
+  MAPPING_ARGS="-mm2 $MINIMAP2 -r $REFFASTA -t $THREADS -s $SAMTOOLS"
   for FA in $CANDIDATE_DIR/*.fa; do
     echo $FA;
   done | \
@@ -457,7 +489,7 @@ else
 fi
 
 if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
-  $SAMTOOLS calmd $BAM_MERGE_OUT $LAST_MAPPING_REFFASTA -b > temp.bam
+  $SAMTOOLS calmd $BAM_MERGE_OUT $REFFASTA -b > temp.bam
   mv temp.bam $BAM_MERGE_OUT
   $SAMTOOLS index $BAM_MERGE_OUT
 fi
