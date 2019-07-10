@@ -50,6 +50,7 @@ SV CALLING SETTINGS
 MAPPING
     -rg|--refgenome                                                    Reference genome [${REFGENOME}]
     -rd|--refdict                                                      Reference genome .dict file [${REFDICT}]
+    -mm2s|--minimap2_settings                                          Minimap2 settings [${MINIMAP2_SETTINGS}]
     -lms|--last_mapping_settings                                       LAST settings [${LAST_MAPPING_SETTINGS}]
     -lmt|--last_mapping_threads                                        Number of threads [${LAST_MAPPING_THREADS}]
 
@@ -88,6 +89,11 @@ LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
 SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
 
+#REFERENCE DEFAULTS
+REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
+REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
+REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+
 #SV CALLING DEFAULTS
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
 NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
@@ -107,10 +113,8 @@ FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 #CONSENSUS CALLING DEFAULTS
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
-#LAST MAPPING DEFAULTS
-REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
-REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
-REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+#MAPPING DEFAULTS
+MINIMAP2_SETTINGS='-ax map-ont'
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
@@ -259,6 +263,11 @@ do
     shift # past argument
     shift # past value
     ;;
+    -mm2s|--minimap2_settings)
+    MINIMAP2_SETTINGS="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -lms|--last_mapping_settings)
     LAST_MAPPING_SETTINGS="$2"
     shift # past argument
@@ -363,6 +372,7 @@ else
     -f $FASTQ \
     -o $BAM \
     -mm2 $MINIMAP2 \
+    -mm2s $MINIMAP2_SETTINGS \
     -r $REFFASTA \
     -t $THREADS \
     -s $SAMTOOLS

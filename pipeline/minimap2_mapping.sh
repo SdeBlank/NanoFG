@@ -10,6 +10,7 @@ Required parameters:
 Optional parameters:
 -h|--help                 Shows help
 -mm2|--minimap2           Path to minimap2 [$MINIMAP2]
+-mm2s|--minimap2          Minimap2 parameters [$MINIMAP2_SETTINGS]
 -t|--threads              Number of threads [${THREADS}]
 -r|--reffasta             Reference genome [${REFFASTA}]
 -s|--sambamba             Path to sambamba|samtools [${SAMTOOLS}]
@@ -27,6 +28,7 @@ THREADS=1
 REF=$PATH_HOMO_SAPIENS_REFFASTA
 SAMTOOLS=$PATH_SAMTOOLS
 MINIMAP2=$PATH_MINIMAP2
+MINIMAP2_SETTINGS='-ax map-ont'
 
 while [[ $# -gt 0 ]]; do
   KEY="$1"
@@ -47,6 +49,11 @@ while [[ $# -gt 0 ]]; do
     ;;
     -mm2|--minimap2)
     MINIMAP2="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -mm2s|--minimap2)
+    MINIMAP2_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -86,7 +93,7 @@ fi
 
 #echo `date`: Running on `uname -n`
 
-$MINIMAP2 -t $THREADS -ax map-ont $REFFASTA $FASTQ\
+$MINIMAP2 -t $THREADS $MINIMAP2_SETTINGS $REFFASTA $FASTQ\
 | $SAMTOOLS view -h -S -b -@ $THREADS /dev/stdin \
 | $SAMTOOLS sort /dev/stdin -o ${OUTPUT} -@ $THREADS
 
