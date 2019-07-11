@@ -15,7 +15,7 @@ Optional parameters:
 GENERAL
     -h|--help                                                          Shows help-v|--vcf
     -v|--vcf		                                                       Path to vcf file
-    -t|--threads
+    -t|--threads                                                       Number of threads
     -e|--venv                                                          Path to virtual environment[${VENV}]
 
 SELECTION AND FILTERING
@@ -366,7 +366,7 @@ fi
 if [ ! -z $BAM ];then
   echo "### bam (-b) already provided. Skipping minimap2 mapping"
 else
-  echo -e "`date` \t 'Mapping all reads using minimap2..."
+  echo -e "`date` \t Mapping all reads using minimap2..."
   BAM=${SAMPLE}.bam
   bash $PIPELINE_DIR/minimap2_mapping.sh \
     -f $FASTQ \
@@ -386,7 +386,7 @@ elif [ -z $SELECTION ];then
   REGION_SELECTION_BAM_OUTPUT=$BAM
   echo "### No selection parameter (-s) provided. Using all mapped reads"
 else
-  echo -e "`date` \t 'Selecting regions to check for fusion genes..."
+  echo -e "`date` \t Selecting regions to check for fusion genes..."
   python $REGION_SELECTION_SCRIPT \
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
