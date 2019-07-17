@@ -178,6 +178,7 @@ vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 if "source" in vcf_reader.metadata:
     if vcf_reader.metadata["source"][0].lower()=="sniffles":
         vcf_type="Sniffles"
+        vcf_reader.infos['RNAMES']=pyvcf.parser._Info('RNAMES', ".", "String", "Names of reads supporting SVs (comma separated)", "Sniffles", "X")
 elif "cmdline" in vcf_reader.metadata:
     if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
         vcf_type="NanoSV"

@@ -35,6 +35,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
         if "source" in original_vcf_reader.metadata:
             if original_vcf_reader.metadata["source"][0].lower()=="sniffles":
                 original_vcf_type="Sniffles"
+                original_vcf_reader.infos['RNAMES']=pyvcf.parser._Info('RNAMES', ".", "String", "Names of reads supporting SVs (comma separated)", "Sniffles", "X")
         elif "cmdline" in original_vcf_reader.metadata:
             if "nanosv" in original_vcf_reader.metadata["cmdline"][0].lower():
                 original_vcf_type="NanoSV"
@@ -56,6 +57,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
                 vcf_type="Sniffles"
+                vcf_reader.infos['RNAMES']=pyvcf.parser._Info('RNAMES', ".", "String", "Names of reads supporting SVs (comma separated)", "Sniffles", "X")
         elif "cmdline" in vcf_reader.metadata:
             if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
                 vcf_type="NanoSV"
