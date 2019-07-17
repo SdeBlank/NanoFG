@@ -97,56 +97,54 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             for read in all_reads:
                 if not read.seq == None and not read.is_unmapped:
                     if read.query_name==selected_read:
-                        tags=read.get_tags()
-                        SA_tag=True
-                        for tag in tags:
-                            if "SA" in tag:
-                                SA_tag=True
-                        if SA_tag:
-                            if read.query_name not in alignments:
-                                alignments[read.query_name]=[]
-                            #print(not_unique)
-                            if read not in not_unique:
-                                not_unique.append(read)
-                                if read.is_reverse:
-                                    left_clipped=int(re.findall("\d+", read.cigarstring)[-1])
-                                    right_clipped=int(re.findall("\d+", read.cigarstring)[0])
-                                    start=read.reference_end
-                                    end=read.reference_start
-                                    strand="-"
-                                    # alignments[read.query_name].append([read.reference_name,read.reference_start,read.reference_end,read.cigarstring, "-"])
-                                else:
-                                    left_clipped=int(re.findall("\d+", read.cigarstring)[0])
-                                    right_clipped=int(re.findall("\d+", read.cigarstring)[-1])
-                                    strand="+"
-                                    start=read.reference_start
-                                    end=read.reference_end
+                        # tags=read.get_tags()
+                        # SA_tag=True
+                        # for tag in tags:
+                        #     if "SA" in tag:
+                        #         SA_tag=True
+                        # if SA_tag:
+                        if read.query_name not in alignments:
+                            alignments[read.query_name]=[]
+                        #print(not_unique)
+                        if read not in not_unique:
+                            not_unique.append(read)
+                            if read.is_reverse:
+                                left_clipped=int(re.findall("\d+", read.cigarstring)[-1])
+                                right_clipped=int(re.findall("\d+", read.cigarstring)[0])
+                                start=read.reference_end
+                                end=read.reference_start
+                                strand="-"
+                                # alignments[read.query_name].append([read.reference_name,read.reference_start,read.reference_end,read.cigarstring, "-"])
+                            else:
+                                left_clipped=int(re.findall("\d+", read.cigarstring)[0])
+                                right_clipped=int(re.findall("\d+", read.cigarstring)[-1])
+                                strand="+"
+                                start=read.reference_start
+                                end=read.reference_end
 
-                                alignment_info=[read.query_name, read.reference_name, int(start), int(end) , left_clipped, right_clipped, strand]
-                                if alignments[read.query_name]==[]:
-                                    alignments[read.query_name].append(alignment_info)
-                                else:
-                                    compare=copy.deepcopy(alignments[read.query_name])
-                                    for index, alignment in enumerate(compare):
-                                        if left_clipped<alignment[4]:
-                                            alignments[read.query_name].insert(index, alignment_info)
-                                        elif index+1==len(alignments[read.query_name]):
-                                            alignments[read.query_name].append(alignment_info)
+                            alignment_info=[read.query_name, read.reference_name, int(start), int(end) , left_clipped, right_clipped, strand]
+                            if alignments[read.query_name]==[]:
+                                alignments[read.query_name].append(alignment_info)
+                            else:
+                                compare=copy.deepcopy(alignments[read.query_name])
+                                for index, alignment in enumerate(compare):
+                                    if left_clipped<alignment[4]:
+                                        alignments[read.query_name].insert(index, alignment_info)
+                                    elif index+1==len(alignments[read.query_name]):
+                                        alignments[read.query_name].append(alignment_info)
             bnd_info={}
             BND=1
             for loc in range(len(alignments[selected_read])-1):
                 bnd_info[BND]=[selected_read , alignments[selected_read][loc][1], int(alignments[selected_read][loc][3]),
-                                alignments[selected_read][loc+1][1], int(alignments[selected_read][loc+1][2])]
+                                alignments[selected_read][loc+1][1], int(alignments[selected_read][loc+1][2]), alignments[selected_read][loc][6]+alignments[selected_read][loc+1][6]]
                 BND+=1
 
             Likeliness={}
-
             for key, value in bnd_info.items():
                 Likeliness[key]={}
                 for SV in complex_sv.split("-"):
                     if str(RECORDS[SV].CHROM)==value[1] and str(RECORDS[SV].ALT[0].chr)==value[3]:
                         Likeliness[key][SV]=abs(RECORDS[SV].POS-value[2])+abs(RECORDS[SV].ALT[0].pos-value[4])
-
 
             order=[]
             for rank, score in Likeliness.items():
@@ -156,8 +154,12 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                         most_likely=sv_id
                         closest=distance
                 order.append(most_likely)
+
             RECORDS[complex_sv]=RECORDS[order[0]]
-            RECORDS[complex_sv].ALT=RECORDS[order[-1]].ALT
+            orientation = RECORDS[order[0]].ALT[0].orientation
+            remoteOrientation = RECORDS[order[-1]].ALT[0].remoteOrientation
+            RECORDS[complex_sv].ALT = [ pyvcf.model._Breakend( RECORDS[order[-1]].ALT[0].chr, RECORDS[order[-1]].ALT[0].pos, orientation, remoteOrientation, record.REF, True ) ]
+            #RECORDS[complex_sv].ALT=RECORDS[order[-1]].ALT
             for record_id in complex_sv.split("-"):
                 del RECORDS[record_id]
             print(RECORDS.keys())
@@ -165,6 +167,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for breakpoint_id, record in RECORDS.items():
+            print(record.ID)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
                 record = alt_convert(record)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
@@ -215,19 +218,21 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             breakend2_info=breakend_annotation(chrom2, pos2, pos2_orientation, breakend2_annotation)
 
             #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
-            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, original_vcf_info[2], info_output)
-
+            complex=False
+            if "-" in breakpoint_id:
+                complex=True
+            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, original_vcf_info[2], info_output, complex)
+            print(record.CHROM,record.POS,record.ALT[0].chr, record.ALT[0].pos)
             #Produce output
             for fusion in fusions:
-                if "-" in breakpoint_id:
-                    fusion["Flags"].insert(0, "Complex_fusion")
+                print(fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"])
                 fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
                 str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
 
                 current_fusion=copy.deepcopy(fusion)
-                #visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
+                visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
                 all_fusions[compared_id]=vcf_fusion_info
@@ -659,7 +664,7 @@ def fusion_check(Annotation1, Annotation2):
     return (Fusion_type, Annotation1_CDS_length, Annotation2_CDS_length)
 
 #################################   Checks each breakpoint for inaccurate mapping and flags all fusions   #########################################
-def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Original_vcf_filter ,Output):
+def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Original_vcf_filter ,Output, is_complex):
     chrom1=Record.CHROM
     pos1=Record.POS
     chrom2=Record.ALT[0].chr
@@ -673,6 +678,9 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
 
             #Add an extra flag based on both fused genes and produce a list of flags
             FLAGS=Original_vcf_filter+Record.FILTER+annotation1["Flags"]+annotation2["Flags"]
+
+            if is_complex:
+                FLAGS.append("Complex-fusion")
 
             if (((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
                 annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
