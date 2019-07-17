@@ -2,18 +2,21 @@
 
 usage() {
 echo "
+bash NanoFG.sh -f </path/to/fastq> [-s SELECTED_GENES_OR_REGIONS] [-cc] [-df] [-dc]
+OR
+bash NanoFG.sh -b </path/to/bam> [-v </path/to/vcf>] [-s SELECTED_GENES_OR_REGIONS] [-cc] [-df] [-dc]
 
-NanoFG_singlejob.sh -b BAM [-v VCF] [-s SELECTED_GENES_OR_REGIONS] [-df]
 
 Required parameters:
-    -f|--fastq                                                         Path to fastq file
+    -f|--fastqdir                                                      Path to fastq directory
     OR
     -b|--bam                                                           Path to bam file
 
 Optional parameters:
 
 GENERAL
-    -h|--help                                                          Shows help-v|--vcf
+    -h|--help                                                          Shows help
+    -n|--name                                                          Name of the sample used
     -v|--vcf		                                                       Path to vcf file
     -t|--threads                                                       Number of threads
     -e|--venv                                                          Path to virtual environment[${VENV}]
@@ -48,6 +51,7 @@ SV CALLING SETTINGS
     -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
 MAPPING
+    -rf|--reffasta                                                     Reference genome fasta [${REFFASTA}]
     -rg|--refgenome                                                    Reference genome [${REFGENOME}]
     -rd|--refdict                                                      Reference genome .dict file [${REFDICT}]
     -mm2s|--minimap2_settings                                          Minimap2 settings [${MINIMAP2_SETTINGS}]
@@ -141,13 +145,18 @@ do
     exit
     shift # past argument
     ;;
-    -f|--fastq)
-    FASTQ="$2"
+    -f|--fastqdir)
+    FASTQDIR="$2"
     shift # past argument
     shift # past value
     ;;
     -b|--bam)
     BAM="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -n|--name)
+    SAMPLE="$2"
     shift # past argument
     shift # past value
     ;;
@@ -311,20 +320,23 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-if [ -z $BAM ] && [ -z $FASTQ ]; then
-    echo "Missing -f|--fastq OR -b|--bam parameter"
+if [ -z $BAM ] && [ -z $FASTQDIR ]; then
+    echo "Missing -f|--fastqdir OR -b|--bam parameter"
     usage
     exit
 fi
 
 echo -e "`date` \t Running on `uname -n`"
 
-if [ -z $BAM ]; then
-  SAMPLE=$(basename $FASTQ)
-  SAMPLE=${SAMPLE/.fastq/}
-else
-  SAMPLE=$(basename $BAM)
-  SAMPLE=${SAMPLE/.bam/}
+if [ -z $SAMPLE ];then
+  if [ -z $BAM ]; then
+    SAMPLE=$(ls $FASTQDIR/*.fastq | head -n 1)
+    SAMPLE=$(basename $SAMPLE)
+    SAMPLE=${SAMPLE/.fastq/}
+  else
+    SAMPLE=$(basename $BAM)
+    SAMPLE=${SAMPLE/.bam/}
+  fi
 fi
 
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
@@ -362,17 +374,21 @@ fi
 
 . $VENV
 
-################################################## MAPPING OF THE NANOPORE READS USING MINIMAP2
+################################################## MAPPING OF THE NANOPORE READS USING MINIMAP2 (OPTIONAL)
 if [ ! -z $BAM ];then
   echo "### bam (-b) already provided. Skipping minimap2 mapping"
 else
   echo -e "`date` \t Mapping all reads using minimap2..."
+
+  FASTQ=${SAMPLE}.merged.fastq
+  cat $FASTQDIR/*.fastq > $FASTQ
   BAM=${SAMPLE}.bam
+
   bash $PIPELINE_DIR/minimap2_mapping.sh \
     -f $FASTQ \
     -o $BAM \
     -mm2 $MINIMAP2 \
-    -mm2s $MINIMAP2_SETTINGS \
+    -mm2s "$MINIMAP2_SETTINGS" \
     -r $REFFASTA \
     -t $THREADS \
     -s $SAMTOOLS
@@ -473,20 +489,19 @@ if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
   xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
 
 elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
-  MAPPING_ARGS="-mm2 $MINIMAP2 -r $REFFASTA -t $THREADS -s $SAMTOOLS"
+  MAPPING_ARGS="-mm2 $MINIMAP2 -oc -mm2s '$MINIMAP2_SETTINGS' -r $REFFASTA -t $LAST_MAPPING_THREADS -s $SAMTOOLS"
   for FA in $CANDIDATE_DIR/*.fa; do
-    echo $FA;
+    echo ${FA/.fa/};
   done | \
-  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {}.fa -o {}.sorted.bam $MAPPING_ARGS; exit 1;"
 fi
-
 ################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES INTO A SINGLE BAM FILE
 echo -e "`date` \t Merging bams..."
 
-NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.last.sorted.bam | wc -l)
+NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.sorted.bam | wc -l)
 
 if [[ NUMBER_OF_BAMS -gt 1 ]];then
-  $SAMTOOLS merge -f $BAM_MERGE_OUT $CANDIDATE_DIR/*.last.sorted.bam
+  $SAMTOOLS merge -f $BAM_MERGE_OUT $CANDIDATE_DIR/*.sorted.bam
   if [[ $SAMTOOLS == *"samtools"* ]] || [[ $SAMTOOLS == *"Samtools"* ]]; then
     $SAMTOOLS index $BAM_MERGE_OUT
   fi
@@ -508,8 +523,10 @@ echo -e "`date` \t Calling SVs..."
 if [ -z $NANOSV_LAST_CONFIG ]; then
   if [ $CONSENSUS_CALLING = true ];then
     NANOSV_LAST_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
+    SNIFFLES_SETTINGS='-s 1 -n -1 --genotype'
   else
     NANOSV_LAST_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
+    SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
   fi
 fi
 
