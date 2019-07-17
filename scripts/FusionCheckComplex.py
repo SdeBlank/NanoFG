@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import vcf as pyvcf
+import pysam
 from EnsemblRestClient import EnsemblRestClient
 import sys
 import nltk
@@ -20,6 +21,7 @@ parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description='Input parameters for NanoFG.')
 parser.add_argument('-v', '--vcf', type=str, help='Input NanoSV vcf file', required=True)
 parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file', required=True)
+parser.add_argument('-b', '--bam', type=str, help='Input NanoSV vcf file', required=True)
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
 parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', required=True)
@@ -52,7 +54,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
     all_fusions={}
     with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
         vcf_reader=pyvcf.Reader(vcf)
-
+        RECORDS={}
         ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
@@ -64,8 +66,105 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
         else:
             sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
 
-        fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
+        svs_per_read={}
         for record in vcf_reader:
+            RECORDS[record.ID]=record
+            if vcf_type=="NanoSV":
+                compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
+                pos1_orientation=record.ALT[0].orientation
+                pos2_orientation=record.ALT[0].remoteOrientation
+                for supporting_read in record.INFO["ALT_READ_IDS"]:
+                    if supporting_read not in svs_per_read:
+                        svs_per_read[supporting_read]=[record.ID]
+                    else:
+                        svs_per_read[supporting_read].append(record.ID)
+
+        complex_reads={}
+        for key, value in svs_per_read.items():
+            if not len(value)<2:
+                complex_sv="-".join(value)
+                if complex_sv not in complex_reads:
+                    complex_reads[complex_sv]=[key]
+                else:
+                    complex_reads[complex_sv].append(key)
+
+        alignments={}
+        not_unique=[]
+        bamfile = pysam.AlignmentFile(args.bam, "rb" )
+        all_reads=bamfile.fetch(until_eof=True)
+        for complex_sv, reads in complex_reads.items():
+            selected_read=reads[0]
+            for read in all_reads:
+                if not read.seq == None and not read.is_unmapped:
+                    if read.query_name==selected_read:
+                        tags=read.get_tags()
+                        SA_tag=True
+                        for tag in tags:
+                            if "SA" in tag:
+                                SA_tag=True
+                        if SA_tag:
+                            if read.query_name not in alignments:
+                                alignments[read.query_name]=[]
+                            #print(not_unique)
+                            if read not in not_unique:
+                                not_unique.append(read)
+                                if read.is_reverse:
+                                    left_clipped=int(re.findall("\d+", read.cigarstring)[-1])
+                                    right_clipped=int(re.findall("\d+", read.cigarstring)[0])
+                                    start=read.reference_end
+                                    end=read.reference_start
+                                    strand="-"
+                                    # alignments[read.query_name].append([read.reference_name,read.reference_start,read.reference_end,read.cigarstring, "-"])
+                                else:
+                                    left_clipped=int(re.findall("\d+", read.cigarstring)[0])
+                                    right_clipped=int(re.findall("\d+", read.cigarstring)[-1])
+                                    strand="+"
+                                    start=read.reference_start
+                                    end=read.reference_end
+
+                                alignment_info=[read.query_name, read.reference_name, int(start), int(end) , left_clipped, right_clipped, strand]
+                                if alignments[read.query_name]==[]:
+                                    alignments[read.query_name].append(alignment_info)
+                                else:
+                                    compare=copy.deepcopy(alignments[read.query_name])
+                                    for index, alignment in enumerate(compare):
+                                        if left_clipped<alignment[4]:
+                                            alignments[read.query_name].insert(index, alignment_info)
+                                        elif index+1==len(alignments[read.query_name]):
+                                            alignments[read.query_name].append(alignment_info)
+            bnd_info={}
+            BND=1
+            for loc in range(len(alignments[selected_read])-1):
+                bnd_info[BND]=[selected_read , alignments[selected_read][loc][1], int(alignments[selected_read][loc][3]),
+                                alignments[selected_read][loc+1][1], int(alignments[selected_read][loc+1][2])]
+                BND+=1
+
+            Likeliness={}
+
+            for key, value in bnd_info.items():
+                Likeliness[key]={}
+                for SV in complex_sv.split("-"):
+                    if str(RECORDS[SV].CHROM)==value[1] and str(RECORDS[SV].ALT[0].chr)==value[3]:
+                        Likeliness[key][SV]=abs(RECORDS[SV].POS-value[2])+abs(RECORDS[SV].ALT[0].pos-value[4])
+
+
+            order=[]
+            for rank, score in Likeliness.items():
+                closest=1000000
+                for sv_id,distance in score.items():
+                    if distance<closest:
+                        most_likely=sv_id
+                        closest=distance
+                order.append(most_likely)
+            RECORDS[complex_sv]=RECORDS[order[0]]
+            RECORDS[complex_sv].ALT=RECORDS[order[-1]].ALT
+            for record_id in complex_sv.split("-"):
+                del RECORDS[record_id]
+            print(RECORDS.keys())
+        bamfile.close()
+
+        fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
+        for breakpoint_id, record in RECORDS.items():
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
                 record = alt_convert(record)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
@@ -78,6 +177,11 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
                 pos1_orientation=record.ALT[0].orientation
                 pos2_orientation=record.ALT[0].remoteOrientation
+                for supporting_read in record.INFO["ALT_READ_IDS"]:
+                    if supporting_read not in svs_per_read:
+                        svs_per_read[supporting_read]=[record.ID]
+                    else:
+                        svs_per_read[supporting_read].append(record.ID)
             #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
             elif vcf_type=="Sniffles":
                 compared_id=re.findall("^\d+", record.INFO["RNAMES"][0])[0]
@@ -89,8 +193,15 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                     pos2_orientation=False
                 else:
                     pos2_orientation=True
+                for supporting_read in record.INFO["RNAMES"]:
+                    if supporting_read not in svs_per_read:
+                        svs_per_read[supporting_read]=[record.ID]
+                    else:
+                        svs_per_read[supporting_read].append(record.ID)
+
             if compared_id in supporting_reads:
                 original_vcf_info=supporting_reads[compared_id]
+
 
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=ensembl_annotation(chrom1, pos1)
@@ -108,13 +219,15 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
             #Produce output
             for fusion in fusions:
+                if "-" in breakpoint_id:
+                    fusion["Flags"].insert(0, "Complex_fusion")
                 fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
                 str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
 
                 current_fusion=copy.deepcopy(fusion)
-                visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
+                #visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
                 all_fusions[compared_id]=vcf_fusion_info

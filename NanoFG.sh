@@ -2,72 +2,68 @@
 
 usage() {
 echo "
+bash NanoFG.sh -f </path/to/fastq> [-s SELECTED_GENES_OR_REGIONS] [-cc] [-df] [-dc]
+OR
+bash NanoFG.sh -b </path/to/bam> [-v </path/to/vcf>] [-s SELECTED_GENES_OR_REGIONS] [-cc] [-df] [-dc]
+
+
 Required parameters:
-    -v|--vcf		                                                       Path to vcf file
+    -f|--fastqdir                                                      Path to fastq directory
+    OR
     -b|--bam                                                           Path to bam file
 
 Optional parameters:
 
-SELECTION
+GENERAL
+    -h|--help                                                          Shows help
+    -n|--name                                                          Name of the sample used
+    -v|--vcf		                                                       Path to vcf file
+    -t|--threads                                                       Number of threads
+    -e|--venv                                                          Path to virtual environment[${VENV}]
+
+SELECTION AND FILTERING
     -s|--selection                                                     Select genes or areas to check for fusion genes.
                                                                        Insert a list of genes or areas, separated by a comma
                                                                        e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
-
-GENERAL
-    -h|--help                                                          Shows help
-    -o|--outputdir                                                     Path to output directory
-    -d|--nanofg_dir                                                    Directory that contains NanoFG [${NANOFG_DIR}]
-    -e|--venv                                                          Path to virtual environment[${VENV}]
-    -m|--mail                                                          Email adress
-    -df|--dont_filter                                                  Don't filter out all non-PASS SVs
     -dc|--dont_clean                                                   Don't clean up the intermediate files
+    -df|--dont_filter                                                  Don't filter out all non-PASS SVs
+    -cc|--consensus_calling                                            Create a consensus sequence of the fusion-supporting reads. Not recommended on low-coverage data.
+
+OUTPUT
+    -o|--outputdir                                                     Path to output directory
+    -io|--info_output                                                  Path to the NanoFG output info file []
+    -vo|--vcf_output                                                   Path to the NanoFG output vcf file []
+    -p|--pdf                                                           Path to the NanoFG output pdf file []
 
 REQUIRED TOOLS
     -sv|--sv_caller                                                    NanoSV or path to Sniffles [${SV_CALLER}]
-    -nsc|--nanosv_config                                               Path to config to use for nanosv [$NANOSV_CONFIG]
-    -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
-    -sa|--sambamba                                                     Path to sambamba|samtools [${SAMBAMBA}]
+    -sa|--samtools                                                     Path to sambamba|samtools [${SAMTOOLS}]
+    -mm2|--minimap2                                                    Path to minimap2 [${MINIMAP2}]
     -l|--last_dir                                                      Path to LAST directory [${LAST_DIR}]
     -w|--wtdbg2_dir                                                    Path to wtdbg2 directory [${WTDBG2_DIR}]
 
-FUSION READ EXTRACTION
-    -fres|--fusion_read_extraction_script                              Path to the fusion_read_extraction.py script [${FUSION_READ_EXTRACTION_SCRIPT}]
-    -fret|--fusion_read_extraction_threads                             Number of threads [${FUSION_READ_EXTRACTION_THREADS}]
-    -frehv|--fusion_read_extraction_h_vmem                             Fusion read extraction memory [${FUSION_READ_EXTRACTION_MEMORY}]
-    -freht|--fusion_read_extraction_h_rt                               Fusion read extraction time [${FUSION_READ_EXTRACTION_TIME}]
+CONSENSUS CALLING
+    -ccws|--consensus_calling_wtdbg2_settings                          Wtdbg2 settings [${CONSENSUS_CALLING_WTDBG2_SETTINGS}]
 
-CONSENSUS MAPPING
+SV CALLING SETTINGS
+    -nmc|--nanosv_minimap2_config                                      Path to config to use for nanosv [$NANOSV_MINIMAP2_CONFIG]
+    -nlc|--nanosv_last_config                                          NanoSV config to detect SVs in the LAST mapped fusion candidates [${NANOSV_LAST_NOCONSENSUS_CONFIG}]
+    -ss|--sniffles_settings                                            Settings to use for sniffles [$SNIFFLES_SETTINGS]
 
-    -ccws|--consensus_calling_wtdbg2_settings                          wtdbg2 settings [${WTDBG2_SETTINGS}]
-    -cct|--consensus_calling_threads                                   Number of threads [${CONSENSUS_CALLING_THREADS}]
-    -cchv|--consensus_calling_h_vmem                                   Consensus mapping memory [${CONSENSUS_CALLING_MEMORY}]
-    -cchr|--consensus_calling_h_rt                                     Consensus mapping time [${CONSENSUS_CALLING_TIME}]
+MAPPING
+    -rf|--reffasta                                                     Reference genome fasta [${REFFASTA}]
+    -rg|--refgenome                                                    Reference genome [${REFGENOME}]
+    -rd|--refdict                                                      Reference genome .dict file [${REFDICT}]
+    -mm2s|--minimap2_settings                                          Minimap2 settings [${MINIMAP2_SETTINGS}]
+    -lms|--last_mapping_settings                                       LAST settings [${LAST_MAPPING_SETTINGS}]
+    -lmt|--last_mapping_threads                                        Number of threads [${LAST_MAPPING_THREADS}]
 
-LAST_MAPPING
-    -lmr|--last_mapping_refgenome                                      Reference genome [${REF}]
-    -lmrd|--last_mapping_refdict                                       Reference genome .dict file [${REF_DICT}]
-    -lms|--last_mapping_settings                                       LAST settings [${LAST_SETTINGS}]
-    -lmt|--last_mapping_threads                                        Number of threads[$LAST_MAPPING_THREADS]
-    -lmhv|--last_mapping_h_vmem                                        Last mapping memory[$LAST_MAPPING_MEMORY]
-    -lmht|--last_mapping_h_rt                                          Last mapping runtime[$LAST_MAPPING_TIME]
-
-BAM MERGE
-    -bmt|--bam_merge_threads                                           Number of threads [${VCF_SPLIT_THREADS}]
-    -bmhv|--bam_merge_h_vmem                                           Bam merge memory [${VCF_SPLIT_MEMORY}]
-    -bmhr|--bam_merge_h_rt                                             Bam merge time [${VCF_SPLIT_TIME}]
-
-SV CALLING
-    -sct|--sv_calling_threads                                          Number of threads [${SV_CALLING_THREADS}]
-    -schv|--sv_calling_h_vmem                                          SV calling memory [${SV_CALLING_MEMORY}]
-    -schr|--sv_calling_h_rt                                            SV calling time [${SV_CALLING_TIME}]
-
-FUSION CHECK
-    -fcio|--fusion_check_info_output                                   Path to the NanoFG output info file []
-    -fcvo|--fusion_check_vcf_output                                    Path to the NanoFG output vcf file []
-    -fcs|--fusion_check_script                                         Path to vcf_primer_filter.py [$FUSION_CHECK_SCRIPT]
-    -fct|--fusion_check_threads                                        VCF output file [$FUSION_CHECK_THREADS]
-    -fchv|--fusion_check_h_vmem                                        VCF output file [$FUSION_CHECK_MEMORY]
-    -fcht|--fusion_check_h_rt                                          VCF output file [$FUSION_CHECK_TIME]
+PRIMER DESIGN
+    -pdf|--primer_design_flank                                         Flanking distance around to breakpoint to extract [$PRIMER_DESIGN_FLANK]
+    -pdd|--primer_design_dir                                           Path to primer3 directory [$PRIMER_DESIGN_DIR]
+    -pdpt|--primer_design_pcr_type                                     PCR type [$PRIMER_DESIGN_PCR_TYPE]
+    -pdtp|--primer_design_tilling_params                               Tilling params [$PRIMER_DESIGN_TILLING_PARAMS]
+    -pdp|--primer_design_psr                                           PSR [$PRIMER_DESIGN_PSR]
 "
 }
 
@@ -75,79 +71,68 @@ POSITIONAL=()
 
 #GENERAL DEFAULTS
 NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
+
 source $NANOFG_DIR/paths.ini
+
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
-OUTPUTDIR=$(realpath ./)
-echo $OUTPUTDIR
+THREADS=8
+CONSENSUS_CALLING=false
 DONT_CLEAN=false
+DONT_FILTER=false
+
+OUTPUTDIR=$(realpath ./)
 
 #TOOL PATH DEFAULTS
-SAMBAMBA=$PATH_SAMBAMBA
+SAMTOOLS=$PATH_SAMTOOLS
+MINIMAP2=$PATH_MINIMAP2
 LAST_DIR=$PATH_LAST_DIR
 WTDBG2_DIR=$PATH_WTDBG2_DIR
-
-#SV_CALLER='NanoSV'
 SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
-NANOSV_CONFIG=$FILES_DIR/nanosv_last_config.ini
+
+#REFERENCE DEFAULTS
+REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
+REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
+REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+
+#SV CALLING DEFAULTS
+NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
+NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
+NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
 SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
+#SNIFFLES_SETTINGS='-s 2 -n -1 --genotype -d 1'     SETTINGS TO DETECT RECIPROCAL TRANSLOCATIONS
 
 #REGION SELECTION DEFAULTS
 REGION_SELECTION_SCRIPT=$SCRIPT_DIR/RegionSelection.py
 REGION_SELECTION_BED_OUTPUT=$OUTPUTDIR/regions.bed
 REGION_SELECTION_BAM_OUTPUT=$OUTPUTDIR/regions.bam
-REGION_SELECTION_THREADS=8
-REGION_SELECTION_TIME=0:10:0
-REGION_SELECTION_MEMORY=10G
-
-#REGION SV CALLING
-REGION_SELECTION_THREADS=8
-REGION_SELECTION_TIME=0:10:0
-REGION_SELECTION_MEMORY=10G
 
 #FUSION READ EXTRACTION DEFAULTS
 FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
-FUSION_READ_EXTRACTION_THREADS=1
-FUSION_READ_EXTRACTION_TIME=0:30:0
-FUSION_READ_EXTRACTION_MEMORY=10G
+FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 
 #CONSENSUS CALLING DEFAULTS
-CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g'
-CONSENSUS_CALLING_THREADS=8
-CONSENSUS_CALLING_TIME=0:10:0
-CONSENSUS_CALLING_MEMORY=30G
+CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
-#LAST MAPPING DEFAULTS
-LAST_MAPPING_REFGENOME=$PATH_HOMO_SAPIENS_REFGENOME
-LAST_MAPPING_REFDICT=$PATH_HOMO_SAPIENS_REFDICT
+#MAPPING DEFAULTS
+MINIMAP2_SETTINGS='-ax map-ont'
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
-LAST_MAPPING_THREADS=8
-LAST_MAPPING_TIME=0:15:0
-LAST_MAPPING_MEMORY=30G
+LAST_MAPPING_THREADS=1
 
-#BAM MERGE DEFAULTS
-BAM_MERGE_THREADS=1
-BAM_MERGE_TIME=0:5:0
-BAM_MERGE_MEMORY=30G
-
-#SV CALLING DEFAULTS
-SV_CALLING_THREADS=1
-SV_CALLING_TIME=0:5:0
-SV_CALLING_MEMORY=10G
-
-#FUSION CHECK DEFAULTS
-FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
-FUSION_CHECK_THREADS=1
-FUSION_CHECK_TIME=0:10:0
-FUSION_CHECK_MEMORY=5G
-
-#CHECK NANOFG DEFAULTS
-CHECK_NANOFG_THREADS=1
-CHECK_NANOFG_TIME=0:5:0
-CHECK_NANOFG_MEMORY=5G
+#PRIMER DESIGN DEFAULTS
+PRIMER_DESIGN_GETSEQ_SCRIPT=$SCRIPT_DIR/Primerseq.py
+PRIMER_DESIGN_DIR=$PATH_PRIMER_DESIGN_DIR
+PRIMER_DESIGN_BINDIR=$PRIMER_DESIGN_DIR/primers
+PRIMER_DESIGN_GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
+PRIMER_DESIGN_PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
+PRIMER_DESIGN_MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
+PRIMER_DESIGN_PCR_TYPE='single'
+PRIMER_DESIGN_TILLING_PARAMS=''
+PRIMER_DESIGN_PSR='100-200'
+PRIMER_DESIGN_FLANK='200'
 
 
 while [[ $# -gt 0 ]]
@@ -160,8 +145,8 @@ do
     exit
     shift # past argument
     ;;
-    -v|--vcf)
-    VCF="$2"
+    -f|--fastqdir)
+    FASTQDIR="$2"
     shift # past argument
     shift # past value
     ;;
@@ -170,8 +155,33 @@ do
     shift # past argument
     shift # past value
     ;;
+    -n|--name)
+    SAMPLE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -v|--vcf)
+    VCF="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -s|--selection)
     SELECTION="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -io|--info_output)
+    FUSION_CHECK_INFO_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -vo|--vcf_output)
+    FUSION_CHECK_VCF_OUTPUT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -p|--pdf)
+    FUSION_CHECK_PDF_OUTPUT="$2"
     shift # past argument
     shift # past value
     ;;
@@ -185,26 +195,30 @@ do
     shift # past argument
     shift # past value
     ;;
-    -e|--venv)
-    VENV="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -m|--mail)
-    MAIL="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -df|--dont_filter)
-    DONT_FILTER=true
+    -cc|--consensus_calling)
+    CONSENSUS_CALLING=true
     shift # past argument
     ;;
     -dc|--dont_clean)
     DONT_CLEAN=true
     shift # past argument
     ;;
-    -sa|--sambamba)
-    SAMBAMBA="$2"
+    -df|--dont_filter)
+    DONT_FILTER=true
+    shift # past argument
+    ;;
+    -e|--venv)
+    VENV="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -sa|--samtools)
+    SAMTOOLS="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -mm2|--minimap2)
+    MINIMAP2="$2"
     shift # past argument
     shift # past value
     ;;
@@ -223,8 +237,13 @@ do
     shift # past argument
     shift # past value
     ;;
-    -nsc|--nanosv_config)
-    NANOSV_CONFIG="$2"
+    -nmc|--nanosv_minimap2_config)
+    NANOSV_MINIMAP2_CONFIG="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -nlc|--nanosv_last_config)
+    NANOSV_LAST_CONFIG="$2"
     shift # past argument
     shift # past value
     ;;
@@ -233,58 +252,28 @@ do
     shift # past argument
     shift # past value
     ;;
-    -fres|--fusion_read_extraction_script)
-    FUSION_READ_EXTRACTION_SCRIPT="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -fret|--fusion_read_extraction_threads)
-    FUSION_READ_EXTRACTION_THREADS="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -frehv|--fusion_read_extraction_h_vmem)
-    FUSION_READ_EXTRACTION_MEMORY="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -freht|--fusion_read_extraction_h_rt)
-    FUSION_READ_EXTRACTION_TIME="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -ccws|--consensus_calling_wtdbg2_settings)
     CONSENSUS_CALLING_WTDBG2_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
-    -cct|--consensus_calling_threads)
-    CONSENSUS_CALLING_THREADS="$2"
+    -rf|--reffasta)
+    REFFASTA="$2"
     shift # past argument
     shift # past value
     ;;
-    -cchv|--consensus_calling_h_vmem)
-    CONSENSUS_CALLING_MEMORY="$2"
+    -rg|--refgenome)
+    REFGENOME="$2"
     shift # past argument
     shift # past value
     ;;
-    -cchr|--consensus_calling_h_rt)
-    CONSENSUS_CALLING_TIME="$2"
+    -rd|--refdict)
+    REFDICT="$2"
     shift # past argument
     shift # past value
     ;;
-    -lmt|--last_mapping_threads)
-    LAST_MAPPING_THREADS="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -lmr|--last_mapping_refgenome)
-    LAST_MAPPING_REFGENOME="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -lmrd|--last_mapping_refdict)
-    LAST_MAPPING_REFDICT="$2"
+    -mm2s|--minimap2_settings)
+    MINIMAP2_SETTINGS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -293,73 +282,33 @@ do
     shift # past argument
     shift # past value
     ;;
-    -lmhv|--last_mapping_h_vmem)
-    LAST_MAPPING_MEMORY="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -lmht|--last_mapping_h_rt)
-    LAST_MAPPING_TIME="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -bmt|vcf_split_threads)
-    BAM_MERGE_THREADS="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -bmhv|vcf_split_h_vmem)
-    BAM_MERGE_MEMORY="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -bmhr|vcf_split_h_rt)
-    BAM_MERGE_TIME="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -sct|sv_calling_threads)
-    SV_CALLING_THREADS="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -schv|sv_calling_h_vmem)
-    SV_CALLING_MEMORY="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -schr|sv_calling_h_rt)
-    SV_CALLING_TIME="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -fcio|--fusion_check_info_output)
-    FUSION_CHECK_INFO_OUTPUT="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -fcvo|--fusion_check_vcf_output)
-    FUSION_CHECK_VCF_OUTPUT="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -fcs|--fusion_check_script)
     FUSION_CHECK_SCRIPT="$2"
     shift # past argument
     shift # past value
     ;;
-    -fct|--fusion_check_threads)
-    FUSION_CHECK_THREADS="$2"
+    -pdf|--primer_design_flank)
+    PRIMER_DESIGN_FLANK="$2"
     shift # past argument
     shift # past value
     ;;
-    -fchv|--fusion_check_h_vmem)
-    FUSION_CHECK_MEMORY="$2"
+    -pdd|--primer_design_dir)
+    PRIMER_DESIGN_DIR="$2"
     shift # past argument
     shift # past value
     ;;
-    -fcht|--fusion_check_h_rt)
-    FUSION_CHECK_TIME="$2"
+    -pdpt|--primer_design_pcr_type)
+    PRIMER_DESIGN_PCR_TYPE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -pdtp|--primer_design_tilling_params)
+    PRIMER_DESIGN_TILLING_PARAMS="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -pdp|--primer_design_psr)
+    PRIMER_DESIGN_PSR="$2"
     shift # past argument
     shift # past value
     ;;
@@ -371,498 +320,333 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-if [ -z $BAM ]; then
-    echo "Missing -b|--bam parameter"
+if [ -z $BAM ] && [ -z $FASTQDIR ]; then
+    echo "Missing -f|--fastqdir OR -b|--bam parameter"
     usage
     exit
 fi
 
-if [ -z $VCF ]; then
-    VCF=./$(basename $BAM)
-    VCF=$OUTPUTDIR/${BAM/.bam/.vcf}
+echo -e "`date` \t Running on `uname -n`"
+
+if [ -z $SAMPLE ];then
+  if [ -z $BAM ]; then
+    SAMPLE=$(ls $FASTQDIR/*.fastq | head -n 1)
+    SAMPLE=$(basename $SAMPLE)
+    SAMPLE=${SAMPLE/.fastq/}
+  else
+    SAMPLE=$(basename $BAM)
+    SAMPLE=${SAMPLE/.bam/}
+  fi
 fi
 
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
-    FUSION_CHECK_VCF_OUTPUT=./$(basename $VCF)
-    FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_VCF_OUTPUT/.vcf/_FusionGenes.vcf}
+    FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.vcf
 fi
 
 if [ -z $FUSION_CHECK_INFO_OUTPUT ]; then
-    FUSION_CHECK_INFO_OUTPUT=./$(basename $VCF)
-    FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${FUSION_CHECK_INFO_OUTPUT/.vcf/_FusionGenesInfo.txt}
+    FUSION_CHECK_INFO_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenesInfo.txt
 fi
 
-echo `date`: Running on `uname -n`
+if [ -z $FUSION_CHECK_PDF_OUTPUT ]; then
+    FUSION_CHECK_PDF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.pdf
+fi
 
-VCF_NAME=$(basename $VCF)
-VCF_NAME=${VCF_NAME/.vcf/}
-VCF_OUTPUT=$OUTPUTDIR/${VCF_NAME}_FusionGenes.vcf
-INFO_OUTPUT=$OUTPUTDIR/${VCF_NAME}_FusionGenesInfo.txt
+VCF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.vcf
+INFO_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenesInfo.txt
 
 PIPELINE_DIR=$NANOFG_DIR/pipeline
 SCRIPT_DIR=$NANOFG_DIR/scripts
-JOB_DIR=$OUTPUTDIR/jobs
-LOG_DIR=$OUTPUTDIR/logs
 CANDIDATE_DIR=$OUTPUTDIR/candidate_fusions
+PRIMER_DIR=$OUTPUTDIR/primers
 
-REGION_SELECTION_JOBNAME=${VCF_NAME}_REGION_SELECTION
-REGION_SELECTION_SH=$JOB_DIR/$REGION_SELECTION_JOBNAME.sh
-REGION_SELECTION_ERR=$LOG_DIR/$REGION_SELECTION_JOBNAME.err
-REGION_SELECTION_LOG=$LOG_DIR/$REGION_SELECTION_JOBNAME.log
+BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
+SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
-FUSION_READ_EXTRACTION_JOBNAME=${VCF_NAME}_FUSION_READ_EXTRACTION
-FUSION_READ_EXTRACTION_SH=$JOB_DIR/$FUSION_READ_EXTRACTION_JOBNAME.sh
-FUSION_READ_EXTRACTION_ERR=$LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.err
-FUSION_READ_EXTRACTION_LOG=$LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.log
+if [ -d $CANDIDATE_DIR ]; then
+  rm $CANDIDATE_DIR/*
+else
+  mkdir -p $CANDIDATE_DIR
+fi
 
-CONSENSUS_CALLING_JOBNAME=${VCF_NAME}_CONSENSUS_CALLING
-CONSENSUS_CALLING_SH=$JOB_DIR/$CONSENSUS_CALLING_JOBNAME.sh
-CONSENSUS_CALLING_ERR=$LOG_DIR/$CONSENSUS_CALLING_JOBNAME.err
-CONSENSUS_CALLING_LOG=$LOG_DIR/$CONSENSUS_CALLING_JOBNAME.log
-
-LAST_MAPPING_JOBNAME=${VCF_NAME}_LAST_MAPPING
-LAST_MAPPING_SH=$JOB_DIR/$LAST_MAPPING_JOBNAME.sh
-LAST_MAPPING_ERR=$LOG_DIR/$LAST_MAPPING_JOBNAME.err
-LAST_MAPPING_LOG=$LOG_DIR/$LAST_MAPPING_JOBNAME.log
-
-BAM_MERGE_JOBNAME=${VCF_NAME}_BAM_MERGE
-BAM_MERGE_SH=$JOB_DIR/$BAM_MERGE_JOBNAME.sh
-BAM_MERGE_ERR=$LOG_DIR/$BAM_MERGE_JOBNAME.err
-BAM_MERGE_LOG=$LOG_DIR/$BAM_MERGE_JOBNAME.log
-BAM_MERGE_OUT=$OUTPUTDIR/consensus_last.sorted.bam
-
-SV_CALLING_JOBNAME=${VCF_NAME}_SV_CALLING
-SV_CALLING_SH=$JOB_DIR/$SV_CALLING_JOBNAME.sh
-SV_CALLING_ERR=$LOG_DIR/$SV_CALLING_JOBNAME.err
-SV_CALLING_LOG=$LOG_DIR/$SV_CALLING_JOBNAME.log
-SV_CALLING_OUT=$OUTPUTDIR/consensus_nanosv.vcf
-
-FUSION_CHECK_JOBNAME=${VCF_NAME}_FUSION_CHECK
-FUSION_CHECK_SH=$JOB_DIR/$FUSION_CHECK_JOBNAME.sh
-FUSION_CHECK_ERR=$LOG_DIR/$FUSION_CHECK_JOBNAME.err
-FUSION_CHECK_LOG=$LOG_DIR/$FUSION_CHECK_JOBNAME.log
-
-CHECK_NANOFG_JOBNAME=${VCF_NAME}_CHECKSHARC
-CHECK_NANOFG_SH=$JOB_DIR/$CHECK_NANOFG_JOBNAME.sh
-CHECK_NANOFG_ERR=$LOG_DIR/$CHECK_NANOFG_JOBNAME.err
-CHECK_NANOFG_LOG=$LOG_DIR/$CHECK_NANOFG_JOBNAME.log
-CHECK_NANOFG_OUT=$OUTPUTDIR/$VCF_NAME'.check'
-
-mkdir -p $CANDIDATE_DIR
 if [ ! -d $CANDIDATE_DIR ]; then
     exit
 fi
 
-mkdir -p $JOB_DIR
-if [ ! -d $JOB_DIR ]; then
-    exit
+. $VENV
+
+################################################## MAPPING OF THE NANOPORE READS USING MINIMAP2 (OPTIONAL)
+if [ ! -z $BAM ];then
+  echo "### bam (-b) already provided. Skipping minimap2 mapping"
+else
+  echo -e "`date` \t Mapping all reads using minimap2..."
+
+  FASTQ=${SAMPLE}.merged.fastq
+  cat $FASTQDIR/*.fastq > $FASTQ
+  BAM=${SAMPLE}.bam
+
+  bash $PIPELINE_DIR/minimap2_mapping.sh \
+    -f $FASTQ \
+    -o $BAM \
+    -mm2 $MINIMAP2 \
+    -mm2s "$MINIMAP2_SETTINGS" \
+    -r $REFFASTA \
+    -t $THREADS \
+    -s $SAMTOOLS
 fi
 
-mkdir -p $LOG_DIR
-if [ ! -d $LOG_DIR ]; then
-    exit
-fi
-
-region_selection(){
-
-cat << EOF > $REGION_SELECTION_SH
-#!/bin/bash
-
-#$ -N $REGION_SELECTION_JOBNAME
-#$ -cwd
-#$ -pe threaded $REGION_SELECTION_THREADS
-#$ -l h_vmem=$REGION_SELECTION_MEMORY
-#$ -l h_rt=$REGION_SELECTION_TIME
-#$ -e $REGION_SELECTION_ERR
-#$ -o $REGION_SELECTION_LOG
-
-echo \`date\`: Running on \`uname -n\`
-
-if [ ! -e $LOG_DIR/${REGION_SELECTION_JOBNAME}.done ]; then
+################################################## SELECTION OF REGIONS THAT ARE SPECIFIED BY THE USER (OPTIONAL)
+if [ ! -z $VCF ];then
+  REGION_SELECTION_BAM_OUTPUT=$BAM
+  echo "### vcf (-v) already provided. Skipping selection and sv calling"
+elif [ -z $SELECTION ];then
+  REGION_SELECTION_BAM_OUTPUT=$BAM
+  echo "### No selection parameter (-s) provided. Using all mapped reads"
+else
+  echo -e "`date` \t Selecting regions to check for fusion genes..."
   python $REGION_SELECTION_SCRIPT \
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
 
-  $SAMBAMBA view -h -f bam -L $REGION_SELECTION_BED_OUTPUT -o $REGION_SELECTION_BAM_OUTPUT $BAM
+  REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
+  $SAMTOOLS view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
+  $SAMTOOLS view -@ $THREADS -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
+  $SAMTOOLS view  -@ $THREADS $BAM | grep -f reads.tmp >> $REGION_SELECTION_SAM_OUTPUT
+  $SAMTOOLS view  -@ $THREADS -h -S -f bam $REGION_SELECTION_SAM_OUTPUT | $SAMTOOLS sort -o $REGION_SELECTION_BAM_OUTPUT /dev/stdin
+  $SAMTOOLS index $REGION_SELECTION_BAM_OUTPUT
+  rm reads.tmp
+  rm $REGION_SELECTION_SAM_OUTPUT
 fi
 
-echo \`date\`: Done
-EOF
-qsub $FUSION_READ_EXTRACTION_SH
-}
+################################################## CALLING OF SVS ON GIVEN BAM FILE (OPTIONAL)
+if [ -z $VCF ]; then
+  echo -e "`date` \t SV calling..."
+  VCF=$OUTPUTDIR/${SAMPLE}.vcf
+  bash $PIPELINE_DIR/sv_calling.sh \
+    -sv $SV_CALLER \
+    -b $REGION_SELECTION_BAM_OUTPUT \
+    -t $THREADS \
+    -s $SAMTOOLS \
+    -v $VENV \
+    -c $NANOSV_MINIMAP2_CONFIG \
+    -ss "$SNIFFLES_SETTINGS" \
+    -o $VCF
+fi
 
-fusion_read_extraction(){
+################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
-cat << EOF > $FUSION_READ_EXTRACTION_SH
-#!/bin/bash
+VCF_FILTERED=${OUTPUTDIR}/$(basename $VCF)
 
-#$ -N $FUSION_READ_EXTRACTION_JOBNAME
-#$ -cwd
-#$ -pe threaded $FUSION_READ_EXTRACTION_THREADS
-#$ -l h_vmem=$FUSION_READ_EXTRACTION_MEMORY
-#$ -l h_rt=$FUSION_READ_EXTRACTION_TIME
-#$ -e $FUSION_READ_EXTRACTION_ERR
-#$ -o $FUSION_READ_EXTRACTION_LOG
-
-echo \`date\`: Running on \`uname -n\`
-
-VCF_NO_INS=${VCF/.vcf/_noINS.vcf}
-VCF_NO_INS=${OUTPUTDIR}/\$(basename \$VCF_NO_INS)
-
-if [ -z $DONT_FILTER ];then
-  grep "^#" $VCF > \$VCF_NO_INS
-  grep -v "^#" $VCF | awk '\$5!="<INS>"' | awk '\$7=="PASS"' >> \$VCF_NO_INS
+if [ $DONT_FILTER = false ];then
+  echo -e "`date` \t Removing insertions and all variants without a PASS filter..."
+  VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS_PASS.vcf}
+  grep "^#" $VCF > $VCF_FILTERED
+  grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_FILTERED
 else
-  grep "^#" $VCF > \$VCF_NO_INS
-  grep -v "^#" $VCF | awk '\$5!="<INS>"' >> \$VCF_NO_INS
+  echo -e "`date` \t Removing insertions..."
+  VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS.vcf}
+  grep "^#" $VCF > $VCF_FILTERED
+  grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_FILTERED
 fi
 
-if [ ! -e ${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
-  . $VENV
-  python $FUSION_READ_EXTRACTION_SCRIPT \
+##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
+echo -e "`date` \t Extracting reads that support candidate fusion genes..."
+
+python $FUSION_READ_EXTRACTION_SCRIPT \
   -b $BAM \
-  -v \$VCF_NO_INS \
-  -o $CANDIDATE_DIR/
+  -v $VCF_FILTERED \
+  -o $CANDIDATE_DIR
 
-  NUMBER_OF_CANDIDATE_FUSIONS=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
-  FINISHED="\$( tail -n 2 ${FUSION_READ_EXTRACTION_LOG} | grep "End" | wc -l | grep -oP "(^\d+)")"
-
-  if [ \$FINISHED -ne 0 ]; then
-    if [ \$NUMBER_OF_CANDIDATE_FUSIONS -ne 0 ];then
-      echo "NUMBER OF FUSION CANDIDATES: \$NUMBER_OF_CANDIDATE_FUSIONS" >&1
-      touch $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done
-    else
-      echo "No fusion candidates found" >&1
-      exit
-    fi
-  else
-    echo "Fusion read extraction did not complete; Increase FUSION_READ_EXTRACTION_MEMORY or FUSION_READ_EXTRACTION_TIME" >&2
-    exit
-  fi
+################################################## CREATION OF A CONSENSUS SEQUENCE OF THE READS THAT SUPPORT A SV (OPTIONAL, NOT RECOMMENDED IF LOW COVERAGE DATA)
+if [ $CONSENSUS_CALLING = true ];then
+  echo -e "`date` \t Producing consensus if possible..."
+else
+  echo -e "`date` \t Consensus calling not activated. Use '-cc' to turn consensus calling on"
 fi
 
-echo \`date\`: Done
-EOF
-qsub $FUSION_READ_EXTRACTION_SH
-}
-
-
-#PUT OUTPUTFILE FROM THIS SCRIPT TO MAKE OUTPUT, OTHERWISE CHECKING IF FILES EXIST IS HARDER
-consensus_calling(){
-
-cat << EOF > $CONSENSUS_CALLING_SH
-#!/bin/bash
-
-#$ -N $CONSENSUS_CALLING_JOBNAME
-#$ -cwd
-#$ -pe threaded $CONSENSUS_CALLING_THREADS
-#$ -l h_vmem=$CONSENSUS_CALLING_MEMORY
-#$ -l h_rt=$CONSENSUS_CALLING_TIME
-#$ -e $CONSENSUS_CALLING_ERR
-#$ -o $CONSENSUS_CALLING_LOG
-#$ -hold_jid $FUSION_READ_EXTRACTION_JOBNAME
-
-echo \`date\`: Running on \`uname -n\`
-
-if [ -e $LOG_DIR/${FUSION_READ_EXTRACTION_JOBNAME}.done ]; then
-  if [ ! -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
-    for FASTA in $CANDIDATE_DIR/*.fasta; do
-      bash $PIPELINE_DIR/consensus_calling.sh \
-      -f \$FASTA \
-      -t $CONSENSUS_CALLING_THREADS \
+for FASTA in $CANDIDATE_DIR/*.fasta; do
+  if [ $CONSENSUS_CALLING = true ];then
+    bash $PIPELINE_DIR/consensus_calling.sh \
+      -f $FASTA \
+      -t $THREADS \
       -w $WTDBG2_DIR \
-      -ws '$CONSENSUS_CALLING_WTDBG2_SETTINGS'
-    done
-
-    NUMBER_FASTA_INPUT=\$(ls $CANDIDATE_DIR/*.fasta | wc -l | grep -oP "(^\d+)")
-    NUMBER_CONTIG_OUTPUT=\$(ls $CANDIDATE_DIR/*.ctg.fa | wc -l | grep -oP "(^\d+)")
-
-    if [ \$NUMBER_FASTA_INPUT -eq \$NUMBER_CONTIG_OUTPUT ];then
-      touch $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done
-    else
-      echo "Number of made contig files (\${NUMBER_CONTIG_OUTPUT}) is not equal to the nubmer of input fasta files (\${NUMBER_FASTA_INPUT}) " >&2
-    fi
-
+      -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
   fi
-fi
 
-echo \`date\`: Done
-EOF
-qsub $CONSENSUS_CALLING_SH
-}
-
-last_mapping() {
-
-cat << EOF > $LAST_MAPPING_SH
-#!/bin/bash
-
-#$ -N $LAST_MAPPING_JOBNAME
-#$ -cwd
-#$ -pe threaded $LAST_MAPPING_THREADS
-#$ -l h_vmem=$LAST_MAPPING_MEMORY
-#$ -l h_rt=$LAST_MAPPING_TIME
-#$ -e $LAST_MAPPING_ERR
-#$ -o $LAST_MAPPING_LOG
-#$ -hold_jid $CONSENSUS_CALLING_JOBNAME
-
-echo \`date\`: Running on \`uname -n\`
-
-if [ -e $LOG_DIR/${CONSENSUS_CALLING_JOBNAME}.done ]; then
-  if [ ! -e $LOG_DIR/${LAST_MAPPING_JOBNAME}.done ]; then
-    LAST_MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $LAST_MAPPING_REFGENOME -rd $LAST_MAPPING_REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMBAMBA"
-
-    for FA in $CANDIDATE_DIR/*.fa; do
-      echo \$FA;
-    done | \
-    xargs -I{} --max-procs $LAST_MAPPING_THREADS bash -c "echo 'Start' {}; bash $PIPELINE_DIR/last_mapping.sh -f {} \$LAST_MAPPING_ARGS; echo 'Done' {}; exit 1;"
-
-    ERROR=\$(cat $LAST_MAPPING_ERR | wc -l | grep -oP "(^\d+)")
-    NUMBER_FA_INPUT=\$(ls $CANDIDATE_DIR/*.ctg.fa | wc -l | grep -oP "(^\d+)")
-    NUMBER_BAM_OUTPUT=\$(ls $CANDIDATE_DIR/*.ctg.last.sorted.bam | wc -l | grep -oP "(^\d+)")
-
-    if [ \$ERROR -eq 0 ];then
-      if [ \$NUMBER_FA_INPUT -eq \$NUMBER_BAM_OUTPUT ];then
-        touch $LOG_DIR/${LAST_MAPPING_JOBNAME}.done
-      else
-        echo "Number of output bam files (\${NUMBER_BAM_OUTPUT}) is not equal to the number of input contig fasta files (\${NUMBER_FA_INPUT})" >&2
-        exit
-      fi
-    else
-      exit
-    fi
+  if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ] && [ $CONSENSUS_CALLING = false ];then
+    ln -s $FASTA ${FASTA/.fasta/.no_ctg.fa}
   fi
+done
+
+################################################## MAPPING OF THE READS (OR CONSENSUS) USING LAST FOR NANOSV AND MINIMAP2 FOR SNIFFLES.
+################################################## LAST IS PREFERRED FOR ACCURATE EXON-EXON FUSION DETECTION
+echo -e "`date` \t Mapping candidate fusion genes..."
+
+if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
+  MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $REFGENOME -rd $REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
+  for FA in $CANDIDATE_DIR/*.fa; do
+    echo $FA;
+  done | \
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
+
+elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  MAPPING_ARGS="-mm2 $MINIMAP2 -oc -mm2s '$MINIMAP2_SETTINGS' -r $REFFASTA -t $LAST_MAPPING_THREADS -s $SAMTOOLS"
+  for FA in $CANDIDATE_DIR/*.fa; do
+    echo ${FA/.fa/};
+  done | \
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {}.fa -o {}.sorted.bam $MAPPING_ARGS; exit 1;"
 fi
+################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES INTO A SINGLE BAM FILE
+echo -e "`date` \t Merging bams..."
 
-echo \`date\`: Done
-EOF
-qsub $LAST_MAPPING_SH
-}
+NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.sorted.bam | wc -l)
 
-bam_merge() {
-
-cat << EOF > $BAM_MERGE_SH
-#!/bin/bash
-
-#$ -N $BAM_MERGE_JOBNAME
-#$ -cwd
-#$ -pe threaded $BAM_MERGE_THREADS
-#$ -l h_vmem=$BAM_MERGE_MEMORY
-#$ -l h_rt=$BAM_MERGE_TIME
-#$ -e $BAM_MERGE_ERR
-#$ -o $BAM_MERGE_LOG
-#$ -hold_jid $LAST_MAPPING_JOBNAME
-
-echo \`date\`: Running on \`uname -n\`
-
-if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
-  if [ ! -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
-    bash $PIPELINE_DIR/bam_merge.sh \
-      -d $CANDIDATE_DIR \
-      -s $SAMBAMBA \
-      -o $BAM_MERGE_OUT
-
-    if [ -e $BAM_MERGE_OUT ];then
-      touch $LOG_DIR/$BAM_MERGE_JOBNAME.done
-    else
-      "BAM merge did not complete correctly" >&2
-    fi
+if [[ NUMBER_OF_BAMS -gt 1 ]];then
+  $SAMTOOLS merge -f $BAM_MERGE_OUT $CANDIDATE_DIR/*.sorted.bam
+  if [[ $SAMTOOLS == *"samtools"* ]] || [[ $SAMTOOLS == *"Samtools"* ]]; then
+    $SAMTOOLS index $BAM_MERGE_OUT
   fi
-fi
-echo \`date\`: Done
-EOF
-qsub $BAM_MERGE_SH
-}
-
-sv_calling() {
-cat << EOF > $SV_CALLING_SH
-#!/bin/bash
-#$ -N $SV_CALLING_JOBNAME
-#$ -cwd
-#$ -pe threaded $SV_CALLING_THREADS
-#$ -l h_vmem=$SV_CALLING_MEMORY
-#$ -l h_rt=$SV_CALLING_TIME
-#$ -e $SV_CALLING_ERR
-#$ -o $SV_CALLING_LOG
-EOF
-
-if [ ! -z $BAM_MERGE_JOBNAME ]; then
-cat << EOF >> $SV_CALLING_SH
-#$ -hold_jid $BAM_MERGE_JOBNAME
-EOF
+elif [[ NUMBER_OF_BAMS -eq 1 ]];then
+  cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
+  cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
+else
+  echo "NO CANDIDATE FUSION GENES FOUND"
+  exit
 fi
 
-cat << EOF >> $SV_CALLING_SH
-echo \`date\`: Running on \`uname -n\`
-if [ -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
-    bash $PIPELINE_DIR/sv_calling.sh \
-      -sv $SV_CALLER \
-      -b $BAM_MERGE_OUT \
-      -t $SV_CALLING_THREADS \
-      -s $SAMBAMBA \
-      -v $VENV \
-      -c $NANOSV_CONFIG \
-      -ss $SNIFFLES_SETTINGS \
-      -o $SV_CALLING_OUT
-    NUMBER_OF_LINES_VCF=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
-    if [ \$NUMBER_OF_LINES_VCF -ne 0 ]; then
-      touch $LOG_DIR/$SV_CALLING_JOBNAME.done
-    else
-      echo "Consensus VCF file is empty" >&2
-      exit
-    fi
+if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  $SAMTOOLS calmd $BAM_MERGE_OUT $REFFASTA -b > temp.bam
+  mv temp.bam $BAM_MERGE_OUT
+  $SAMTOOLS index $BAM_MERGE_OUT
 fi
-echo \`date\`: Done
-EOF
-qsub $SV_CALLING_SH
-}
-
-fusion_check() {
-cat << EOF > $FUSION_CHECK_SH
-#!/bin/bash
-#$ -N $FUSION_CHECK_JOBNAME
-#$ -cwd
-#$ -pe threaded $FUSION_CHECK_THREADS
-#$ -l h_vmem=$FUSION_CHECK_MEMORY
-#$ -l h_rt=$FUSION_CHECK_TIME
-#$ -e $FUSION_CHECK_ERR
-#$ -o $FUSION_CHECK_LOG
-#$ -hold_jid $SV_CALLING_JOBNAME
-
-echo \`date\`: Running on \`uname -n\`
-if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ];then
-  bash $PIPELINE_DIR/fusion_check.sh \
-    -v $SV_CALLING_OUT \
-    -o $FUSION_CHECK_VCF_OUTPUT \
-    -fo $FUSION_CHECK_INFO_OUTPUT \
-    -s $FUSION_CHECK_SCRIPT \
-    -e $VENV
-
-  NUMBER_VCF_INPUT=\$(grep -v "^#" $SV_CALLING_OUT | wc -l | grep -oP "(^\d+)")
-  NUMBER_VCF_OUTPUT=\$(grep -v "^#" $FUSION_CHECK_VCF_OUTPUT | wc -l | grep -oP "(^\d+)")
-
-  FINISHED="\$(tail -n 2 $FUSION_CHECK_LOG | grep -o "End\|Done" | wc -l | grep -oP "(^\d+)")"
-
-  if [ \$FINISHED -eq 2 ]; then
-    if [ $NUMBER_VCF_INPUT -eq $NUMBER_VCF_OUTPUT ]; then
-      touch $LOG_DIR/$FUSION_CHECK_JOBNAME.done
-    else
-      echo "Number of lines in all split VCF files (\${NUMBER_VCF_OUTPUT}) is not equal to the number of lines in the original VCF file (\${NUMBER_VCF_INPUT})" >&2
-      exit
-    fi
+################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
+echo -e "`date` \t Calling SVs..."
+if [ -z $NANOSV_LAST_CONFIG ]; then
+  if [ $CONSENSUS_CALLING = true ];then
+    NANOSV_LAST_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
+    SNIFFLES_SETTINGS='-s 1 -n -1 --genotype'
   else
-    echo "Fusion check did not complete; Increase FUSION_CHECK_MEMORY or FUSION_CHECK_TIME" >&2
-    exit
+    NANOSV_LAST_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
+    SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
   fi
 fi
-echo \`date\`: Done
-EOF
-qsub $FUSION_CHECK_SH
-}
 
-check_NanoFG() {
-cat << EOF > $CHECK_NANOFG_SH
-#!/bin/bash
-#$ -N $CHECK_NANOFG_JOBNAME
-#$ -cwd
-#$ -pe threaded $CHECK_NANOFG_THREADS
-#$ -l h_vmem=$CHECK_NANOFG_MEMORY
-#$ -l h_rt=$CHECK_NANOFG_TIME
-#$ -e $CHECK_NANOFG_ERR
-#$ -o $CHECK_NANOFG_LOG
-#$ -hold_jid $FUSION_CHECK_JOBNAME
+bash $PIPELINE_DIR/sv_calling.sh \
+  -sv $SV_CALLER \
+  -b $BAM_MERGE_OUT \
+  -t $THREADS \
+  -s $SAMTOOLS \
+  -v $VENV \
+  -c $NANOSV_LAST_CONFIG \
+  -ss "$SNIFFLES_SETTINGS" \
+  -o $SV_CALLING_OUT
 
-echo \`date\`: Running on \`uname -n\`
-CHECK_BOOL=true
-echo "------------------------------------------------" >> $CHECK_NANOFG_OUT
-echo "\`date\`" >> $CHECK_NANOFG_OUT
-echo "Sample name: $VCF_NAME" >> $CHECK_NANOFG_OUT
+# if [ $CONSENSUS_CALLING = true ];then
+#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
+# else
+#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
+# fi
+#
+# for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
+#   echo ${CANDIDATE_BAM/.bam/};
+# done | \
+# xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/sv_calling.sh -b {}.bam -o {}.vcf $SV_CALLING_SETTINGS; exit 1;"
+#
+# grep "^#" $(ls $CANDIDATE_DIR/*.last.sorted.vcf | head -n 1) > $SV_CALLING_OUT
+# for CANDIDATE_VCF in $CANDIDATE_DIR/*.last.sorted.vcf; do
+#   grep -v "^#" $CANDIDATE_VCF >> $SV_CALLING_OUT
+# done
 
-if [ -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
-  echo "Fusion read extraction: Done" >> $CHECK_NANOFG_OUT
+################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
+
+if [ $DONT_FILTER = false ];then
+  SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS_PASS.vcf}
+  echo -e "`date` \t Removing insertions and all variants without a PASS filter..."
+  grep "^#" $SV_CALLING_OUT > $SV_CALLING_OUT_FILTERED
+  grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $SV_CALLING_OUT_FILTERED
 else
-  echo "Fusion read extraction: Fail" >> $CHECK_NANOFG_OUT
-  CHECK_BOOL=false
+  SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS.vcf}
+  echo -e "`date` \t Removing insertions..."
+  grep "^#" $SV_CALLING_OUT > $SV_CALLING_OUT_FILTERED
+  grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' >> $SV_CALLING_OUT_FILTERED
 fi
 
-if [ -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
-    echo "Consensus calling: Done" >> $CHECK_NANOFG_OUT
-else
-    echo "Consensus calling: Fail" >> $CHECK_NANOFG_OUT
-    CHECK_BOOL=false
+################################################### CHECKING THE CANDIDATE FUSION GENES FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
+echo -e "`date` \t Checking fusion candidates..."
+
+python $FUSION_CHECK_SCRIPT \
+  -v $SV_CALLING_OUT_FILTERED \
+  -ov $VCF \
+  -o $FUSION_CHECK_VCF_OUTPUT \
+  -fo $FUSION_CHECK_INFO_OUTPUT \
+  -p $FUSION_CHECK_PDF_OUTPUT
+
+################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
+echo -e "`date` \t Designing primers around fusion breakpoints..."
+mkdir -p $PRIMER_DIR
+if [ ! -d $PRIMER_DIR ]; then
+  exit
 fi
 
-if [ -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
-    echo "Last mapping: Done" >> $CHECK_NANOFG_OUT
-else
-    echo "Last mapping: Fail" >> $CHECK_NANOFG_OUT
-    CHECK_BOOL=false
+python $PRIMER_DESIGN_GETSEQ_SCRIPT \
+ -v $FUSION_CHECK_VCF_OUTPUT \
+ -d $PRIMER_DIR \
+ -f $PRIMER_DESIGN_FLANK
+
+mkdir -p $PRIMER_DIR/tmp
+if [ ! -d $PRIMER_DIR/tmp ]; then
+ exit
 fi
 
-if [ -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
-    echo "Bam merge: Done" >> $CHECK_NANOFG_OUT
-else
-    echo "Bam merge: Fail" >> $CHECK_NANOFG_OUT
-    CHECK_BOOL=false
-fi
-
-if [ -e $LOG_DIR/$SV_CALLING_JOBNAME.done ]; then
-    echo "SV calling: Done" >> $CHECK_NANOFG_OUT
-else
-    echo "SV calling: Fail" >> $CHECK_NANOFG_OUT
-    CHECK_BOOL=false
-fi
-
-if [ -e $LOG_DIR/$FUSION_CHECK_JOBNAME.done ]; then
-    echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
-else
-    echo "Fusion check: Fail" >> $CHECK_NANOFG_OUT
-    CHECK_BOOL=false
-fi
-
-if [ \$CHECK_BOOL = true ]; then
-  echo "Fusion check: Done" >> $CHECK_NANOFG_OUT
-    touch $LOG_DIR/$CHECK_NANOFG_JOBNAME.done
-    if [ $DONT_CLEAN = false ]; then
-      rm -rf $CANDIDATE_DIR
-      rm $BAM_MERGE_OUT
-      rm $SV_CALLING_OUT
+if [ -d $PRIMER_DESIGN_DIR ];then
+  cd $PRIMER_DIR/tmp
+  for FUSION_FASTA in $PRIMER_DIR/*.fasta; do
+    if [ -z $PRIMER_DESIGN_TILLING_PARAMS ]; then
+      bash $PIPELINE_DIR/primer_design.sh \
+       -f $FUSION_FASTA \
+       -o ${FUSION_FASTA/.fasta/.primers} \
+       -pdb $PRIMER_DESIGN_BINDIR \
+       -pdpt $PRIMER_DESIGN_PCR_TYPE \
+       -psr $PRIMER_DESIGN_PSR \
+       -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
+       -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
+       -pdm $PRIMER_DESIGN_MISPRIMING
+    else
+      bash $PIPELINE_DIR/primer_design.sh \
+       -f $FUSION_FASTA \
+       -o ${FUSION_FASTA/.fasta/.primers} \
+       -pdb $PRIMER_DESIGN_BINDIR \
+       -pdpt $PRIMER_DESIGN_PCR_TYPE \
+       -pdtp $PRIMER_DESIGN_TILLING_PARAMS \
+       -psr $PRIMER_DESIGN_PSR \
+       -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
+       -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
+       -pdm $PRIMER_DESIGN_MISPRIMING
     fi
+    mv $PRIMER_DIR/tmp/primer3.out ${FUSION_FASTA/.fasta/_primerinfo.txt}
+    rm $PRIMER_DIR/tmp/*
+  done
+  rmdir $PRIMER_DIR/tmp/
+  cat $PRIMER_DIR/*.primers > $OUTPUTDIR/${SAMPLE}_FusionGenes.primers
+  cd $OUTPUTDIR
 else
-  echo "NanoFG check: Fail" >> $CHECK_NANOFG_OUT
+  echo "Path to primer3 does not exist. Giving only breakpoint sequences"
+  cat $PRIMER_DIR/*.fasta > $OUTPUTDIR/${SAMPLE}_FusionGenesBNDseq.fasta
 fi
 
-if [ -z $MAIL ]; then
-  tac $CHECK_NANOFG_OUT | sed '/^Qsub/q' | tac | mail -s 'NANOFG_${VCF_NAME}' $MAIL
+################################################### IF -DC IS SPECIFIED, ALL FILES EXCEPT THE OUTPUT FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
+
+if [ $DONT_CLEAN = false ];then
+  rm $VCF_FILTERED
+  rm $CANDIDATE_DIR/*
+  rmdir $CANDIDATE_DIR
+  rm $BAM_MERGE_OUT
+  rm $BAM_MERGE_OUT.bai
+  rm $SV_CALLING_OUT
+  rm $SV_CALLING_OUT_FILTERED
+  rm $PRIMER_DIR/*
+  rmdir $PRIMER_DIR
 fi
 
-echo \`date\`: Done
+deactivate
 
-sleep 20
-EOF
-qsub $CHECK_NANOFG_SH
-}
-
-if [ ! -e $LOG_DIR/$FUSION_READ_EXTRACTION_JOBNAME.done ]; then
-    fusion_read_extraction
-fi
-if [ ! -e $LOG_DIR/$CONSENSUS_CALLING_JOBNAME.done ]; then
-    consensus_calling
-fi
-if [ ! -e $LOG_DIR/$LAST_MAPPING_JOBNAME.done ]; then
-    last_mapping
-fi
-
-if [ ! -e $LOG_DIR/$BAM_MERGE_JOBNAME.done ]; then
-    bam_merge
-fi
-if [ ! -e $LOG_DIR/$SV_CALLING_JOBNAME.done ]; then
-    sv_calling
-fi
-if [ ! -e $LOG_DIR/$FUSION_CHECK_JOBNAME.done ]; then
-    fusion_check
-fi
-if [ ! -e $LOG_DIR/$CHECK_NANOFG_JOBNAME.done ]; then
-    check_NanoFG
-fi
-
-echo `date`: Done
+echo -e "`date` \t Done"

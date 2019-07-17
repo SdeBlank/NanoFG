@@ -4,16 +4,15 @@
 usage(){
 echo "
 Required parameters:
--f|--fasta                Input fasta file [${FASTA}]
+-f|--fastq                Input fastq file
+-o|--output               Name of bam output file
 
 Optional parameters:
 -h|--help                 Shows help
--mm2|--minimap2             Path to minimap2
+-mm2|--minimap2           Path to minimap2 [$MINIMAP2]
+-mm2s|--minimap2          Minimap2 parameters [$MINIMAP2_SETTINGS]
 -t|--threads              Number of threads [${THREADS}]
--r|--refgenome            Reference genome [${REF}]
--rd|--refdict             Reference genome .dict file [${REF_DICT}]
--l|--last_dir             Path to LAST directory [${LAST_DIR}]
--ls|--last_settings       LAST settings [${LAST_SETTINGS}]
+-r|--reffasta             Reference genome [${REFFASTA}]
 -s|--sambamba             Path to sambamba|samtools [${SAMTOOLS}]
 "
 exit
@@ -21,11 +20,15 @@ exit
 
 POSITIONAL=()
 
+NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))/../
+source $NANOFG_DIR/paths.ini
+
 # DEFAULT SETTINGS
 THREADS=1
-REF=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
-SAMTOOLS=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
-MINIMAP2=
+REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
+SAMTOOLS=$PATH_SAMTOOLS
+MINIMAP2=$PATH_MINIMAP2
+MINIMAP2_SETTINGS='-ax map-ont'
 
 while [[ $# -gt 0 ]]; do
   KEY="$1"
@@ -34,8 +37,13 @@ while [[ $# -gt 0 ]]; do
     usage
     shift # past argument
     ;;
-    -f|--fasta)
-    FASTA="$2"
+    -f|--fastq)
+    FASTQ="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -o|--output)
+    OUTPUT="$2"
     shift # past argument
     shift # past value
     ;;
@@ -44,15 +52,21 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
+    -mm2s|--minimap2)
+    MINIMAP2_SETTINGS="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -t|--threads)
     THREADS="$2"
     shift # past argument
     shift # past value
     ;;
-    -r|--refgenome)
-    REF="$2"
+    -r|--reffasta)
+    REFFASTA="$2"
     shift # past argument
     shift # past value
+    ;;
     -s|--samtools)
     SAMTOOLS="$2"
     shift # past argument
@@ -67,18 +81,22 @@ done
 
 set -- "${POSITIONAL[@]}" # Restore postional parameters
 
-if [ -z ${FASTA} ]; then
-  echo "Missing -f|--fasta parameter"
+if [ -z ${FASTQ} ]; then
+  echo "Missing -f|--fastq parameter"
   usage
 fi
 
+if [ -z ${OUTPUT} ]; then
+  echo "Missing -o|--output parameter"
+  usage
+fi
 
 #echo `date`: Running on `uname -n`
 
-$MINIMAP2 -t $THREADS -ax map-ont $REF $FASTA\
-| $SAMTOOLS view -h -S -b -t $THREADS /dev/stdin \
-| $SAMTOOLS sort /dev/stdin -o ${bam/.bam/.sorted.bam} -t $THREADS
+$MINIMAP2 -t $THREADS $MINIMAP2_SETTINGS $REFFASTA $FASTQ\
+| $SAMTOOLS view -h -S -b -@ $THREADS /dev/stdin \
+| $SAMTOOLS sort /dev/stdin -o ${OUTPUT} -@ $THREADS
 
-$SAMTOOLS index ${bam/.bam/.sorted.bam} -t $THREADS
+$SAMTOOLS index ${OUTPUT} -@ $THREADS
 
 #echo `date`: Done
