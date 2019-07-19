@@ -123,7 +123,7 @@ LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
 #PRIMER DESIGN DEFAULTS
-PRIMER_DESIGN_GETSEQ_SCRIPT=$SCRIPT_DIR/Primerseq.py
+PRIMER_DESIGN_GETSEQ_SCRIPT=$SCRIPT_DIR/PrimerFlankDesign.py
 PRIMER_DESIGN_DIR=$PATH_PRIMER_DESIGN_DIR
 PRIMER_DESIGN_BINDIR=$PRIMER_DESIGN_DIR/primers
 PRIMER_DESIGN_GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
@@ -407,6 +407,11 @@ else
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
 
+  if ! [ $? -eq 0 ]; then
+    echo "!!! REGION SELECTION NOT CORRECTLY COMPLETED... exiting"
+    exit
+  fi
+
   REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
   $SAMTOOLS view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
   $SAMTOOLS view -@ $THREADS -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
@@ -430,6 +435,10 @@ if [ -z $VCF ]; then
     -c $NANOSV_MINIMAP2_CONFIG \
     -ss "$SNIFFLES_SETTINGS" \
     -o $VCF
+    if ! [ $? -eq 0 ]; then
+      echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
+      exit
+    fi
 fi
 
 ################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
@@ -456,6 +465,10 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -v $VCF_FILTERED \
   -o $CANDIDATE_DIR
 
+if ! [ $? -eq 0 ]; then
+  echo "!!! FUSION READ EXTRACTION NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
 ################################################## CREATION OF A CONSENSUS SEQUENCE OF THE READS THAT SUPPORT A SV (OPTIONAL, NOT RECOMMENDED IF LOW COVERAGE DATA)
 if [ $CONSENSUS_CALLING = true ];then
   echo -e "`date` \t Producing consensus if possible..."
@@ -540,12 +553,16 @@ bash $PIPELINE_DIR/sv_calling.sh \
   -ss "$SNIFFLES_SETTINGS" \
   -o $SV_CALLING_OUT
 
+if ! [ $? -eq 0 ]; then
+  echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
 # if [ $CONSENSUS_CALLING = true ];then
 #   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
 # else
 #   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
 # fi
-#
+# #
 # for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
 #   echo ${CANDIDATE_BAM/.bam/};
 # done | \
@@ -581,6 +598,11 @@ python $FUSION_CHECK_SCRIPT \
   -fo $FUSION_CHECK_INFO_OUTPUT \
   -p $FUSION_CHECK_PDF_OUTPUT
 
+if ! [ $? -eq 0 ]; then
+  echo "!!! FUSION CHECK NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
+
 ################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
 echo -e "`date` \t Designing primers around fusion breakpoints..."
 mkdir -p $PRIMER_DIR
@@ -593,6 +615,10 @@ python $PRIMER_DESIGN_GETSEQ_SCRIPT \
  -d $PRIMER_DIR \
  -f $PRIMER_DESIGN_FLANK
 
+if ! [ $? -eq 0 ]; then
+ echo "!!! PRIMER FLANK DESIGN NOT CORRECTLY COMPLETED... exiting"
+ exit
+fi
 mkdir -p $PRIMER_DIR/tmp
 if [ ! -d $PRIMER_DIR/tmp ]; then
  exit
@@ -623,6 +649,7 @@ if [ -d $PRIMER_DESIGN_DIR ];then
        -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
        -pdm $PRIMER_DESIGN_MISPRIMING
     fi
+
     mv $PRIMER_DIR/tmp/primer3.out ${FUSION_FASTA/.fasta/_primerinfo.txt}
     rm $PRIMER_DIR/tmp/*
   done

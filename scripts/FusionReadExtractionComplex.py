@@ -138,16 +138,16 @@ def create_fasta( chr, start, end, svid, exclude, include ):
         Breakpoints that only have supplementary reads and not a primary read spanning the breakpoint will be excluded
         No effect when testing on the truthset in recall, but see if it ever happens in real sets
         '''
-        if read.query_name in include and not read.seq == None and not read.is_supplementary:
+        if read.query_name in include and not read.seq == None and not read.is_supplementary and read.query_name not in exclude:
             fasta.write( ">"+svid+"."+read.query_name+"\n")
             fasta.write(read.seq+"\n")
-
+            exclude.append(read.query_name)
         #### Uncomment to select all the reads supporting the breakpoint and adjacent regions of the gene to get full gene sequence back
         # if read.query_name in exclude or read.seq == None or read.is_supplementary:
         #     continue
         # fasta.write( ">"+svid+"."+read.query_name+"\n")
         # fasta.write(read.seq+"\n")
-        #exclude.append(read.query_name)
+
     fasta.close()
     bamfile.close()
 
