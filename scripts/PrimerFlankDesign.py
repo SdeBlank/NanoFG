@@ -134,8 +134,8 @@ EnsemblRestClient=EnsemblRestClient()
 server = "http://grch37.rest.ensembl.org"
 
 with open(vcf, "r") as fusion_vcf:
-    vcf_reader = pyvcf.Reader(open(vcf, 'r'))
-
+    vcf_reader = pyvcf.Reader(fusion_vcf)
+    print("READ IN")
     ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
     if "source" in vcf_reader.metadata:
         if vcf_reader.metadata["source"][0].lower()=="sniffles":
@@ -146,42 +146,36 @@ with open(vcf, "r") as fusion_vcf:
 
     ### GATHER THE SEQUENCE AROUND BREAKPOINTS THAT PRODUCE A VALID FUSION GENE
     for record in vcf_reader:
-        if "FUSION" in record.INFO:
-            if isinstance(record.ALT[0], pyvcf.model._SV) or isinstance( record.ALT[0], pyvcf.model._Substitution ):
-                record = alt_convert( record )
-            if not record:
-                continue
+        if vcf_type=="NanoSV":
+            pos1_orientation=record.ALT[0].orientation
+            pos2_orientation=record.ALT[0].remoteOrientation
 
-            if vcf_type=="NanoSV":
-                pos1_orientation=record.ALT[0].orientation
-                pos2_orientation=record.ALT[0].remoteOrientation
-
-            #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
-            elif vcf_type=="Sniffles":
-                if record.INFO["STRANDS"][0][0]=="+":
-                    pos1_orientation=False
-                else:
-                    pos1_orientation=True
-                if record.INFO["STRANDS"][0][1]=="+":
-                    pos2_orientation=False
-                else:
-                    pos2_orientation=True
-
-            seq1 = ''
-            seq2 = ''
-            if pos1_orientation:
-                seq1 = get_seq(record.CHROM, record.POS+offset, record.POS+offset+flank, -1)
+        #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
+        elif vcf_type=="Sniffles":
+            if record.INFO["STRANDS"][0][0]=="+":
+                pos1_orientation=False
             else:
-                seq1 = get_seq(record.CHROM, record.POS-flank-offset, record.POS-offset, 1)
-            if not seq1:
-                continue
-            if pos2_orientation:
-                seq2 = get_seq(record.ALT[0].chr, record.ALT[0].pos+offset, record.ALT[0].pos+offset+flank, 1)
+                pos1_orientation=True
+            if record.INFO["STRANDS"][0][1]=="+":
+                pos2_orientation=False
             else:
-                seq2 = get_seq(record.ALT[0].chr, record.ALT[0].pos-offset-flank, record.ALT[0].pos-offset, -1)
-            if not seq2:
-                continue
+                pos2_orientation=True
 
-            with open(directory+"/"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+".fasta", "w") as primer_output:
-                primer_output.write(">"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+"\n")
-                primer_output.write(seq1+"[]"+seq2+"\n")
+        seq1 = ''
+        seq2 = ''
+        if pos1_orientation:
+            seq1 = get_seq(record.CHROM, record.POS+offset, record.POS+offset+flank, -1)
+        else:
+            seq1 = get_seq(record.CHROM, record.POS-flank-offset, record.POS-offset, 1)
+        if not seq1:
+            continue
+        if pos2_orientation:
+            seq2 = get_seq(record.ALT[0].chr, record.ALT[0].pos+offset, record.ALT[0].pos+offset+flank, 1)
+        else:
+            seq2 = get_seq(record.ALT[0].chr, record.ALT[0].pos-offset-flank, record.ALT[0].pos-offset, -1)
+        if not seq2:
+            continue
+
+        with open(directory+"/"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+".fasta", "w") as primer_output:
+            primer_output.write(">"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+"\n")
+            primer_output.write(seq1+"[]"+seq2+"\n")
