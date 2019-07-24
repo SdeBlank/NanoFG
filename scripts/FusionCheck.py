@@ -31,6 +31,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
     with open(full_vcf, "r") as original_vcf:
         supporting_reads={}
         original_vcf_reader=pyvcf.Reader(original_vcf)
+        vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
 
         if "source" in original_vcf_reader.metadata:
             if original_vcf_reader.metadata["source"][0].lower()=="sniffles":
@@ -49,10 +50,10 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             elif original_vcf_type=="Sniffles":
                 supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
 
-    all_fusions={}
-    with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
+    with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf, open(vcf_output, "w") as vcf_output::
         vcf_reader=pyvcf.Reader(vcf)
-
+        vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+        vcf_reader.infos['ORIGINAL_SVID']=pyvcf.parser._Info('ORIGINAL_SVID', ".", "Int", "SVID in the vcf of the full vcf", "NanoSV", "X")
         ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
@@ -117,17 +118,9 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
-                all_fusions[compared_id]=vcf_fusion_info
-
-    with open(full_vcf, "r") as original_vcf, open(vcf_output, "w") as vcf_output:
-        original_vcf_reader=pyvcf.Reader(original_vcf)
-        original_vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
-        vcf_writer=pyvcf.Writer(vcf_output, original_vcf_reader, lineterminator='\n')
-
-        for original_record in original_vcf_reader:
-            if original_record.ID in all_fusions:
-                original_record.INFO["FUSION"]=all_fusions[original_record.ID]
-            vcf_writer.write_record(original_record)
+                record.INFO["FUSION"]=vcf_fusion_info
+                record.INFO["ORIGINAL_SVID"]=compared_id
+            vcf_writer.write_record(record)
 
 #############################################   Convert unknown ALT fields to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):

@@ -118,7 +118,7 @@ FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
 #MAPPING DEFAULTS
-MINIMAP2_SETTINGS='-ax map-ont'
+MINIMAP2_SETTINGS='-x map-ont -a --MD'
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
@@ -526,11 +526,6 @@ else
   exit
 fi
 
-if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
-  $SAMTOOLS calmd $BAM_MERGE_OUT $REFFASTA -b > temp.bam
-  mv temp.bam $BAM_MERGE_OUT
-  $SAMTOOLS index $BAM_MERGE_OUT
-fi
 ################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
 echo -e "`date` \t Calling SVs..."
 if [ -z $NANOSV_LAST_CONFIG ]; then
