@@ -49,10 +49,11 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             elif original_vcf_type=="Sniffles":
                 supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
 
-    all_fusions={}
-    with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf:
+    with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf, open(vcf_output, "w") as vcf_output:
         vcf_reader=pyvcf.Reader(vcf)
-
+        vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+        vcf_reader.infos['ORIGINAL_SVID']=pyvcf.parser._Info('ORIGINAL_SVID', "1", "Integer", "SVID in the vcf of the full vcf", "NanoSV", "X")
+        vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
         ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
@@ -117,17 +118,9 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
 
             if len(vcf_fusion_info)>0:
-                all_fusions[compared_id]=vcf_fusion_info
-
-    with open(full_vcf, "r") as original_vcf, open(vcf_output, "w") as vcf_output:
-        original_vcf_reader=pyvcf.Reader(original_vcf)
-        original_vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
-        vcf_writer=pyvcf.Writer(vcf_output, original_vcf_reader, lineterminator='\n')
-
-        for original_record in original_vcf_reader:
-            if original_record.ID in all_fusions:
-                original_record.INFO["FUSION"]=all_fusions[original_record.ID]
-            vcf_writer.write_record(original_record)
+                record.INFO["FUSION"]=vcf_fusion_info
+                record.INFO["ORIGINAL_SVID"]=compared_id
+            vcf_writer.write_record(record)
 
 #############################################   Convert unknown ALT fields to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):
@@ -351,43 +344,46 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_start"])
-                BND_INFO["Type"]=None
+                BND_INFO["Type"]="before_transcript"
             elif POS<gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
-            elif POS>gene["CDS_start"] and POS<gene["CDS_end"]:
-                if abs(POS-gene["CDS_end"])<3:
-                    BND_INFO["Breakpoint_location"]="StopCodon"
-                # elif abs(POS-gene["CDS_end"])<10:                 #### ADDED pos inside stop codon==different and pos close to translation end gives 3'UTR fusion instead
-                #     BND_INFO["Breakpoint_location"]="3'UTR"
-                else:
-                    BND_INFO["Breakpoint_location"]="CDS"
+            elif POS>=gene["CDS_start"] and POS<=gene["CDS_end"]:
+                # if abs(POS-gene["CDS_end"])<3:
+                #     BND_INFO["Breakpoint_location"]="StopCodon"
+                # # elif abs(POS-gene["CDS_end"])<10:                 #### ADDED pos inside stop codon==different and pos close to translation end gives 3'UTR fusion instead
+                # #     BND_INFO["Breakpoint_location"]="3'UTR"
+                # else:
+                BND_INFO["Breakpoint_location"]="CDS"
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
-                BND_INFO["Type"]=None
+                BND_INFO["Type"]="after_transcript"
             elif POS>gene["CDS_end"]:
                 BND_INFO["Breakpoint_location"]="3'UTR"
+            else:
+                print(gene["Transcript_start"], gene["CDS_start"],  POS, gene["CDS_end"], gene["Transcript_end"])
         else:
             ORIENTATION= not orientation
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript end"]=abs(POS-gene["Transcript_start"])
-                BND_INFO["Type"]=None
+                BND_INFO["Type"]="after_transcript"
             elif POS<gene["CDS_end"]:
                 BND_INFO["Breakpoint_location"]="3'UTR"
-            elif POS>gene["CDS_end"] and POS<gene["CDS_start"]:
-                if abs(POS-gene["CDS_end"])<3:
-                    BND_INFO["Breakpoint_location"]="StopCodon"
-                elif abs(POS-gene["CDS_end"])>3 and abs(POS-gene["CDS_end"])<10:
-                    BND_INFO["Breakpoint_location"]="3'UTR"
-                else:
-                    BND_INFO["Breakpoint_location"]="CDS"
+            elif POS>=gene["CDS_end"] and POS<=gene["CDS_start"]:
+                # if abs(POS-gene["CDS_end"])<3:
+                #     BND_INFO["Breakpoint_location"]="StopCodon"
+                # elif abs(POS-gene["CDS_end"])>3 and abs(POS-gene["CDS_end"])<10:
+                #     BND_INFO["Breakpoint_location"]="3'UTR"
+                # else:
+                BND_INFO["Breakpoint_location"]="CDS"
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
-                BND_INFO["Type"]=None
             elif POS>gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
+            else:
+                print(gene["Transcript_start"], gene["CDS_start"],  POS, gene["CDS_end"], gene["Transcript_end"])
 
         if ORIENTATION:
             BND_INFO["Order"]="3'"
@@ -1014,16 +1010,21 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
                 else:
                     fused_exons.append((exon_start, exon_length, label, False, origin, False))
                 space=Intron_size
+    else:
+        print("Visualisation for '", annotated_breakpoints["Fusion_type"], "' has not been implemented yet")
 
-    Protein_info=str(int((annotated_breakpoints["5'"]["CDS_length"]+annotated_breakpoints["3'"]["CDS_length"])/3))+" aa"
-    ax = fig.add_subplot(gs[3, 0])
-    ax.text(0, yvalue, annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
-    ax.text(0, yvalue-0.1, "("+Protein_info+")", horizontalalignment='center',verticalalignment='center', size=7)
-    plt.axis('off')
+    try:
+        Protein_info=str(int((annotated_breakpoints["5'"]["CDS_length"]+annotated_breakpoints["3'"]["CDS_length"])/3))+" aa"
+        ax = fig.add_subplot(gs[3, 0])
+        ax.text(0, yvalue, annotated_breakpoints["5'"]["Gene_name"]+"-"+annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
+        ax.text(0, yvalue-0.1, "("+Protein_info+")", horizontalalignment='center',verticalalignment='center', size=7)
+        plt.axis('off')
 
-    exons_plot( fused_exons, 3 )
-    introns_plot( 0, BND, 3, "blue")
-    introns_plot( BND, 100, 3, "red" )
+        exons_plot( fused_exons, 3 )
+        introns_plot( 0, BND, 3, "blue")
+        introns_plot( BND, 100, 3, "red" )
+    except:
+        pass
 
     ############################################################################# Visualisation of additional info
     ax = fig.add_subplot(gs[6, :])
