@@ -55,6 +55,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
     with open(vcf, "r") as vcf, open(info_output, "w") as fusion_output, PdfPages(pdf) as output_pdf, open(vcf_output, "w") as vcf_output:
         vcf_reader=pyvcf.Reader(vcf)
         vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
+        vcf_reader.infos['ORIGINAL_SVID']=pyvcf.parser._Info('ORIGINAL_SVID', "1", "Integer", "SVID in the vcf of the full vcf", "NanoSV", "X")
         vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
 
         RECORDS={}
@@ -175,6 +176,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
         for breakpoint_id, record in RECORDS.items():
+            print(breakpoint_id, record.ID)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
                 record = alt_convert(record)
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
@@ -231,7 +233,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, original_vcf_info[2], info_output, complex)
             #Produce output
             for fusion in fusions:
-                print(breakpoint_id)
+                print(breakpoint_id, record.ID)
                 print(fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"])
                 fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
@@ -470,7 +472,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_start"])
-                BND_INFO["Type"]=None
+                BND_INFO["Type"]="before_transcript"
             elif POS<gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
             elif POS>=gene["CDS_start"] and POS<=gene["CDS_end"]:
@@ -480,12 +482,12 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                 # #     BND_INFO["Breakpoint_location"]="3'UTR"
                 # else:
                 BND_INFO["Breakpoint_location"]="CDS"
-            elif POS>gene["CDS_end"]:
-                BND_INFO["Breakpoint_location"]="3'UTR"
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
-                BND_INFO["Type"]=None
+                BND_INFO["Type"]="after_transcript"
+            elif POS>gene["CDS_end"]:
+                BND_INFO["Breakpoint_location"]="3'UTR"
             else:
                 print(gene["Transcript_start"], gene["CDS_start"],  POS, gene["CDS_end"], gene["Transcript_end"])
         else:
@@ -493,7 +495,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript end"]=abs(POS-gene["Transcript_start"])
-                BND_INFO["Type"]=None
+                BND_INFO["Type"]="after_transcript"
             elif POS<gene["CDS_end"]:
                 BND_INFO["Breakpoint_location"]="3'UTR"
             elif POS>=gene["CDS_end"] and POS<=gene["CDS_start"]:
@@ -503,12 +505,11 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                 #     BND_INFO["Breakpoint_location"]="3'UTR"
                 # else:
                 BND_INFO["Breakpoint_location"]="CDS"
-            elif POS>gene["CDS_start"]:
-                BND_INFO["Breakpoint_location"]="5'UTR"
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
-                BND_INFO["Type"]=None
+            elif POS>gene["CDS_start"]:
+                BND_INFO["Breakpoint_location"]="5'UTR"
             else:
                 print(gene["Transcript_start"], gene["CDS_start"],  POS, gene["CDS_end"], gene["Transcript_end"])
 
@@ -600,7 +601,7 @@ def fusion_check(Annotation1, Annotation2):
                 Fusion_type="intron-intron (OUT OF FRAME)"
         else:
             sys.exit("Unknown error in fusion check - 1")
-    elif Annotation1["Type"]=="exon" and Annotation2["Type"]=="intron":
+    elif Annotation1["Breakpoint_location"]=="CDS" and Annotation1["Type"]=="exon" and Annotation2["Type"]=="intron":
         Annotation1_CDS_length=0
         Annotation2_CDS_length=Annotation2["CDS_length"]
         if Annotation1["Order"]=="5'":
@@ -622,7 +623,7 @@ def fusion_check(Annotation1, Annotation2):
                 Fusion_type="intron-exon (OUT OF FRAME)"
         else:
             sys.exit("Unknown error in fusion check - 2")
-    elif Annotation2["Type"]=="exon" and Annotation1["Type"]=="intron":
+    elif Annotation1["Breakpoint_location"]=="CDS" and Annotation2["Type"]=="exon" and Annotation1["Type"]=="intron":
         Annotation1_CDS_length=Annotation1["CDS_length"]
         Annotation2_CDS_length=0
         if Annotation2["Order"]=="5'":
