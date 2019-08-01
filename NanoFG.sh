@@ -368,207 +368,213 @@ else
   mkdir -p $CANDIDATE_DIR
 fi
 
+if [ -d $PRIMER_DIR ]; then
+  rm $PRIMER_DIR/*
+else
+  mkdir -p $PRIMER_DIR
+fi
+
 if [ ! -d $CANDIDATE_DIR ]; then
     exit
 fi
 
 . $VENV
-# 
-# ################################################## MAPPING OF THE NANOPORE READS USING MINIMAP2 (OPTIONAL)
-# if [ ! -z $BAM ];then
-#   echo "### bam (-b) already provided. Skipping minimap2 mapping"
-# else
-#   echo -e "`date` \t Mapping all reads using minimap2..."
-#
-#   FASTQ=${SAMPLE}.merged.fastq
-#   cat $FASTQDIR/*.fastq > $FASTQ
-#   BAM=${SAMPLE}.bam
-#
-#   bash $PIPELINE_DIR/minimap2_mapping.sh \
-#     -f $FASTQ \
-#     -o $BAM \
-#     -mm2 $MINIMAP2 \
-#     -mm2s "$MINIMAP2_SETTINGS" \
-#     -r $REFFASTA \
-#     -t $THREADS \
-#     -s $SAMTOOLS
-# fi
-#
-# ################################################## SELECTION OF REGIONS THAT ARE SPECIFIED BY THE USER (OPTIONAL)
-# if [ ! -z $VCF ];then
-#   REGION_SELECTION_BAM_OUTPUT=$BAM
-#   echo "### vcf (-v) already provided. Skipping selection and sv calling"
-# elif [ -z $SELECTION ];then
-#   REGION_SELECTION_BAM_OUTPUT=$BAM
-#   echo "### No selection parameter (-s) provided. Using all mapped reads"
-# else
-#   echo -e "`date` \t Selecting regions to check for fusion genes..."
-#   python $REGION_SELECTION_SCRIPT \
-#   -b $REGION_SELECTION_BED_OUTPUT \
-#   -r $SELECTION
-#
-#   if ! [ $? -eq 0 ]; then
-#     echo "!!! REGION SELECTION NOT CORRECTLY COMPLETED... exiting"
-#     exit
-#   fi
-#
-#   REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
-#   $SAMTOOLS view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
-#   $SAMTOOLS view -@ $THREADS -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
-#   $SAMTOOLS view  -@ $THREADS $BAM | grep -f reads.tmp >> $REGION_SELECTION_SAM_OUTPUT
-#   $SAMTOOLS view  -@ $THREADS -h -S -f bam $REGION_SELECTION_SAM_OUTPUT | $SAMTOOLS sort -o $REGION_SELECTION_BAM_OUTPUT /dev/stdin
-#   $SAMTOOLS index $REGION_SELECTION_BAM_OUTPUT
-#   rm reads.tmp
-#   rm $REGION_SELECTION_SAM_OUTPUT
-# fi
-#
-# ################################################## CALLING OF SVS ON GIVEN BAM FILE (OPTIONAL)
-# if [ -z $VCF ]; then
-#   echo -e "`date` \t SV calling..."
-#   VCF=$OUTPUTDIR/${SAMPLE}.vcf
-#   bash $PIPELINE_DIR/sv_calling.sh \
-#     -sv $SV_CALLER \
-#     -b $REGION_SELECTION_BAM_OUTPUT \
-#     -t $THREADS \
-#     -s $SAMTOOLS \
-#     -v $VENV \
-#     -c $NANOSV_MINIMAP2_CONFIG \
-#     -ss "$SNIFFLES_SETTINGS" \
-#     -o $VCF
-#     if ! [ $? -eq 0 ]; then
-#       echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
-#       exit
-#     fi
-# fi
-#
-# ################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
-#
-# VCF_FILTERED=${OUTPUTDIR}/$(basename $VCF)
-#
-# if [ $DONT_FILTER = false ];then
-#   echo -e "`date` \t Removing insertions and all variants without a PASS filter..."
-#   VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS_PASS.vcf}
-#   grep "^#" $VCF > $VCF_FILTERED
-#   grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_FILTERED
-# else
-#   echo -e "`date` \t Removing insertions..."
-#   VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS.vcf}
-#   grep "^#" $VCF > $VCF_FILTERED
-#   grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_FILTERED
-# fi
-#
-# ##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
-# echo -e "`date` \t Extracting reads that support candidate fusion genes..."
-#
-# python $FUSION_READ_EXTRACTION_SCRIPT \
-#   -b $BAM \
-#   -v $VCF_FILTERED \
-#   -o $CANDIDATE_DIR
-#
-# if ! [ $? -eq 0 ]; then
-#   echo "!!! FUSION READ EXTRACTION NOT CORRECTLY COMPLETED... exiting"
-#   exit
-# fi
-# ################################################## CREATION OF A CONSENSUS SEQUENCE OF THE READS THAT SUPPORT A SV (OPTIONAL, NOT RECOMMENDED IF LOW COVERAGE DATA)
+
+################################################## MAPPING OF THE NANOPORE READS USING MINIMAP2 (OPTIONAL)
+if [ ! -z $BAM ];then
+  echo "### bam (-b) already provided. Skipping minimap2 mapping"
+else
+  echo -e "`date` \t Mapping all reads using minimap2..."
+
+  FASTQ=${SAMPLE}.merged.fastq
+  cat $FASTQDIR/*.fastq > $FASTQ
+  BAM=${SAMPLE}.bam
+
+  bash $PIPELINE_DIR/minimap2_mapping.sh \
+    -f $FASTQ \
+    -o $BAM \
+    -mm2 $MINIMAP2 \
+    -mm2s "$MINIMAP2_SETTINGS" \
+    -r $REFFASTA \
+    -t $THREADS \
+    -s $SAMTOOLS
+fi
+
+################################################## SELECTION OF REGIONS THAT ARE SPECIFIED BY THE USER (OPTIONAL)
+if [ ! -z $VCF ];then
+  REGION_SELECTION_BAM_OUTPUT=$BAM
+  echo "### vcf (-v) already provided. Skipping selection and sv calling"
+elif [ -z $SELECTION ];then
+  REGION_SELECTION_BAM_OUTPUT=$BAM
+  echo "### No selection parameter (-s) provided. Using all mapped reads"
+else
+  echo -e "`date` \t Selecting regions to check for fusion genes..."
+  python $REGION_SELECTION_SCRIPT \
+  -b $REGION_SELECTION_BED_OUTPUT \
+  -r $SELECTION
+
+  if ! [ $? -eq 0 ]; then
+    echo "!!! REGION SELECTION NOT CORRECTLY COMPLETED... exiting"
+    exit
+  fi
+
+  REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
+  $SAMTOOLS view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
+  $SAMTOOLS view -@ $THREADS -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
+  $SAMTOOLS view  -@ $THREADS $BAM | grep -f reads.tmp >> $REGION_SELECTION_SAM_OUTPUT
+  $SAMTOOLS view  -@ $THREADS -h -S -f bam $REGION_SELECTION_SAM_OUTPUT | $SAMTOOLS sort -o $REGION_SELECTION_BAM_OUTPUT /dev/stdin
+  $SAMTOOLS index $REGION_SELECTION_BAM_OUTPUT
+  rm reads.tmp
+  rm $REGION_SELECTION_SAM_OUTPUT
+fi
+
+################################################## CALLING OF SVS ON GIVEN BAM FILE (OPTIONAL)
+if [ -z $VCF ]; then
+  echo -e "`date` \t SV calling..."
+  VCF=$OUTPUTDIR/${SAMPLE}.vcf
+  bash $PIPELINE_DIR/sv_calling.sh \
+    -sv $SV_CALLER \
+    -b $REGION_SELECTION_BAM_OUTPUT \
+    -t $THREADS \
+    -s $SAMTOOLS \
+    -v $VENV \
+    -c $NANOSV_MINIMAP2_CONFIG \
+    -ss "$SNIFFLES_SETTINGS" \
+    -o $VCF
+    if ! [ $? -eq 0 ]; then
+      echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
+      exit
+    fi
+fi
+
+################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
+
+VCF_FILTERED=${OUTPUTDIR}/$(basename $VCF)
+
+if [ $DONT_FILTER = false ];then
+  echo -e "`date` \t Removing insertions and all variants without a PASS filter..."
+  VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS_PASS.vcf}
+  grep "^#" $VCF > $VCF_FILTERED
+  grep -v "^#" $VCF | awk '$5!="<INS>"' | awk '$7=="PASS"' >> $VCF_FILTERED
+else
+  echo -e "`date` \t Removing insertions..."
+  VCF_FILTERED=${VCF_FILTERED/.vcf/_noINS.vcf}
+  grep "^#" $VCF > $VCF_FILTERED
+  grep -v "^#" $VCF | awk '$5!="<INS>"' >> $VCF_FILTERED
+fi
+
+##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
+echo -e "`date` \t Extracting reads that support candidate fusion genes..."
+
+python $FUSION_READ_EXTRACTION_SCRIPT \
+  -b $BAM \
+  -v $VCF_FILTERED \
+  -o $CANDIDATE_DIR
+
+if ! [ $? -eq 0 ]; then
+  echo "!!! FUSION READ EXTRACTION NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
+################################################## CREATION OF A CONSENSUS SEQUENCE OF THE READS THAT SUPPORT A SV (OPTIONAL, NOT RECOMMENDED IF LOW COVERAGE DATA)
+if [ $CONSENSUS_CALLING = true ];then
+  echo -e "`date` \t Producing consensus if possible..."
+else
+  echo -e "`date` \t Consensus calling not activated. Use '-cc' to turn consensus calling on"
+fi
+
+for FASTA in $CANDIDATE_DIR/*.fasta; do
+  if [ $CONSENSUS_CALLING = true ];then
+    bash $PIPELINE_DIR/consensus_calling.sh \
+      -f $FASTA \
+      -t $THREADS \
+      -w $WTDBG2_DIR \
+      -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
+  fi
+
+  if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ] && [ $CONSENSUS_CALLING = false ];then
+    ln -s $FASTA ${FASTA/.fasta/.no_ctg.fa}
+  fi
+done
+
+################################################## MAPPING OF THE READS (OR CONSENSUS) USING LAST FOR NANOSV AND MINIMAP2 FOR SNIFFLES.
+################################################## LAST IS PREFERRED FOR ACCURATE EXON-EXON FUSION DETECTION
+echo -e "`date` \t Mapping candidate fusion genes..."
+
+if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
+  MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $REFGENOME -rd $REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
+  for FA in $CANDIDATE_DIR/*.fa; do
+    echo $FA;
+  done | \
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
+
+elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  MAPPING_ARGS="-mm2 $MINIMAP2 -oc -mm2s '$MINIMAP2_SETTINGS' -r $REFFASTA -t $LAST_MAPPING_THREADS -s $SAMTOOLS"
+  for FA in $CANDIDATE_DIR/*.fa; do
+    echo ${FA/.fa/};
+  done | \
+  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {}.fa -o {}.sorted.bam $MAPPING_ARGS; exit 1;"
+fi
+################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES INTO A SINGLE BAM FILE
+echo -e "`date` \t Merging bams..."
+
+NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.sorted.bam | wc -l)
+
+if [[ NUMBER_OF_BAMS -gt 1 ]];then
+  $SAMTOOLS merge -f $BAM_MERGE_OUT $CANDIDATE_DIR/*.sorted.bam
+  if [[ $SAMTOOLS == *"samtools"* ]] || [[ $SAMTOOLS == *"Samtools"* ]]; then
+    $SAMTOOLS index $BAM_MERGE_OUT
+  fi
+elif [[ NUMBER_OF_BAMS -eq 1 ]];then
+  cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
+  cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
+else
+  echo "NO CANDIDATE FUSION GENES FOUND"
+  exit
+fi
+
+################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
+echo -e "`date` \t Calling SVs..."
+if [ -z $NANOSV_LAST_CONFIG ]; then
+  if [ $CONSENSUS_CALLING = true ];then
+    NANOSV_LAST_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
+    SNIFFLES_SETTINGS='-s 1 -n -1 --genotype'
+  else
+    NANOSV_LAST_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
+    SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
+  fi
+fi
+
+bash $PIPELINE_DIR/sv_calling.sh \
+  -sv $SV_CALLER \
+  -b $BAM_MERGE_OUT \
+  -t $THREADS \
+  -s $SAMTOOLS \
+  -v $VENV \
+  -c $NANOSV_LAST_CONFIG \
+  -ss "$SNIFFLES_SETTINGS" \
+  -o $SV_CALLING_OUT
+
+if ! [ $? -eq 0 ]; then
+  echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
 # if [ $CONSENSUS_CALLING = true ];then
-#   echo -e "`date` \t Producing consensus if possible..."
+#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
 # else
-#   echo -e "`date` \t Consensus calling not activated. Use '-cc' to turn consensus calling on"
+#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
 # fi
-#
-# for FASTA in $CANDIDATE_DIR/*.fasta; do
-#   if [ $CONSENSUS_CALLING = true ];then
-#     bash $PIPELINE_DIR/consensus_calling.sh \
-#       -f $FASTA \
-#       -t $THREADS \
-#       -w $WTDBG2_DIR \
-#       -ws  "$CONSENSUS_CALLING_WTDBG2_SETTINGS"
-#   fi
-#
-#   if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ] && [ $CONSENSUS_CALLING = false ];then
-#     ln -s $FASTA ${FASTA/.fasta/.no_ctg.fa}
-#   fi
-# done
-#
-# ################################################## MAPPING OF THE READS (OR CONSENSUS) USING LAST FOR NANOSV AND MINIMAP2 FOR SNIFFLES.
-# ################################################## LAST IS PREFERRED FOR ACCURATE EXON-EXON FUSION DETECTION
-# echo -e "`date` \t Mapping candidate fusion genes..."
-#
-# if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
-#   MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $REFGENOME -rd $REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
-#   for FA in $CANDIDATE_DIR/*.fa; do
-#     echo $FA;
-#   done | \
-#   xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
-#
-# elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
-#   MAPPING_ARGS="-mm2 $MINIMAP2 -oc -mm2s '$MINIMAP2_SETTINGS' -r $REFFASTA -t $LAST_MAPPING_THREADS -s $SAMTOOLS"
-#   for FA in $CANDIDATE_DIR/*.fa; do
-#     echo ${FA/.fa/};
-#   done | \
-#   xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {}.fa -o {}.sorted.bam $MAPPING_ARGS; exit 1;"
-# fi
-# ################################################## MERGING ALL SEPARATE BAM FILES OF ALL FUSION GENE CANDIDATES INTO A SINGLE BAM FILE
-# echo -e "`date` \t Merging bams..."
-#
-# NUMBER_OF_BAMS=$(ls $CANDIDATE_DIR/*.sorted.bam | wc -l)
-#
-# if [[ NUMBER_OF_BAMS -gt 1 ]];then
-#   $SAMTOOLS merge -f $BAM_MERGE_OUT $CANDIDATE_DIR/*.sorted.bam
-#   if [[ $SAMTOOLS == *"samtools"* ]] || [[ $SAMTOOLS == *"Samtools"* ]]; then
-#     $SAMTOOLS index $BAM_MERGE_OUT
-#   fi
-# elif [[ NUMBER_OF_BAMS -eq 1 ]];then
-#   cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
-#   cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
-# else
-#   echo "NO CANDIDATE FUSION GENES FOUND"
-#   exit
-# fi
-#
-# ################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
-# echo -e "`date` \t Calling SVs..."
-# if [ -z $NANOSV_LAST_CONFIG ]; then
-#   if [ $CONSENSUS_CALLING = true ];then
-#     NANOSV_LAST_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
-#     SNIFFLES_SETTINGS='-s 1 -n -1 --genotype'
-#   else
-#     NANOSV_LAST_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
-#     SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
-#   fi
-# fi
-#
-# bash $PIPELINE_DIR/sv_calling.sh \
-#   -sv $SV_CALLER \
-#   -b $BAM_MERGE_OUT \
-#   -t $THREADS \
-#   -s $SAMTOOLS \
-#   -v $VENV \
-#   -c $NANOSV_LAST_CONFIG \
-#   -ss "$SNIFFLES_SETTINGS" \
-#   -o $SV_CALLING_OUT
-#
-# if ! [ $? -eq 0 ]; then
-#   echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
-#   exit
-# fi
-# # if [ $CONSENSUS_CALLING = true ];then
-# #   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
-# # else
-# #   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
-# # fi
-# # #
-# # for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
-# #   echo ${CANDIDATE_BAM/.bam/};
-# # done | \
-# # xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/sv_calling.sh -b {}.bam -o {}.vcf $SV_CALLING_SETTINGS; exit 1;"
 # #
-# # grep "^#" $(ls $CANDIDATE_DIR/*.last.sorted.vcf | head -n 1) > $SV_CALLING_OUT
-# # for CANDIDATE_VCF in $CANDIDATE_DIR/*.last.sorted.vcf; do
-# #   grep -v "^#" $CANDIDATE_VCF >> $SV_CALLING_OUT
-# # done
+# for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
+#   echo ${CANDIDATE_BAM/.bam/};
+# done | \
+# xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/sv_calling.sh -b {}.bam -o {}.vcf $SV_CALLING_SETTINGS; exit 1;"
 #
-# ################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
+# grep "^#" $(ls $CANDIDATE_DIR/*.last.sorted.vcf | head -n 1) > $SV_CALLING_OUT
+# for CANDIDATE_VCF in $CANDIDATE_DIR/*.last.sorted.vcf; do
+#   grep -v "^#" $CANDIDATE_VCF >> $SV_CALLING_OUT
+# done
+
+################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
 if [ $DONT_FILTER = false ];then
   SV_CALLING_OUT_FILTERED=${SV_CALLING_OUT/.vcf/_noINS_PASS.vcf}
@@ -600,10 +606,6 @@ fi
 
 ################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
 echo -e "`date` \t Designing primers around fusion breakpoints..."
-mkdir -p $PRIMER_DIR
-if [ ! -d $PRIMER_DIR ]; then
-  exit
-fi
 
 python $PRIMER_DESIGN_GETSEQ_SCRIPT \
  -v $FUSION_CHECK_VCF_OUTPUT \
@@ -614,6 +616,7 @@ if ! [ $? -eq 0 ]; then
  echo "!!! PRIMER FLANK DESIGN NOT CORRECTLY COMPLETED... exiting"
  exit
 fi
+
 mkdir -p $PRIMER_DIR/tmp
 if [ ! -d $PRIMER_DIR/tmp ]; then
  exit
