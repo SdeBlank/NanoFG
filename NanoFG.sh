@@ -24,10 +24,11 @@ GENERAL
 SELECTION AND FILTERING
     -s|--selection                                                     Select genes or areas to check for fusion genes.
                                                                        Insert a list of genes or areas, separated by a comma
-                                                                       e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
+                                                                       e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590856'
     -dc|--dont_clean                                                   Don't clean up the intermediate files
     -df|--dont_filter                                                  Don't filter out all non-PASS SVs
     -cc|--consensus_calling                                            Create a consensus sequence of the fusion-supporting reads. Not recommended on low-coverage data.
+    -cf|--complex_fusion_detection                                     Link multiple SVs together to give an indication of fusions where small SVs are located within the fusion breakpoint
 
 OUTPUT
     -o|--outputdir                                                     Path to output directory
@@ -80,6 +81,7 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
 THREADS=8
+COMPLEX_FUSION=false
 CONSENSUS_CALLING=false
 DONT_CLEAN=false
 DONT_FILTER=false
@@ -111,8 +113,8 @@ REGION_SELECTION_BED_OUTPUT=$OUTPUTDIR/regions.bed
 REGION_SELECTION_BAM_OUTPUT=$OUTPUTDIR/regions.bam
 
 #FUSION READ EXTRACTION DEFAULTS
-FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtractionComplex.py
-FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
+FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtraction.py
+FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 
 #CONSENSUS CALLING DEFAULTS
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
@@ -194,6 +196,10 @@ do
     NANOFG_DIR="$2"
     shift # past argument
     shift # past value
+    ;;
+    -cf|--complex_fusion_detection)
+    COMPLEX_FUSION=true
+    shift # past argument
     ;;
     -cc|--consensus_calling)
     CONSENSUS_CALLING=true
@@ -337,6 +343,11 @@ if [ -z $SAMPLE ];then
     SAMPLE=$(basename $BAM)
     SAMPLE=${SAMPLE/.bam/}
   fi
+fi
+
+if [ $COMPLEX_FUSION = True ]; then
+  FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtractionComplex.py
+  FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
 fi
 
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
