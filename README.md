@@ -1,7 +1,5 @@
 # NanoFG
 
-## *--WORK IN PROGRESS--*
-
 ## INSTALL
 ```
 virtualenv venv -p </path/to/python>
@@ -12,11 +10,11 @@ Adjust all paths in the paths.ini file to installed tools
 
 ## How to run
 ```
-bash NanoFG.sh -f </path/to/fastq> [-s SELECTION] [-cc] [-df] [-dc]
+bash NanoFG.sh -f </path/to/fastq>  [-n SAMPLE_NAME ] [-s SELECTION] [-cc] [-df] [-dc]
 ```
 OR
 ```
-bash NanoFG.sh -b </path/to/bam> [-v </path/to/vcf>] [-s SELECTION] [-cc] [-df] [-dc]
+bash NanoFG.sh -b </path/to/bam> [-v </path/to/vcf>] [-n SAMPLE_NAME ] [-s SELECTION] [-cc] [-df] [-dc]
 ```
 For more information, see the wiki:
 https://github.com/SdeBlank/NanoFG/wiki
