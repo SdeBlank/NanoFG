@@ -1,7 +1,5 @@
 # NanoFG
 
-## *--WORK IN PROGRESS--*
-
 ## INSTALL
 ```
 virtualenv venv -p </path/to/python>
