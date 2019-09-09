@@ -104,7 +104,7 @@ REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
 NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
 NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
-SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
+SNIFFLES_SETTINGS='-s 2 -n -1 -d 10 --genotype'
 #SNIFFLES_SETTINGS='-s 2 -n -1 --genotype -d 1'     SETTINGS TO DETECT RECIPROCAL TRANSLOCATIONS
 
 #REGION SELECTION DEFAULTS
@@ -199,6 +199,8 @@ do
     ;;
     -cf|--complex_fusion_detection)
     COMPLEX_FUSION=true
+    FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtractionComplex.py
+    FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
     shift # past argument
     ;;
     -cc|--consensus_calling)
@@ -288,11 +290,6 @@ do
     shift # past argument
     shift # past value
     ;;
-    -fcs|--fusion_check_script)
-    FUSION_CHECK_SCRIPT="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -pdf|--primer_design_flank)
     PRIMER_DESIGN_FLANK="$2"
     shift # past argument
@@ -345,11 +342,6 @@ if [ -z $SAMPLE ];then
   fi
 fi
 
-if [ $COMPLEX_FUSION = True ]; then
-  FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtractionComplex.py
-  FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
-fi
-
 if [ -z $FUSION_CHECK_VCF_OUTPUT ]; then
     FUSION_CHECK_VCF_OUTPUT=$OUTPUTDIR/${SAMPLE}_FusionGenes.vcf
 fi
@@ -373,13 +365,13 @@ PRIMER_DIR=$OUTPUTDIR/primers
 BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
 SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
-if [ -d $CANDIDATE_DIR ]; then
+if [ -d "$CANDIDATE_DIR" ]; then
   rm $CANDIDATE_DIR/*
 else
   mkdir -p $CANDIDATE_DIR
 fi
 
-if [ -d $PRIMER_DIR ]; then
+if [ -d "$PRIMER_DIR" ]; then
   rm $PRIMER_DIR/*
 else
   mkdir -p $PRIMER_DIR
@@ -569,21 +561,6 @@ if ! [ $? -eq 0 ]; then
   echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
   exit
 fi
-# if [ $CONSENSUS_CALLING = true ];then
-#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
-# else
-#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
-# fi
-# #
-# for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
-#   echo ${CANDIDATE_BAM/.bam/};
-# done | \
-# xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/sv_calling.sh -b {}.bam -o {}.vcf $SV_CALLING_SETTINGS; exit 1;"
-#
-# grep "^#" $(ls $CANDIDATE_DIR/*.last.sorted.vcf | head -n 1) > $SV_CALLING_OUT
-# for CANDIDATE_VCF in $CANDIDATE_DIR/*.last.sorted.vcf; do
-#   grep -v "^#" $CANDIDATE_VCF >> $SV_CALLING_OUT
-# done
 
 ################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
@@ -599,13 +576,27 @@ else
   grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' >> $SV_CALLING_OUT_FILTERED
 fi
 
+################################################### COMBINING SVS ON THE SAME READ FOR THE DETECTION OF COMPLEX FUSIONS
+if [ $COMPLEX_FUSION = false ];then
+  echo -e "### No complex fusion detection parameter (-cf) provided. Skipping SV combination"
+else
+  echo -e "`date` \t Linking and combining SVs for complex fusion detection"
+  VCF_COMPLEX=./complex.vcf
+
+  python $SCRIPT_DIR/CombineSVs.py \
+  -v $SV_CALLING_OUT_FILTERED \
+  -b $BAM_MERGE_OUT \
+  -o $VCF_COMPLEX
+
+  grep -v "^#" $VCF_COMPLEX >> $SV_CALLING_OUT_FILTERED
+fi
+
 ################################################### CHECKING THE CANDIDATE FUSION GENES FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
 echo -e "`date` \t Checking fusion candidates..."
 
 python $FUSION_CHECK_SCRIPT \
   -v $SV_CALLING_OUT_FILTERED \
   -ov $VCF \
-  -b $BAM_MERGE_OUT \
   -o $FUSION_CHECK_VCF_OUTPUT \
   -fo $FUSION_CHECK_INFO_OUTPUT \
   -p $FUSION_CHECK_PDF_OUTPUT
@@ -670,7 +661,7 @@ else
   cat $PRIMER_DIR/*.fasta > $OUTPUTDIR/${SAMPLE}_FusionGenesBNDseq.fasta
 fi
 
-################################################### IF -DC IS SPECIFIED, ALL FILES EXCEPT THE OUTPUT FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
+################################################### IF -DC IS NOT SPECIFIED, ALL FILES EXCEPT THE OUTPUT FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
 
 if [ $DONT_CLEAN = false ];then
   rm $VCF_FILTERED

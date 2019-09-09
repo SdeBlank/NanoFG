@@ -1,9 +1,0 @@
-
-
-
-- Check if minimap2 SNIFFLES vs LAST NanoSV gives a different number of OOF exon-exon fusions
-- Create figures on simulated dataset (Minimap2 NanoSV, Minimap2 Sniffles, LAST NanoSV)
-- Automate when NanoFG performs consensus calling and when notations
-  - If contig is empty, map all the reads but tag that they're detected without consensus calling
-
-- Put original vcf as output? --> Remapped with LAST

@@ -23,6 +23,7 @@ parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file',
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
 parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', required=True)
+parser.add_argument('-b', '--bam', type=str, help='Input bam file')
 
 args = parser.parse_args()
 
