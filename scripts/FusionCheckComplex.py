@@ -23,10 +23,8 @@ parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file',
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
 parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', required=True)
-parser.add_argument('-b', '--bam', type=str, help='Input bam file')
 
 args = parser.parse_args()
-
 ########################################   Read in the vcf and perform all fusion check steps for each record in the vcf   ########################################
 def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
     with open(full_vcf, "r") as original_vcf:
@@ -55,6 +53,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
         vcf_reader.infos['FUSION']=pyvcf.parser._Info('FUSION', ".", "String", "Gene names of the fused genes reported if present", "NanoSV", "X")
         vcf_reader.infos['ORIGINAL_SVID']=pyvcf.parser._Info('ORIGINAL_SVID', "1", "Integer", "SVID in the vcf of the full vcf", "NanoSV", "X")
         vcf_writer=pyvcf.Writer(vcf_output, vcf_reader, lineterminator='\n')
+
         ### DETERMINE IF VCF IS PRODUCED BY SNIFFLES OR NANOSV
         if "source" in vcf_reader.metadata:
             if vcf_reader.metadata["source"][0].lower()=="sniffles":
@@ -67,6 +66,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             sys.exit("Unknown VCF format or re-run sniffle with '-n -1' to get supporting reads")
 
         fusion_output.write("\t".join(["ID","Fusion_type", "Flags", "ENSEMBL_IDS", "5'_gene", "5'_Breakpoint_location" ,"5'_BND", "5'_CDS_length", "5'_Original_CDS_length","3'_gene", "3'_Breakpoint_location", "3'_BND","3'_CDS_length", "3'_Original_CDS_length", "Supporting reads"])+"\n")
+
         for record in vcf_reader:
             if not isinstance(record.ALT[0], pyvcf.model._Breakend):
                 record = alt_convert(record)
@@ -80,6 +80,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 compared_id=re.findall("^\d+", record.INFO["ALT_READ_IDS"][0])[0]
                 pos1_orientation=record.ALT[0].orientation
                 pos2_orientation=record.ALT[0].remoteOrientation
+
             #SNIFFLES DOES NOT SHOW A CORRECT BND STRUCTURE FOR ALL BREAKPOINTS. FOR THAT REASON, THE STRANDS VALUE IN THE INFO FIELD IS USED TO PRODUCE A CORRECT BND STRUCTURE
             elif vcf_type=="Sniffles":
                 compared_id=re.findall("^\d+", record.INFO["RNAMES"][0])[0]
@@ -91,8 +92,10 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                     pos2_orientation=False
                 else:
                     pos2_orientation=True
+
             if compared_id in supporting_reads:
                 original_vcf_info=supporting_reads[compared_id]
+
 
             #Gather all ENSEMBL information on genes that overlap with the BND
             breakend1_annotation=ensembl_annotation(chrom1, pos1)
@@ -106,10 +109,13 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             breakend2_info=breakend_annotation(chrom2, pos2, pos2_orientation, breakend2_annotation)
 
             #Cross-compare all BND1 hits against all BND2 hits, determine correct fusions and produce output
-            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, original_vcf_info[2], info_output)
-
+            complex=False
+            if "complex" in record.FILTER:
+                complex=True
+            fusions, vcf_fusion_info=breakpoint_annotation(record, breakend1_info, breakend2_info, pos1_orientation, pos2_orientation, original_vcf_info[2], info_output, complex)
             #Produce output
             for fusion in fusions:
+                print(fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"])
                 fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
                 fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
                 fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
@@ -122,6 +128,7 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
                 record.INFO["FUSION"]=vcf_fusion_info
                 record.INFO["ORIGINAL_SVID"]=compared_id
             vcf_writer.write_record(record)
+
 
 #############################################   Convert unknown ALT fields to bracket notations N[Chr:pos[   #############################################
 def alt_convert( record ):
@@ -474,7 +481,7 @@ def fusion_check(Annotation1, Annotation2):
                 Fusion_type="intron-intron (OUT OF FRAME)"
         else:
             sys.exit("Unknown error in fusion check - 1")
-    elif Annotation1["Type"]=="exon" and Annotation2["Type"]=="intron":
+    elif Annotation1["Breakpoint_location"]=="CDS" and Annotation1["Type"]=="exon" and Annotation2["Type"]=="intron":
         Annotation1_CDS_length=0
         Annotation2_CDS_length=Annotation2["CDS_length"]
         if Annotation1["Order"]=="5'":
@@ -496,7 +503,7 @@ def fusion_check(Annotation1, Annotation2):
                 Fusion_type="intron-exon (OUT OF FRAME)"
         else:
             sys.exit("Unknown error in fusion check - 2")
-    elif Annotation2["Type"]=="exon" and Annotation1["Type"]=="intron":
+    elif Annotation1["Breakpoint_location"]=="CDS" and Annotation2["Type"]=="exon" and Annotation1["Type"]=="intron":
         Annotation1_CDS_length=Annotation1["CDS_length"]
         Annotation2_CDS_length=0
         if Annotation2["Order"]=="5'":
@@ -543,7 +550,7 @@ def fusion_check(Annotation1, Annotation2):
     return (Fusion_type, Annotation1_CDS_length, Annotation2_CDS_length)
 
 #################################   Checks each breakpoint for inaccurate mapping and flags all fusions   #########################################
-def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Original_vcf_filter ,Output):
+def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientation2, Original_vcf_filter ,Output, is_complex):
     chrom1=Record.CHROM
     pos1=Record.POS
     chrom2=Record.ALT[0].chr
@@ -557,6 +564,10 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
 
             #Add an extra flag based on both fused genes and produce a list of flags
             FLAGS=Original_vcf_filter+Record.FILTER+annotation1["Flags"]+annotation2["Flags"]
+
+            if is_complex:
+                FLAGS.append("Complex_fusion")
+                FLAGS.remove("complex")
 
             if (((annotation1["Gene_start"]>annotation2["Gene_start"] and annotation1["Gene_start"]<annotation2["Gene_end"] and
                 annotation1["Gene_end"]>annotation2["Gene_start"] and annotation1["Gene_end"]<annotation2["Gene_end"]) or
@@ -872,8 +883,8 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     domains_plot( acceptor_domains, 5 , "red", "3'")
 
 ############################################################################# Visualisation of the fusion gene
-
     fused_exons = []
+
     if "exon-exon" in annotated_breakpoints["Fusion_type"]:
         fused_protein=annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2-1]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-2:]
         fused_length=0
@@ -1043,7 +1054,8 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
     ax.text(0.62, 0.2, "Consensus sequence:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
     ax.text(0.62, 0.5, consensus, horizontalalignment='left',verticalalignment='center', size=9)
     ax.text(0.84, 0.2, "Supporting reads:", horizontalalignment='left',verticalalignment='top', size=10, fontweight='bold')
-    ax.text(0.84, 0.5, str(supporting_reads[0])+"/"+str(supporting_reads[0]+supporting_reads[1]), horizontalalignment='left',verticalalignment='center', size=9)
+    #ax.text(0.84, 0.5, str(supporting_reads[0])+"/"+str(supporting_reads[0]+supporting_reads[1]), horizontalalignment='left',verticalalignment='center', size=9)
+    ax.text(0.84, 0.5, str(supporting_reads[0]), horizontalalignment='left',verticalalignment='center', size=9)
 
     matplotlib.axes.Axes.invert_yaxis(ax)
     plt.axis('off')

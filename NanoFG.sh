@@ -24,10 +24,11 @@ GENERAL
 SELECTION AND FILTERING
     -s|--selection                                                     Select genes or areas to check for fusion genes.
                                                                        Insert a list of genes or areas, separated by a comma
-                                                                       e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590yy856'
+                                                             e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590856'
     -dc|--dont_clean                                                   Don't clean up the intermediate files
     -df|--dont_filter                                                  Don't filter out all non-PASS SVs
     -cc|--consensus_calling                                            Create a consensus sequence of the fusion-supporting reads. Not recommended on low-coverage data.
+    -cf|--complex_fusion_detection                                     Link multiple SVs together to give an indication of fusions where small SVs are located within the fusion breakpoint
 
 OUTPUT
     -o|--outputdir                                                     Path to output directory
@@ -80,6 +81,8 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
 THREADS=8
+
+COMPLEX_FUSION=false
 CONSENSUS_CALLING=false
 DONT_CLEAN=false
 DONT_FILTER=false
@@ -102,8 +105,8 @@ REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
 NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
 NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
-SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
-#SNIFFLES_SETTINGS='-s 2 -n -1 --genotype -d 1'     SETTINGS TO DETECT RECIPROCAL TRANSLOCATIONS
+
+SNIFFLES_SETTINGS='-s 2 -n -1 -d 10 --genotype'
 
 #REGION SELECTION DEFAULTS
 REGION_SELECTION_SCRIPT=$SCRIPT_DIR/RegionSelection.py
@@ -118,7 +121,8 @@ FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheck.py
 CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
 #MAPPING DEFAULTS
-MINIMAP2_SETTINGS='-ax map-ont'
+MINIMAP2_SETTINGS='-x map-ont -a --MD'
+
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
@@ -194,6 +198,12 @@ do
     NANOFG_DIR="$2"
     shift # past argument
     shift # past value
+    ;;
+    -cf|--complex_fusion_detection)
+    COMPLEX_FUSION=true
+    FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtractionComplex.py
+    FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
+    shift # past argument
     ;;
     -cc|--consensus_calling)
     CONSENSUS_CALLING=true
@@ -282,11 +292,6 @@ do
     shift # past argument
     shift # past value
     ;;
-    -fcs|--fusion_check_script)
-    FUSION_CHECK_SCRIPT="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -pdf|--primer_design_flank)
     PRIMER_DESIGN_FLANK="$2"
     shift # past argument
@@ -362,10 +367,17 @@ PRIMER_DIR=$OUTPUTDIR/primers
 BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
 SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
-if [ -d $CANDIDATE_DIR ]; then
+
+if [ -d "$CANDIDATE_DIR" ]; then
   rm $CANDIDATE_DIR/*
 else
   mkdir -p $CANDIDATE_DIR
+fi
+
+if [ -d "$PRIMER_DIR" ]; then
+  rm $PRIMER_DIR/*
+else
+  mkdir -p $PRIMER_DIR
 fi
 
 if [ ! -d $CANDIDATE_DIR ]; then
@@ -407,6 +419,11 @@ else
   -b $REGION_SELECTION_BED_OUTPUT \
   -r $SELECTION
 
+  if ! [ $? -eq 0 ]; then
+    echo "!!! REGION SELECTION NOT CORRECTLY COMPLETED... exiting"
+    exit
+  fi
+
   REGION_SELECTION_SAM_OUTPUT=${REGION_SELECTION_BAM_OUTPUT/.bam/.sam}
   $SAMTOOLS view -H $BAM > $REGION_SELECTION_SAM_OUTPUT
   $SAMTOOLS view -@ $THREADS -L $REGION_SELECTION_BED_OUTPUT $BAM | cut -f 1 | sort -k1n | uniq > reads.tmp
@@ -430,6 +447,10 @@ if [ -z $VCF ]; then
     -c $NANOSV_MINIMAP2_CONFIG \
     -ss "$SNIFFLES_SETTINGS" \
     -o $VCF
+    if ! [ $? -eq 0 ]; then
+      echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
+      exit
+    fi
 fi
 
 ################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
@@ -456,6 +477,10 @@ python $FUSION_READ_EXTRACTION_SCRIPT \
   -v $VCF_FILTERED \
   -o $CANDIDATE_DIR
 
+if ! [ $? -eq 0 ]; then
+  echo "!!! FUSION READ EXTRACTION NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
 ################################################## CREATION OF A CONSENSUS SEQUENCE OF THE READS THAT SUPPORT A SV (OPTIONAL, NOT RECOMMENDED IF LOW COVERAGE DATA)
 if [ $CONSENSUS_CALLING = true ];then
   echo -e "`date` \t Producing consensus if possible..."
@@ -512,12 +537,6 @@ else
   echo "NO CANDIDATE FUSION GENES FOUND"
   exit
 fi
-
-if [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
-  $SAMTOOLS calmd $BAM_MERGE_OUT $REFFASTA -b > temp.bam
-  mv temp.bam $BAM_MERGE_OUT
-  $SAMTOOLS index $BAM_MERGE_OUT
-fi
 ################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
 echo -e "`date` \t Calling SVs..."
 if [ -z $NANOSV_LAST_CONFIG ]; then
@@ -540,21 +559,10 @@ bash $PIPELINE_DIR/sv_calling.sh \
   -ss "$SNIFFLES_SETTINGS" \
   -o $SV_CALLING_OUT
 
-# if [ $CONSENSUS_CALLING = true ];then
-#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONSENSUS_CONFIG -ss '$SNIFFLES_SETTINGS'"
-# else
-#   SV_CALLING_SETTINGS="-sv $SV_CALLER -t 1 -s $SAMTOOLS -v $VENV -c $NANOSV_LAST_CONFIG -ss '$SNIFFLES_SETTINGS'"
-# fi
-#
-# for CANDIDATE_BAM in $CANDIDATE_DIR/*.last.sorted.bam; do
-#   echo ${CANDIDATE_BAM/.bam/};
-# done | \
-# xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/sv_calling.sh -b {}.bam -o {}.vcf $SV_CALLING_SETTINGS; exit 1;"
-#
-# grep "^#" $(ls $CANDIDATE_DIR/*.last.sorted.vcf | head -n 1) > $SV_CALLING_OUT
-# for CANDIDATE_VCF in $CANDIDATE_DIR/*.last.sorted.vcf; do
-#   grep -v "^#" $CANDIDATE_VCF >> $SV_CALLING_OUT
-# done
+if ! [ $? -eq 0 ]; then
+  echo "!!! SV CALLING NOT CORRECTLY COMPLETED... exiting"
+  exit
+fi
 
 ################################################## REMOVAL OF INSERTIONS (ALWAYS) AND SVS WITHOUT THE PASS FILTER (OPTIONAL)
 
@@ -570,6 +578,21 @@ else
   grep -v "^#" $SV_CALLING_OUT | awk '$5!="<INS>"' >> $SV_CALLING_OUT_FILTERED
 fi
 
+################################################### COMBINING SVS ON THE SAME READ FOR THE DETECTION OF COMPLEX FUSIONS
+if [ $COMPLEX_FUSION = false ];then
+  echo -e "### No complex fusion detection parameter (-cf) provided. Skipping SV combination"
+else
+  echo -e "`date` \t Linking and combining SVs for complex fusion detection"
+  VCF_COMPLEX=./complex.vcf
+
+  python $SCRIPT_DIR/CombineSVs.py \
+  -v $SV_CALLING_OUT_FILTERED \
+  -b $BAM_MERGE_OUT \
+  -o $VCF_COMPLEX
+
+  grep -v "^#" $VCF_COMPLEX >> $SV_CALLING_OUT_FILTERED
+fi
+
 ################################################### CHECKING THE CANDIDATE FUSION GENES FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
 echo -e "`date` \t Checking fusion candidates..."
 
@@ -580,17 +603,23 @@ python $FUSION_CHECK_SCRIPT \
   -fo $FUSION_CHECK_INFO_OUTPUT \
   -p $FUSION_CHECK_PDF_OUTPUT
 
-################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
-echo -e "`date` \t Designing primers around fusion breakpoints..."
-mkdir -p $PRIMER_DIR
-if [ ! -d $PRIMER_DIR ]; then
+if ! [ $? -eq 0 ]; then
+  echo "!!! FUSION CHECK NOT CORRECTLY COMPLETED... exiting"
   exit
 fi
+
+################################################### DESIGNING PRIMERS FOR THE DETECTED FUSIONS
+echo -e "`date` \t Designing primers around fusion breakpoints..."
 
 python $PRIMER_DESIGN_GETSEQ_SCRIPT \
  -v $FUSION_CHECK_VCF_OUTPUT \
  -d $PRIMER_DIR \
  -f $PRIMER_DESIGN_FLANK
+
+if ! [ $? -eq 0 ]; then
+ echo "!!! PRIMER FLANK DESIGN NOT CORRECTLY COMPLETED... exiting"
+ exit
+fi
 
 mkdir -p $PRIMER_DIR/tmp
 if [ ! -d $PRIMER_DIR/tmp ]; then
@@ -622,6 +651,7 @@ if [ -d $PRIMER_DESIGN_DIR ];then
        -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
        -pdm $PRIMER_DESIGN_MISPRIMING
     fi
+
     mv $PRIMER_DIR/tmp/primer3.out ${FUSION_FASTA/.fasta/_primerinfo.txt}
     rm $PRIMER_DIR/tmp/*
   done
@@ -633,7 +663,7 @@ else
   cat $PRIMER_DIR/*.fasta > $OUTPUTDIR/${SAMPLE}_FusionGenesBNDseq.fasta
 fi
 
-################################################### IF -DC IS SPECIFIED, ALL FILES EXCEPT THE OUTPUT FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
+################################################### IF -DC IS NOT SPECIFIED, ALL FILES EXCEPT THE OUTPUT FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
 
 if [ $DONT_CLEAN = false ];then
   rm $VCF_FILTERED
@@ -648,5 +678,4 @@ if [ $DONT_CLEAN = false ];then
 fi
 
 deactivate
-
 echo -e "`date` \t Done"

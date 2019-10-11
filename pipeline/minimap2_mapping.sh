@@ -10,7 +10,7 @@ Required parameters:
 Optional parameters:
 -h|--help                 Shows help
 -mm2|--minimap2           Path to minimap2 [$MINIMAP2]
--mm2s|--minimap2          Minimap2 parameters [$MINIMAP2_SETTINGS]
+-mm2s|--minimap2_settings Minimap2 parameters [$MINIMAP2_SETTINGS]
 -t|--threads              Number of threads [${THREADS}]
 -r|--reffasta             Reference genome [${REFFASTA}]
 -s|--sambamba             Path to sambamba|samtools [${SAMTOOLS}]
@@ -28,7 +28,7 @@ THREADS=1
 REFFASTA=$PATH_HOMO_SAPIENS_REFFASTA
 SAMTOOLS=$PATH_SAMTOOLS
 MINIMAP2=$PATH_MINIMAP2
-MINIMAP2_SETTINGS='-ax map-ont'
+MINIMAP2_SETTINGS='-x map-ont -a --MD'
 
 while [[ $# -gt 0 ]]; do
   KEY="$1"
@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
-    -mm2s|--minimap2)
+    -mm2s|--minimap2_settings)
     MINIMAP2_SETTINGS="$2"
     shift # past argument
     shift # past value
