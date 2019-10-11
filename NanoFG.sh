@@ -24,7 +24,7 @@ GENERAL
 SELECTION AND FILTERING
     -s|--selection                                                     Select genes or areas to check for fusion genes.
                                                                        Insert a list of genes or areas, separated by a comma
-                                                                       e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590856'
+                                                             e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590856'
     -dc|--dont_clean                                                   Don't clean up the intermediate files
     -df|--dont_filter                                                  Don't filter out all non-PASS SVs
     -cc|--consensus_calling                                            Create a consensus sequence of the fusion-supporting reads. Not recommended on low-coverage data.
@@ -81,6 +81,7 @@ SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
 THREADS=8
+
 COMPLEX_FUSION=false
 CONSENSUS_CALLING=false
 DONT_CLEAN=false
@@ -104,8 +105,8 @@ REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
 NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
 NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
+
 SNIFFLES_SETTINGS='-s 2 -n -1 -d 10 --genotype'
-#SNIFFLES_SETTINGS='-s 2 -n -1 --genotype -d 1'     SETTINGS TO DETECT RECIPROCAL TRANSLOCATIONS
 
 #REGION SELECTION DEFAULTS
 REGION_SELECTION_SCRIPT=$SCRIPT_DIR/RegionSelection.py
@@ -121,6 +122,7 @@ CONSENSUS_CALLING_WTDBG2_SETTINGS='-x ont -g 3g -q'
 
 #MAPPING DEFAULTS
 MINIMAP2_SETTINGS='-x map-ont -a --MD'
+
 LAST_MAPPING_SETTINGS="-Q 0 -p ${LAST_DIR}/last_params"
 LAST_MAPPING_THREADS=1
 
@@ -365,6 +367,7 @@ PRIMER_DIR=$OUTPUTDIR/primers
 BAM_MERGE_OUT=$OUTPUTDIR/candidate_fusion_genes.bam
 SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
+
 if [ -d "$CANDIDATE_DIR" ]; then
   rm $CANDIDATE_DIR/*
 else
@@ -534,7 +537,6 @@ else
   echo "NO CANDIDATE FUSION GENES FOUND"
   exit
 fi
-
 ################################################## CALLING SVS FOR THE MAPPED FUSION CANDIDATES
 echo -e "`date` \t Calling SVs..."
 if [ -z $NANOSV_LAST_CONFIG ]; then
@@ -676,5 +678,4 @@ if [ $DONT_CLEAN = false ];then
 fi
 
 deactivate
-
 echo -e "`date` \t Done"
