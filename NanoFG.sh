@@ -80,7 +80,7 @@ FILES_DIR=$NANOFG_DIR/files
 SCRIPT_DIR=$NANOFG_DIR/scripts
 VENV=${NANOFG_DIR}/venv/bin/activate
 
-THREADS=8
+THREADS=1
 
 COMPLEX_FUSION=false
 CONSENSUS_CALLING=false
@@ -166,6 +166,11 @@ do
     ;;
     -v|--vcf)
     VCF="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -t|--threads)
+    THREADS="$2"
     shift # past argument
     shift # past value
     ;;
