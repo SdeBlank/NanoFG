@@ -2,7 +2,10 @@
 
 ## INSTALL
 ```
-virtualenv venv -p </path/to/python>
+git clone https://github.com/SdeBlank/NanoFG.git NanoFG
+cd NanoFG
+
+virtualenv venv -p python3
 . venv/bin/activate
 pip install -r requirements.txt
 ```
