@@ -2,7 +2,7 @@
 
 This demonstration of NanoFG can be run on the simulation demo set demo.fastq. 
 
-This data constitutes 3524 simulated nanopore reads containing fusion spanning reads for the gene fusion NEDD4L – CEP112.
+This data constitutes 3524 simulated nanopore reads containing 17 fusion spanning reads for the gene fusion NEDD4L – CEP112.
 
 ## Dependencies
 NanoFG has been tested on the following operating system:
