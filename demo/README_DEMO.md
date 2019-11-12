@@ -1,5 +1,5 @@
 This demonstration of NanoFG can be run on the simulation demo set demo.fastq. 
-This data constitutes simulated nanopore reads containing XX fusion spanning reads for the gene fusion XX – XX.
+This data constitutes simulated nanopore reads containing 17 fusion spanning reads for the gene fusion NEDD4L – CEP112.
 
 To run NanoFG on the demo set, enter this command in the bash command line:
 
@@ -17,6 +17,6 @@ The expected output of NanoFG on the demo.fastq should contain:
 - demo_FusionGenes.primers
 - demo.FusionGenes.pdf
 
-NanoFG should detect XX fusion spanning reads for the gene fusion XX – XX.
+NanoFG should detect 17 fusion spanning reads for the gene fusion NEDD4L – CEP112.
 
-Estimated runtime: X minutes.
+Estimated runtime: 30 minutes.
