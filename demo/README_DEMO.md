@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ```
 Adjust all paths in the paths.ini file to installed tools
 
-
+*Installation should take <5 minutes*
 
 
 ## How to run
@@ -35,7 +35,7 @@ Adjust all paths in the paths.ini file to installed tools
 To run NanoFG on the demo set, enter this command in the bash command line:
 
 ```
-NanoFG.sh -f NanoFG/demo/demo_fastqdir
+bash NanoFG.sh -f NanoFG/demo/demo_fastqdir
 ```
 
 ## Expected results
@@ -49,3 +49,8 @@ The expected output of NanoFG on the demo.fastq should contain:
 NanoFG should detect 17 fusion spanning reads for the gene fusion NEDD4L – CEP112.
 
 Estimated runtime: 5 minutes.
+
+```
+For more information, see the wiki:
+https://github.com/SdeBlank/NanoFG/wiki
+```
