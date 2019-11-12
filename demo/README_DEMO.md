@@ -4,7 +4,7 @@ This data constitutes 3524 simulated nanopore reads containing 17 fusion spannin
 To run NanoFG on the demo set, enter this command in the bash command line:
 
 ```
-NanoFG.sh -f NanoFG/demo/
+NanoFG.sh -f NanoFG/demo/demo_fastqdir
 ```
 
 NanoFG has been tested on the following operating system:
