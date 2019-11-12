@@ -2,14 +2,21 @@
 
 This demonstration of NanoFG can be run on the simulation demo set demo.fastq. 
 
-This data constitutes 3524 simulated nanopore reads containing 17 fusion spanning reads for the gene fusion NEDD4L – CEP112.
+This data constitutes 3524 simulated nanopore reads containing fusion spanning reads for the gene fusion NEDD4L – CEP112.
 
-## Installation
-
+## Dependencies
 NanoFG has been tested on the following operating system:
 - Operating system:       CentOS Linux release 7.7.1908 (Core)
 - LSB Version:            :core-4.1-amd64:core-4.1-noarch
 
+NanoFG requires installation of the following tools:
+
+- Samtools (1.7) - http://samtools.sourceforge.net/
+- Minimap2 (2.6) - https://github.com/lh3/minimap2 
+- LAST (921) - http://last.cbrc.jp/doc/last.html
+- NanoSV (1.2.4) - https://github.com/mroosmalen/nanosv
+
+## Installation
 ```
 git clone https://github.com/SdeBlank/NanoFG.git NanoFG
 cd NanoFG
