@@ -13,7 +13,7 @@ Adjust all paths in the paths.ini file to installed tools
 
 ## How to run
 
-bash NanoFG.sh -f </path/to/fastq>  [-n SAMPLE_NAME ] [-s SELECTION] [-cf] [-cc] [-df] [-dc]
+bash NanoFG.sh -f </path/to/fastqdir>  [-n SAMPLE_NAME ] [-s SELECTION] [-cf] [-cc] [-df] [-dc]
 ```
 OR
 ```
