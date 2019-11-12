@@ -1,5 +1,29 @@
+# NanoFG Demo
+
 This demonstration of NanoFG can be run on the simulation demo set demo.fastq. 
+
 This data constitutes 3524 simulated nanopore reads containing 17 fusion spanning reads for the gene fusion NEDD4L – CEP112.
+
+## Installation
+
+NanoFG has been tested on the following operating system:
+- Operating system:       CentOS Linux release 7.7.1908 (Core)
+- LSB Version:            :core-4.1-amd64:core-4.1-noarch
+
+```
+git clone https://github.com/SdeBlank/NanoFG.git NanoFG
+cd NanoFG
+
+virtualenv venv -p python3
+. venv/bin/activate
+pip install -r requirements.txt
+```
+Adjust all paths in the paths.ini file to installed tools
+
+
+
+
+## How to run
 
 To run NanoFG on the demo set, enter this command in the bash command line:
 
@@ -7,9 +31,7 @@ To run NanoFG on the demo set, enter this command in the bash command line:
 NanoFG.sh -f NanoFG/demo/demo_fastqdir
 ```
 
-NanoFG has been tested on the following operating system:
-- Operating system:       CentOS Linux release 7.7.1908 (Core)
-- LSB Version:            :core-4.1-amd64:core-4.1-noarch
+## Expected results
 
 The expected output of NanoFG on the demo.fastq should contain:
 - demo_FusionGenesInfo.txt
