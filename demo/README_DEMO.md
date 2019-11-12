@@ -4,7 +4,7 @@ This data constitutes simulated nanopore reads containing XX fusion spanning rea
 To run NanoFG on the demo set, enter this command in the bash command line:
 
 ```
-NanoFG.sh -f demo.fastq
+NanoFG.sh -f <path/to/demo_fastqdir>
 ```
 
 NanoFG has been tested on the following operating system:
