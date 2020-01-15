@@ -22,3 +22,7 @@ bash NanoFG.sh -b </path/to/bam> [-v </path/to/vcf>] [-n SAMPLE_NAME ] [-s SELEC
 ```
 For more information, see the wiki:
 https://github.com/SdeBlank/NanoFG/wiki
+```
+
+## How to run
+Please see and cite: https://www.biorxiv.org/content/10.1101/807545v2
