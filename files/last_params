@@ -1,0 +1,136 @@
+# lastal version: 921
+# maximum percent identity: 100
+# scale of score parameters: 4.36661
+# scale used while training: 87.3322
+
+# lastal -j7 -S1 -P4 -Q1 /hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37 /tmp/2886301.1.default/tmpWSdjFp
+
+# aligned letter pairs: 841274.9
+# deletes: 36128.01625
+# inserts: 33263.292183
+# delOpens: 20570.83379
+# insOpens: 20061.653305
+# alignments: 748
+# mean delete size: 1.75627
+# mean insert size: 1.65805
+# delOpenProb: 0.0233056
+# insOpenProb: 0.0227287
+# delExtendProb: 0.430613
+# insExtendProb: 0.396883
+
+# delExistCost: 304
+# insExistCost: 294
+# delExtendCost: 74
+# insExtendCost: 81
+
+# lastal -j7 -S1 -P4 -Q1 -p- /hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37 /tmp/2886301.1.default/tmpWSdjFp
+
+# aligned letter pairs: 912988.3
+# deletes: 57156.2587
+# inserts: 50036.3289
+# delOpens: 30586.1052
+# insOpens: 29481.1691
+# alignments: 611
+# mean delete size: 1.8687
+# mean insert size: 1.69723
+# delOpenProb: 0.0314133
+# insOpenProb: 0.0302785
+# delExtendProb: 0.464869
+# insExtendProb: 0.410805
+
+# delExistCost: 290
+# insExistCost: 274
+# delExtendCost: 67
+# insExtendCost: 78
+
+# lastal -j7 -S1 -P4 -Q1 -p- /hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37 /tmp/2886301.1.default/tmpWSdjFp
+
+# aligned letter pairs: 910380.3
+# deletes: 60081.4707
+# inserts: 52375.084
+# delOpens: 31934.4587
+# insOpens: 30960.9624
+# alignments: 601
+# mean delete size: 1.8814
+# mean insert size: 1.69165
+# delOpenProb: 0.032791
+# insOpenProb: 0.0317914
+# delExtendProb: 0.468481
+# insExtendProb: 0.408861
+
+# delExistCost: 287
+# insExistCost: 269
+# delExtendCost: 66
+# insExtendCost: 78
+
+# lastal -j7 -S1 -P4 -Q1 -p- /hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37 /tmp/2886301.1.default/tmpWSdjFp
+
+# aligned letter pairs: 912039.5
+# deletes: 60784.0785
+# inserts: 52911.777
+# delOpens: 32297.2619
+# insOpens: 31344.1585
+# alignments: 602
+# mean delete size: 1.88202
+# mean insert size: 1.68809
+# delOpenProb: 0.0330818
+# insOpenProb: 0.0321056
+# delExtendProb: 0.468656
+# insExtendProb: 0.407615
+
+# delExistCost: 287
+# insExistCost: 268
+# delExtendCost: 66
+# insExtendCost: 78
+
+# lastal -j7 -S1 -P4 -Q1 -p- /hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37 /tmp/2886301.1.default/tmpWSdjFp
+
+# aligned letter pairs: 910074.5
+# deletes: 60594.1484
+# inserts: 52861.049
+# delOpens: 32211.4419
+# insOpens: 31348.9267
+# alignments: 601
+# mean delete size: 1.88114
+# mean insert size: 1.68622
+# delOpenProb: 0.0330633
+# insOpenProb: 0.0321779
+# delExtendProb: 0.468407
+# insExtendProb: 0.406956
+
+# delExistCost: 287
+# insExistCost: 267
+# delExtendCost: 66
+# insExtendCost: 79
+
+# lastal -j7 -S1 -P4 -Q1 -p- /hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37 /tmp/2886301.1.default/tmpWSdjFp
+
+# aligned letter pairs: 909765.5
+# deletes: 60495.4183
+# inserts: 52752.375
+# delOpens: 32175.3318
+# insOpens: 31345.8145
+# alignments: 599
+# mean delete size: 1.88018
+# mean insert size: 1.68292
+# delOpenProb: 0.0330381
+# insOpenProb: 0.0321863
+# delExtendProb: 0.468136
+# insExtendProb: 0.405793
+
+# delExistCost: 287
+# insExistCost: 267
+# delExtendCost: 66
+# insExtendCost: 79
+
+#last -a 14
+#last -A 13
+#last -b 3
+#last -B 4
+#last -S 1
+# score matrix (query letters = columns, reference letters = rows):
+       A      C      G      T
+A      6    -18    -18    -18
+C    -18      6    -18    -18
+G    -18    -18      6    -18
+T    -18    -18    -18      6
