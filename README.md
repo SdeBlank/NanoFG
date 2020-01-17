@@ -24,5 +24,5 @@ For more information, see the wiki:
 https://github.com/SdeBlank/NanoFG/wiki
 ```
 
-## How to run
+## Citation
 Please see and cite: https://www.biorxiv.org/content/10.1101/807545v2
