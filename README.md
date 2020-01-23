@@ -1,5 +1,7 @@
 # NanoFG
 
+##### NanoFG integrates existing genomic tools and additonal code to provide an easy-to-use pipeline for the detection of fusion genes from Nanopore sequencing data
+
 ## INSTALL
 ```
 git clone https://github.com/SdeBlank/NanoFG.git NanoFG
