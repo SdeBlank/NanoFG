@@ -19,19 +19,20 @@ exit
 }
 
 POSITIONAL=()
-
+NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
+source ${NANOFG_DIR}/paths.ini
 # DEFAULT SETTINGS
 THREADS=1
-REF=/hpc/cog_bioinf/GENOMES/LAST/human_GATK_GRCh37
-REF_DICT=/hpc/cog_bioinf/GENOMES/Homo_sapiens.GRCh37.GATK.illumina/Homo_sapiens.GRCh37.GATK.illumina.dict
+REF=${PATH_HOMO_SAPIENS_REFGENOME}
+REF_DICT=${PATH_HOMO_SAPIENS_REFDICT}
+LAST_DIR=${PATH_LAST_DIR}
 LASTAL=${LAST_DIR}/src/lastal
-LAST_DIR=/hpc/cog_bioinf/kloosterman/tools/last-921
 LAST_SPLIT=${LAST_DIR}/src/last-split
 LAST_PARAMS=${LAST_DIR}/last_params
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
 LAST_SETTINGS="-Q 0 -p ${LAST_PARAMS}"
 MAF_CONVERT=${LAST_DIR}/scripts/maf-convert
-SAMTOOLS=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
+SAMTOOLS=${PATH_SAMTOOLS}
 
 while [[ $# -gt 0 ]]; do
   KEY="$1"

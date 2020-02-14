@@ -12,8 +12,11 @@ Optional parameters:
 "
 }
 
+NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
+source ${NANOFG_DIR}/paths.ini
+
 POSITIONAL=()
-SAMBAMBA=/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba
+SAMBAMBA=${PATH_SAMTOOLS}
 OUTPUT='/dev/stdout'
 SPLITDIR=./split_vcf
 

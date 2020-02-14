@@ -21,7 +21,10 @@ Optional parameters:
 
 POSITIONAL=()
 
-PRIMER_DESIGN_DIR="/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3/"
+NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
+source ${NANOFG_DIR}/paths.ini
+
+PRIMER_DESIGN_DIR=${PATH_PRIMER_DESIGN_DIR}
 # DEFAULTS
 BINDIR=$PRIMER_DESIGN_DIR/primers
 PCR_TYPE='single'
@@ -30,7 +33,6 @@ PSR='60-200'
 GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
 PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
 MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
-#MISPRIMING='/hpc/cog_bioinf/cuppen/personal_data/jvalleinclan/tools_kloosterman/primer3repbase/current/humrep.ref'
 
 while [[ $# -gt 0 ]]
 do

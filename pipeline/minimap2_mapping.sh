@@ -20,8 +20,8 @@ exit
 
 POSITIONAL=()
 
-NANOFG_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))/../
-source $NANOFG_DIR/paths.ini
+NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
+source ${NANOFG_DIR}/paths.ini
 
 # DEFAULT SETTINGS
 THREADS=1

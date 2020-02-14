@@ -19,13 +19,15 @@ Optional parameters:
 
 POSITIONAL=()
 
+
 # DEFAULTS
 NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
+source ${NANOFG_DIR}/paths.ini
 FILES_DIR=$NANOFG_DIR/files
 
 THREADS=1
-SV_CALLER='/hpc/cog_bioinf/kloosterman/tools/NanoSV/nanosv/NanoSV.py'
-SAMBAMBA='/hpc/local/CentOS7/cog_bioinf/sambamba_v0.6.5/sambamba'
+SV_CALLER=${PATH_SV_CALLER}
+SAMBAMBA=${PATH_SAMTOOLS}
 OUTPUT='/dev/stdout'
 VENV=$NANOFG_DIR/venv/bin/activate
 CONFIG=$FILES_DIR/nanosv_last_config.ini

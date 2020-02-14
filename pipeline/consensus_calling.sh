@@ -16,10 +16,11 @@ exit
 }
 
 POSITIONAL=()
-
+NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
+source ${NANOFG_DIR}/paths.ini
 # DEFAULT SETTINGS
 THREADS=1
-WTDBG2_DIR=/hpc/cog_bioinf/kloosterman/tools/wtdbg2_v2.2
+WTDBG2_DIR=${PATH_WTDBG2_DIR}
 WTDBG2=${WTDBG2_DIR}/wtdbg2
 WTPOA_CNS=${WTDBG2_DIR}/wtpoa-cns
 WTDBG2_SETTINGS='-x ont -g 3g'
