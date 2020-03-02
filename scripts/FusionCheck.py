@@ -381,6 +381,7 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
+                BND_INFO["Type"]="before_transcript"
             elif POS>gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
             else:
