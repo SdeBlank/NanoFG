@@ -116,11 +116,16 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
             #Produce output
             for fusion in fusions:
                 print(fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"])
-                fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
-                fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
-                fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
-                str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
-
+                if fusion["Fusion_type"]!="Possible promoter fusion":
+                    fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
+                    fusion["5'"]["Type"]+" "+str(fusion["5'"]["Rank"])+"-"+str(fusion["5'"]["Rank"]+1), fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
+                    fusion["3'"]["Gene_name"], fusion["3'"]["Type"]+" "+str(fusion["3'"]["Rank"])+"-"+str(fusion["3'"]["Rank"]+1), fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
+                    str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
+                else:
+                    fusion_output.write("\t".join([str(compared_id), fusion["Fusion_type"], ";".join(fusion["Flags"]), fusion["5'"]["Gene_id"]+"-"+fusion["3'"]["Gene_id"] ,fusion["5'"]["Gene_name"],
+                    fusion["5'"]["Breakpoint_location"], fusion["5'"]["BND"], str(fusion["5'"]["CDS_length"]), str(fusion["5'"]["Original_CDS_length"]),
+                    fusion["3'"]["Gene_name"], fusion["3'"]["Breakpoint_location"], fusion["3'"]["BND"], str(fusion["3'"]["CDS_length"]),
+                    str(fusion["3'"]["Original_CDS_length"]), str(original_vcf_info[0])+"/"+str(original_vcf_info[0]+original_vcf_info[1])])+"\n")
                 current_fusion=copy.deepcopy(fusion)
                 visualisation(current_fusion, compared_id, original_vcf_info, output_pdf)
 
@@ -349,10 +354,18 @@ def breakend_annotation(CHROM, POS, orientation, Info):
         BND_INFO["Breakend_position"]=POS
         if gene["Strand"]==1:
             ORIENTATION=orientation
+            if ORIENTATION:
+                BND_INFO["Order"]="3'"
+            else:
+                BND_INFO["Order"]="5'"
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_start"])
                 BND_INFO["Type"]="before_transcript"
+                if BND_INFO["Order"]=="5'":
+                    BND_INFO["TSS_retained"]=False
+                else:
+                    BND_INFO["TSS_retained"]=True
             elif POS<gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
             elif POS>=gene["CDS_start"] and POS<=gene["CDS_end"]:
@@ -372,6 +385,10 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                 print(gene["Transcript_start"], gene["CDS_start"],  POS, gene["CDS_end"], gene["Transcript_end"])
         else:
             ORIENTATION= not orientation
+            if ORIENTATION:
+                BND_INFO["Order"]="3'"
+            else:
+                BND_INFO["Order"]="5'"
             if POS<gene["Transcript_start"]:
                 BND_INFO["Breakpoint_location"]="after_transcript"
                 BND_INFO["Distance from transcript end"]=abs(POS-gene["Transcript_start"])
@@ -388,16 +405,15 @@ def breakend_annotation(CHROM, POS, orientation, Info):
             elif POS>gene["Transcript_end"]:
                 BND_INFO["Breakpoint_location"]="before_transcript"
                 BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
-                BND_INFO["Type"]="before_transcript"
+                BND_INFO["Type"]="after_transcript"
+                if BND_INFO["Order"]=="5'":
+                    BND_INFO["TSS_retained"]=False
+                else:
+                    BND_INFO["TSS_retained"]=True
             elif POS>gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
             else:
                 print(gene["Transcript_start"], gene["CDS_start"],  POS, gene["CDS_end"], gene["Transcript_end"])
-
-        if ORIENTATION:
-            BND_INFO["Order"]="3'"
-        else:
-            BND_INFO["Order"]="5'"
 
         for idx, sequence in enumerate(gene["Exons"]):
             if gene["Strand"]==1:
@@ -528,8 +544,12 @@ def fusion_check(Annotation1, Annotation2):
         else:
             sys.exit("Unknown error in fusion check - 3")
 
-    elif Annotation1["Breakpoint_location"]=="5'UTR" and Annotation1["Type"]==Annotation2["Type"]:
-        Fusion_type="Promoter fusion"
+    elif Annotation1["Breakpoint_location"]=="5'UTR":
+        if Annotation1["Type"]==Annotation2["Type"]:
+            Fusion_type="5'UTR fusion"
+        else:
+            #Exon-intron are not yet calculated, so NanoFG currently reports 'possible' until added
+            Fusion_type="Possible 5'UTR fusion"
         if Annotation1["Order"]=="5'":
             Annotation1_CDS_length=0
             Annotation2_CDS_length=Annotation2["Original_CDS_length"]
@@ -537,14 +557,31 @@ def fusion_check(Annotation1, Annotation2):
             Annotation1_CDS_length=Annotation2["Original_CDS_length"]
             Annotation2_CDS_length=0
 
-    elif Annotation1["Breakpoint_location"]=="3'UTR" and Annotation1["Type"]==Annotation2["Type"]:
-        Fusion_type="3'UTR fusion"
+    elif Annotation1["Breakpoint_location"]=="3'UTR":
+        if Annotation1["Type"]==Annotation2["Type"]:
+            Fusion_type="3'UTR fusion"
+        else:
+            #Exon-intron are not yet calculated, so NanoFG currently reports 'possible' until added
+            Fusion_type="Possible 3'UTR fusion"
+
         if Annotation1["Order"]=="5'":
             Annotation1_CDS_length=Annotation2["Original_CDS_length"]
             Annotation2_CDS_length=0
         else:
             Annotation1_CDS_length=0
             Annotation2_CDS_length=Annotation2["Original_CDS_length"]
+
+    elif ((Annotation1["Breakpoint_location"]=="before_transcript" or Annotation2["Breakpoint_location"]=="before_transcript") or
+            (Annotation1["Breakpoint_location"]=="before_transcript" or Annotation2["Breakpoint_location"]=="5'UTR") or
+            (Annotation1["Breakpoint_location"]=="5'UTR" or Annotation2["Breakpoint_location"]=="before_transcript") and
+            Annotation1["TSS_retained"]==True and Annotation2["TSS_retained"]==True):
+        Fusion_type="Possible promoter fusion"
+        if Annotation1["Order"]=="5'":
+            Annotation1_CDS_length=0
+            Annotation2_CDS_length=Annotation2["Original_CDS_length"]
+        else:
+            Annotation1_CDS_length=Annotation2["Original_CDS_length"]
+            Annotation2_CDS_length=0
     else:
         sys.exit("Unknown fusion in vcf")
 
@@ -602,15 +639,18 @@ def breakpoint_annotation(Record, Breakend1, Breakend2, Orientation1, Orientatio
                     three_prime_gene=annotation1
                 else:
                     continue
-                if ((Orientation1 and Orientation2 and annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
-                    (Orientation1 and not Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
-                    (not Orientation1 and Orientation2 and annotation1["Strand"]==annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"]) or
-                    (not Orientation1 and not Orientation2 and annotation1["Strand"]!=annotation2["Strand"] and annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"])):
-                        fusion_type, annotation1["CDS_length"], annotation2["CDS_length"] = fusion_check(annotation1, annotation2)
-                        if len(FLAGS)==0:
-                            FLAGS=["None"]
-                        Fusion_output.append({"5'": five_prime_gene, "3'": three_prime_gene, "Fusion_type": fusion_type, "Flags":FLAGS})
-                        Vcf_output.append(five_prime_gene["Gene_name"]+"-"+three_prime_gene["Gene_name"])
+                if ((Orientation1 and Orientation2 and annotation1["Strand"]!=annotation2["Strand"]) or
+                    (Orientation1 and not Orientation2 and annotation1["Strand"]==annotation2["Strand"]) or
+                    (not Orientation1 and Orientation2 and annotation1["Strand"]==annotation2["Strand"]) or
+                    (not Orientation1 and not Orientation2 and annotation1["Strand"]!=annotation2["Strand"])):
+                        if (annotation1["Breakpoint_location"]==annotation2["Breakpoint_location"] or
+                            (annotation1["Breakpoint_location"]=="before_transcript" or annotation1["Breakpoint_location"]=="5'UTR") and
+                            (annotation2["Breakpoint_location"]=="before_transcript" or annotation2["Breakpoint_location"]=="5'UTR")):
+                            fusion_type, annotation1["CDS_length"], annotation2["CDS_length"] = fusion_check(annotation1, annotation2)
+                            if len(FLAGS)==0:
+                                FLAGS=["None"]
+                            Fusion_output.append({"5'": five_prime_gene, "3'": three_prime_gene, "Fusion_type": fusion_type, "Flags":FLAGS})
+                            Vcf_output.append(five_prime_gene["Gene_name"]+"-"+three_prime_gene["Gene_name"])
 
     return (Fusion_output, Vcf_output)
 
@@ -841,189 +881,190 @@ def visualisation(annotated_breakpoints, original_svid, supporting_reads, pdf):
 
 
 ############################################################################# Visualisation of the donor gene (5')
-    donor_exons, donor_domains, breakpoint = gene_visualisation(annotated_breakpoints["5'"], "5'")
+    try:
+        donor_exons, donor_domains, breakpoint = gene_visualisation(annotated_breakpoints["5'"], "5'")
 
-    ax = fig.add_subplot(gs[2, 0])
-    ax.text(0, yvalue, annotated_breakpoints["5'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
-    ax.text(0, yvalue-0.1, "("+str(int(annotated_breakpoints["5'"]["Original_CDS_length"]/3))+" aa)", horizontalalignment='center',verticalalignment='center', size=7)
-    plt.axis('off')
+        ax = fig.add_subplot(gs[2, 0])
+        ax.text(0, yvalue, annotated_breakpoints["5'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
+        ax.text(0, yvalue-0.1, "("+str(int(annotated_breakpoints["5'"]["Original_CDS_length"]/3))+" aa)", horizontalalignment='center',verticalalignment='center', size=7)
+        plt.axis('off')
 
-    ax = fig.add_subplot(gs[2, 2])
-    if annotated_breakpoints["5'"]["Strand"]==1:
-        ax.text(0, yvalue, "+", horizontalalignment='center',verticalalignment='center', size=15)
-    else:
-        ax.text(0, yvalue, "_", horizontalalignment='center',verticalalignment='bottom', size=15)
-    plt.axis('off')
+        ax = fig.add_subplot(gs[2, 2])
+        if annotated_breakpoints["5'"]["Strand"]==1:
+            ax.text(0, yvalue, "+", horizontalalignment='center',verticalalignment='center', size=15)
+        else:
+            ax.text(0, yvalue, "_", horizontalalignment='center',verticalalignment='bottom', size=15)
+        plt.axis('off')
 
-    domains_plot( donor_domains, 1 , "blue", "5'")
-    exons_plot( donor_exons , 2 )
-    introns_plot( 0, 100, 2, "blue" )
+        domains_plot( donor_domains, 1 , "blue", "5'")
+        exons_plot( donor_exons , 2 )
+        introns_plot( 0, 100, 2, "blue" )
 
-    breakpoint_plot(breakpoint, 2)
+        breakpoint_plot(breakpoint, 2)
 
-############################################################################# Visualisation of the acceptor gene (3')
+    ############################################################################# Visualisation of the acceptor gene (3')
 
-    acceptor_exons, acceptor_domains, breakpoint = gene_visualisation(annotated_breakpoints["3'"], "3'")
+        acceptor_exons, acceptor_domains, breakpoint = gene_visualisation(annotated_breakpoints["3'"], "3'")
 
-    Protein_info=annotated_breakpoints["3'"]["Gene_name"]+"\n"+"("+str(int(annotated_breakpoints["3'"]["Original_CDS_length"]/3))+" aa)"
-    ax = fig.add_subplot(gs[4, 0])
-    ax.text(0, yvalue, annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
-    ax.text(0, yvalue-0.1, "("+str(int(annotated_breakpoints["3'"]["Original_CDS_length"]/3))+" aa)", horizontalalignment='center',verticalalignment='center', size=7)
-    plt.axis('off')
+        Protein_info=annotated_breakpoints["3'"]["Gene_name"]+"\n"+"("+str(int(annotated_breakpoints["3'"]["Original_CDS_length"]/3))+" aa)"
+        ax = fig.add_subplot(gs[4, 0])
+        ax.text(0, yvalue, annotated_breakpoints["3'"]["Gene_name"], horizontalalignment='center',verticalalignment='bottom', size=9)
+        ax.text(0, yvalue-0.1, "("+str(int(annotated_breakpoints["3'"]["Original_CDS_length"]/3))+" aa)", horizontalalignment='center',verticalalignment='center', size=7)
+        plt.axis('off')
 
-    ax = fig.add_subplot(gs[4, 2])
-    if annotated_breakpoints["3'"]["Strand"]==1:
-        ax.text(0, yvalue, "+", horizontalalignment='center',verticalalignment='center', size=15)
-    else:
-        ax.text(0, yvalue, "_", horizontalalignment='center',verticalalignment='bottom', size=15)
-    plt.axis('off')
+        ax = fig.add_subplot(gs[4, 2])
+        if annotated_breakpoints["3'"]["Strand"]==1:
+            ax.text(0, yvalue, "+", horizontalalignment='center',verticalalignment='center', size=15)
+        else:
+            ax.text(0, yvalue, "_", horizontalalignment='center',verticalalignment='bottom', size=15)
+        plt.axis('off')
 
-    introns_plot( 0, 100, 4, "red" )
-    exons_plot( acceptor_exons, 4 )
-    breakpoint_plot(breakpoint, 4)
-    domains_plot( acceptor_domains, 5 , "red", "3'")
+        introns_plot( 0, 100, 4, "red" )
+        exons_plot( acceptor_exons, 4 )
+        breakpoint_plot(breakpoint, 4)
+        domains_plot( acceptor_domains, 5 , "red", "3'")
 
-############################################################################# Visualisation of the fusion gene
-    fused_exons = []
+    ############################################################################# Visualisation of the fusion gene
+        fused_exons = []
 
-    if "exon-exon" in annotated_breakpoints["Fusion_type"]:
-        fused_protein=annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2-1]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-2:]
-        fused_length=0
-        fused_nr_of_exons=0
-        for index, exon in enumerate(fused_protein):
-            if exon["Type"]=="exon":
-                fused_nr_of_exons+=1
-                origin=exon["Origin"]
-                if exon["Origin"]=="5'" and exon["Rank"]==annotated_breakpoints["5'"]["Rank"]:
-                    fused_protein[index]["End"]=annotated_breakpoints["5'"]["Breakend_position"]
-                    exon["End"]=annotated_breakpoints["5'"]["Breakend_position"]
-                if exon["Origin"]=="3'" and exon["Rank"]==annotated_breakpoints["3'"]["Rank"]:
-                    fused_protein[index]["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
-                    exon["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
-                fused_length+=abs(exon["End"]-exon["Start"])
-        breaks=fused_nr_of_exons-2
-        part=(xmax-breaks)/fused_length
-        space=0
-        exon_length=0
-        exon_start=0
-        origin="5'"
-        for exon in fused_protein:
-            if exon["Type"]=="exon":
-                if exon["Origin"]!=origin:
-                    BND=exon_start+exon_length
-                    exon_start=exon_start+exon_length
-                else:
-                    exon_start=exon_start+exon_length+space
-                origin=exon["Origin"]
-                exon_length=(abs(exon["End"]-exon["Start"])+1)*part
-                label=exon["Rank"]
-                if exon["CDS"]:
-                    if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
-                        fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
-                        coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
-                        fused_exons.append((CDS_start, coding_length, label, True,origin, False))
-                    elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
-                        fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
-                    else:
-                        fused_exons.append((exon_start, exon_length, label, True, origin, False))
-                else:
-                    fused_exons.append((exon_start, exon_length, label, False, origin, False))
-                space=Intron_size
-    elif "intron-intron" in annotated_breakpoints["Fusion_type"]:
-        fused_protein=annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2-1]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-1:]
-        fused_length=0
-        fused_nr_of_exons=0
-        for exon in fused_protein:
-            if exon["Type"]=="exon":
-                fused_length+=abs(exon["End"]-exon["Start"])
-                fused_nr_of_exons+=1
-        breaks=fused_nr_of_exons-1
-        part=(xmax-breaks)/fused_length
-        space=0
-        exon_length=0
-        exon_start=0
-        origin="5'"
-        for exon in fused_protein:
-            if exon["Type"]=="exon":
-                if exon["Origin"]!=origin:
-                    BND=exon_start+exon_length+(space/2)
-                origin=exon["Origin"]
-                exon_start=exon_start+exon_length+space
-                exon_length=(abs(exon["End"]-exon["Start"])+1)*part
-                label=exon["Rank"]
-                if exon["CDS"]:
-                    if exon["Contains_start_CDS"]:
-                        fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
-                        coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
-                        fused_exons.append((CDS_start, coding_length, label, True,origin, False))
-                    elif exon["Contains_end_CDS"]:
-                        fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
-                        fused_exons.append((exon_start, coding_length, label, True, origin, False))
-                    else:
-                        fused_exons.append((exon_start, exon_length, label, True, origin, False))
-                else:
-                    fused_exons.append((exon_start, exon_length, label, False, origin, False))
-                space=Intron_size
-
-    elif "exon" in annotated_breakpoints["Fusion_type"] and "intron" in annotated_breakpoints["Fusion_type"]:
-        if "exon-intron" in annotated_breakpoints["Fusion_type"]:
-            fused_protein=copy.deepcopy(annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-1:])
-        elif "intron-exon" in annotated_breakpoints["Fusion_type"]:
-            fused_protein=copy.deepcopy(annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-2:])
-        fused_length=0
-        fused_nr_of_exons=0
-        for index, exon in enumerate(fused_protein):
-            if exon["Type"]=="exon":
-                fused_nr_of_exons+=1
-                origin=exon["Origin"]
-                if exon["Origin"]=="5'" and exon["Rank"]==annotated_breakpoints["5'"]["Rank"] and "exon-intron" in annotated_breakpoints["Fusion_type"]:
-                    fused_protein[index]["End"]=annotated_breakpoints["5'"]["Breakend_position"]
-                    exon["End"]=annotated_breakpoints["5'"]["Breakend_position"]
-                if exon["Origin"]=="3'" and exon["Rank"]==annotated_breakpoints["3'"]["Rank"] and "intron-exon" in annotated_breakpoints["Fusion_type"]:
-                    fused_protein[index]["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
-                    exon["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
-                fused_length+=abs(exon["End"]-exon["Start"])
-        breaks=fused_nr_of_exons-1
-        part=(xmax-breaks)/fused_length
-        space=0
-        exon_length=0
-        exon_start=0
-        origin="5'"
-        for index, exon in enumerate(fused_protein):
-            if exon["Type"]=="exon":
-                if exon["Origin"]!=origin:
-                    if "exon-intron" in annotated_breakpoints["Fusion_type"]:
+        if "exon-exon" in annotated_breakpoints["Fusion_type"]:
+            fused_protein=annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2-1]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-2:]
+            fused_length=0
+            fused_nr_of_exons=0
+            for index, exon in enumerate(fused_protein):
+                if exon["Type"]=="exon":
+                    fused_nr_of_exons+=1
+                    origin=exon["Origin"]
+                    if exon["Origin"]=="5'" and exon["Rank"]==annotated_breakpoints["5'"]["Rank"]:
+                        fused_protein[index]["End"]=annotated_breakpoints["5'"]["Breakend_position"]
+                        exon["End"]=annotated_breakpoints["5'"]["Breakend_position"]
+                    if exon["Origin"]=="3'" and exon["Rank"]==annotated_breakpoints["3'"]["Rank"]:
+                        fused_protein[index]["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
+                        exon["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
+                    fused_length+=abs(exon["End"]-exon["Start"])
+            breaks=fused_nr_of_exons-2
+            part=(xmax-breaks)/fused_length
+            space=0
+            exon_length=0
+            exon_start=0
+            origin="5'"
+            for exon in fused_protein:
+                if exon["Type"]=="exon":
+                    if exon["Origin"]!=origin:
                         BND=exon_start+exon_length
-                        splicing_plot(exon_start-space, exon_start+0.5*exon_length, 3, "black")
-                        splicing_plot(exon_start+exon_length+space, exon_start+0.5*exon_length, 3, "black")
+                        exon_start=exon_start+exon_length
                     else:
-                        BND=exon_start+exon_length+space
-                        splicing_plot(exon_start+exon_length, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
-                        splicing_plot(exon_start+exon_length+2*space+(abs(exon["End"]-exon["Start"])+1)*part, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
-                origin=exon["Origin"]
-                exon_start=exon_start+exon_length+space
-                exon_length=abs(exon["End"]-exon["Start"])*part
-                label=exon["Rank"]
-                if exon["CDS"]:
-                    if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
-                        fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
-                        coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
-                        fused_exons.append((CDS_start, coding_length, label, True,origin, False))
-                    elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
-                        fused_exons.append((exon_start, exon_length, None, False, origin, False))
-                        coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
-                        fused_exons.append((exon_start, coding_length, label, True, origin, False))
+                        exon_start=exon_start+exon_length+space
+                    origin=exon["Origin"]
+                    exon_length=(abs(exon["End"]-exon["Start"])+1)*part
+                    label=exon["Rank"]
+                    if exon["CDS"]:
+                        if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
+                            fused_exons.append((exon_start, exon_length, None, False, origin, False))
+                            CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
+                            coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
+                            fused_exons.append((CDS_start, coding_length, label, True,origin, False))
+                        elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
+                            fused_exons.append((exon_start, exon_length, None, False, origin, False))
+                            coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
+                        else:
+                            fused_exons.append((exon_start, exon_length, label, True, origin, False))
                     else:
-                        fused_exons.append((exon_start, exon_length, label, True, origin, False))
-                else:
-                    fused_exons.append((exon_start, exon_length, label, False, origin, False))
-                space=Intron_size
-    else:
+                        fused_exons.append((exon_start, exon_length, label, False, origin, False))
+                    space=Intron_size
+        elif "intron-intron" in annotated_breakpoints["Fusion_type"]:
+            fused_protein=annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2-1]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-1:]
+            fused_length=0
+            fused_nr_of_exons=0
+            for exon in fused_protein:
+                if exon["Type"]=="exon":
+                    fused_length+=abs(exon["End"]-exon["Start"])
+                    fused_nr_of_exons+=1
+            breaks=fused_nr_of_exons-1
+            part=(xmax-breaks)/fused_length
+            space=0
+            exon_length=0
+            exon_start=0
+            origin="5'"
+            for exon in fused_protein:
+                if exon["Type"]=="exon":
+                    if exon["Origin"]!=origin:
+                        BND=exon_start+exon_length+(space/2)
+                    origin=exon["Origin"]
+                    exon_start=exon_start+exon_length+space
+                    exon_length=(abs(exon["End"]-exon["Start"])+1)*part
+                    label=exon["Rank"]
+                    if exon["CDS"]:
+                        if exon["Contains_start_CDS"]:
+                            fused_exons.append((exon_start, exon_length, None, False, origin, False))
+                            CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
+                            coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
+                            fused_exons.append((CDS_start, coding_length, label, True,origin, False))
+                        elif exon["Contains_end_CDS"]:
+                            fused_exons.append((exon_start, exon_length, None, False, origin, False))
+                            coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
+                            fused_exons.append((exon_start, coding_length, label, True, origin, False))
+                        else:
+                            fused_exons.append((exon_start, exon_length, label, True, origin, False))
+                    else:
+                        fused_exons.append((exon_start, exon_length, label, False, origin, False))
+                    space=Intron_size
+
+        elif "exon" in annotated_breakpoints["Fusion_type"] and "intron" in annotated_breakpoints["Fusion_type"]:
+            if "exon-intron" in annotated_breakpoints["Fusion_type"]:
+                fused_protein=copy.deepcopy(annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-1:])
+            elif "intron-exon" in annotated_breakpoints["Fusion_type"]:
+                fused_protein=copy.deepcopy(annotated_breakpoints["5'"]["Exons"][:annotated_breakpoints["5'"]["Rank"]*2]+annotated_breakpoints["3'"]["Exons"][annotated_breakpoints["3'"]["Rank"]*2-2:])
+            fused_length=0
+            fused_nr_of_exons=0
+            for index, exon in enumerate(fused_protein):
+                if exon["Type"]=="exon":
+                    fused_nr_of_exons+=1
+                    origin=exon["Origin"]
+                    if exon["Origin"]=="5'" and exon["Rank"]==annotated_breakpoints["5'"]["Rank"] and "exon-intron" in annotated_breakpoints["Fusion_type"]:
+                        fused_protein[index]["End"]=annotated_breakpoints["5'"]["Breakend_position"]
+                        exon["End"]=annotated_breakpoints["5'"]["Breakend_position"]
+                    if exon["Origin"]=="3'" and exon["Rank"]==annotated_breakpoints["3'"]["Rank"] and "intron-exon" in annotated_breakpoints["Fusion_type"]:
+                        fused_protein[index]["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
+                        exon["Start"]=annotated_breakpoints["3'"]["Breakend_position"]
+                    fused_length+=abs(exon["End"]-exon["Start"])
+            breaks=fused_nr_of_exons-1
+            part=(xmax-breaks)/fused_length
+            space=0
+            exon_length=0
+            exon_start=0
+            origin="5'"
+            for index, exon in enumerate(fused_protein):
+                if exon["Type"]=="exon":
+                    if exon["Origin"]!=origin:
+                        if "exon-intron" in annotated_breakpoints["Fusion_type"]:
+                            BND=exon_start+exon_length
+                            splicing_plot(exon_start-space, exon_start+0.5*exon_length, 3, "black")
+                            splicing_plot(exon_start+exon_length+space, exon_start+0.5*exon_length, 3, "black")
+                        else:
+                            BND=exon_start+exon_length+space
+                            splicing_plot(exon_start+exon_length, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
+                            splicing_plot(exon_start+exon_length+2*space+(abs(exon["End"]-exon["Start"])+1)*part, exon_start+exon_length+space+0.5*abs(exon["End"]-exon["Start"])*part, 3, "black")
+                    origin=exon["Origin"]
+                    exon_start=exon_start+exon_length+space
+                    exon_length=abs(exon["End"]-exon["Start"])*part
+                    label=exon["Rank"]
+                    if exon["CDS"]:
+                        if exon["Contains_start_CDS"] and exon["Origin"]=="5'":
+                            fused_exons.append((exon_start, exon_length, None, False, origin, False))
+                            CDS_start=exon_start+(abs(annotated_breakpoints["5'"]["CDS_start"]-exon["Start"])+1)*part
+                            coding_length=(abs(exon["End"]-annotated_breakpoints["5'"]["CDS_start"])+1)*part
+                            fused_exons.append((CDS_start, coding_length, label, True,origin, False))
+                        elif exon["Contains_end_CDS"] and exon["Origin"]=="3'":
+                            fused_exons.append((exon_start, exon_length, None, False, origin, False))
+                            coding_length=(abs(exon["Start"]-annotated_breakpoints["3'"]["CDS_end"])+1)*part
+                            fused_exons.append((exon_start, coding_length, label, True, origin, False))
+                        else:
+                            fused_exons.append((exon_start, exon_length, label, True, origin, False))
+                    else:
+                        fused_exons.append((exon_start, exon_length, label, False, origin, False))
+                    space=Intron_size
+    except:
         print("Visualisation for '", annotated_breakpoints["Fusion_type"], "' has not been implemented yet")
 
     try:
