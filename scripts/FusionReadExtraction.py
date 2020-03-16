@@ -103,27 +103,27 @@ def get_gene_overlap( bnd1_chr, bnd1_pos, bnd1_ori, bnd2_chr, bnd2_pos, bnd2_ori
 
     fusions = dict()
     for gene in overlap:
-        if gene["biotype"]=="protein_coding":
-            if gene['bnd']=="1":
-                ori=bnd1_ori
-            elif gene['bnd']=="2":
-                ori=bnd2_ori
-            if not ori and gene['strand'] == 1:
+        # if gene["biotype"]=="protein_coding":
+        if gene['bnd']=="1":
+            ori=bnd1_ori
+            if not ori:
                 if 'donor' not in fusions:
                     fusions['donor'] = dict()
                 fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['start']
-            elif not ori and gene['strand'] == -1:
-                if 'acceptor' not in fusions:
-                    fusions['acceptor'] = dict()
-                fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['start']
-            elif ori and gene['strand'] == 1:
-                if 'acceptor' not in fusions:
-                    fusions['acceptor'] = dict()
-                fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['end']
-            elif ori and gene['strand'] == -1:
+            elif ori:
                 if 'donor' not in fusions:
                     fusions['donor'] = dict()
                 fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['end']
+        elif gene['bnd']=="2":
+            ori=bnd2_ori
+            if not ori:
+                if 'acceptor' not in fusions:
+                    fusions['acceptor'] = dict()
+                fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['start']
+            elif ori:
+                if 'acceptor' not in fusions:
+                    fusions['acceptor'] = dict()
+                fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['end']
     return( fusions )
 
 ########################################   Obtain all reads from the bam file that support a breakpoint, excluding reference or non-overlapping reads   ########################################
@@ -138,16 +138,16 @@ def create_fasta( chr, start, end, svid, exclude, include ):
         Breakpoints that only have supplementary reads and not a primary read spanning the breakpoint will be excluded
         No effect when testing on the truthset in recall, but see if it ever happens in real sets
         '''
-        if read.query_name in include and not read.seq == None and not read.is_supplementary:
+        if read.query_name in include and not read.seq == None and not read.is_supplementary and read.query_name not in exclude:
             fasta.write( ">"+svid+"."+read.query_name+"\n")
             fasta.write(read.seq+"\n")
-
+            exclude.append(read.query_name)
         #### Uncomment to select all the reads supporting the breakpoint and adjacent regions of the gene to get full gene sequence back
         # if read.query_name in exclude or read.seq == None or read.is_supplementary:
         #     continue
         # fasta.write( ">"+svid+"."+read.query_name+"\n")
         # fasta.write(read.seq+"\n")
-        #exclude.append(read.query_name)
+
     fasta.close()
     bamfile.close()
 
@@ -178,7 +178,6 @@ vcf_reader = pyvcf.Reader(open(args.vcf, 'r'))
 if "source" in vcf_reader.metadata:
     if vcf_reader.metadata["source"][0].lower()=="sniffles":
         vcf_type="Sniffles"
-        vcf_reader.infos['RNAMES']=pyvcf.parser._Info('RNAMES', ".", "String", "Names of reads supporting SVs (comma separated)", "Sniffles", "X")
 elif "cmdline" in vcf_reader.metadata:
     if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
         vcf_type="NanoSV"
@@ -228,10 +227,14 @@ for record in vcf_reader:
                 acceptor_gene, acceptor_bp = acceptor.split("\t")
                 fusion = donor_gene+"_"+acceptor_gene
                 if donor_gene != acceptor_gene:
+                    good_fusion=True
                     if donor_bp == '1' and acceptor_bp == '2':
-                        good_fusion=True
+                    #     good_fusion=True
+                    # donor_start = fusions['donor'][donor]
+                    # if donor_strand=="1":
+                    #     donor_end = record.POS
 
-                        ### OPTIONAL CODE TO SELECT ALL THE READS FOR A WHOLE GENE (CURRENTLY NOT USED)
+                    ### OPTIONAL CODE TO SELECT ALL THE READS FOR A WHOLE GENE (CURRENTLY NOT USED)
                         donor_size=abs(record.POS-fusions['donor'][donor])
                         if donor_size>largest_donor_size:
                             largest_donor_size=donor_size
@@ -247,7 +250,7 @@ for record in vcf_reader:
                             acceptor_end = fusions['acceptor'][acceptor]
 
                     elif donor_bp == '2' and acceptor_bp == '1':
-                        good_fusion=True
+                        # good_fusion=True
 
                         donor_size=abs(record.ALT[0].pos-fusions['donor'][donor])
                         if donor_size>largest_donor_size:

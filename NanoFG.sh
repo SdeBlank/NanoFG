@@ -28,7 +28,6 @@ SELECTION AND FILTERING
     -dc|--dont_clean                                                   Don't clean up the intermediate files
     -df|--dont_filter                                                  Don't filter out all non-PASS SVs
     -cc|--consensus_calling                                            Create a consensus sequence of the fusion-supporting reads. Not recommended on low-coverage data.
-    -cf|--complex_fusion_detection                                     Link multiple SVs together to give an indication of fusions where small SVs are located within the fusion breakpoint
 
 OUTPUT
     -o|--outputdir                                                     Path to output directory
@@ -203,12 +202,6 @@ do
     NANOFG_DIR="$2"
     shift # past argument
     shift # past value
-    ;;
-    -cf|--complex_fusion_detection)
-    COMPLEX_FUSION=true
-    FUSION_READ_EXTRACTION_SCRIPT=$SCRIPT_DIR/FusionReadExtractionComplex.py
-    FUSION_CHECK_SCRIPT=$SCRIPT_DIR/FusionCheckComplex.py
-    shift # past argument
     ;;
     -cc|--consensus_calling)
     CONSENSUS_CALLING=true
@@ -584,19 +577,16 @@ else
 fi
 
 ################################################### COMBINING SVS ON THE SAME READ FOR THE DETECTION OF COMPLEX FUSIONS
-if [ $COMPLEX_FUSION = false ];then
-  echo -e "### No complex fusion detection parameter (-cf) provided. Skipping SV combination"
-else
-  echo -e "`date` \t Linking and combining SVs for complex fusion detection"
-  VCF_COMPLEX=./complex.vcf
+echo -e "`date` \t Linking and combining SVs for complex fusion detection"
+VCF_COMPLEX=./complex.vcf
 
-  python $SCRIPT_DIR/CombineSVs.py \
-  -v $SV_CALLING_OUT_FILTERED \
-  -b $BAM_MERGE_OUT \
-  -o $VCF_COMPLEX
+python $SCRIPT_DIR/CombineSVs.py \
+-v $SV_CALLING_OUT_FILTERED \
+-b $BAM_MERGE_OUT \
+-o $VCF_COMPLEX
 
-  grep -v "^#" $VCF_COMPLEX >> $SV_CALLING_OUT_FILTERED
-fi
+grep -v "^#" $VCF_COMPLEX >> $SV_CALLING_OUT_FILTERED
+
 
 ################################################### CHECKING THE CANDIDATE FUSION GENES FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
 echo -e "`date` \t Checking fusion candidates..."
