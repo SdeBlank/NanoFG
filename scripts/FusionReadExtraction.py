@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser(description='Put here a description.')
 parser.add_argument('-b', '--bam', required=True, type=str, help='Input bam file')
 parser.add_argument('-v', '--vcf', required=True, type=str, help='Input NanoSV vcf file')
 parser.add_argument('-o', '--output_dir', required=True, type=str, help='Output directory for fasta files')
+parser.add_argument('-nc', '--non_coding', action='store_true', help='True lets NanoFG detect fusions with non-coding genes (Not fully tested yet)')
 
 args = parser.parse_args()
 
@@ -103,27 +104,27 @@ def get_gene_overlap( bnd1_chr, bnd1_pos, bnd1_ori, bnd2_chr, bnd2_pos, bnd2_ori
 
     fusions = dict()
     for gene in overlap:
-        # if gene["biotype"]=="protein_coding":
-        if gene['bnd']=="1":
-            ori=bnd1_ori
-            if not ori:
-                if 'donor' not in fusions:
-                    fusions['donor'] = dict()
-                fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['start']
-            elif ori:
-                if 'donor' not in fusions:
-                    fusions['donor'] = dict()
-                fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['end']
-        elif gene['bnd']=="2":
-            ori=bnd2_ori
-            if not ori:
-                if 'acceptor' not in fusions:
-                    fusions['acceptor'] = dict()
-                fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['start']
-            elif ori:
-                if 'acceptor' not in fusions:
-                    fusions['acceptor'] = dict()
-                fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['end']
+        if gene["biotype"]=="protein_coding" or args.non_coding:
+            if gene['bnd']=="1":
+                ori=bnd1_ori
+                if not ori:
+                    if 'donor' not in fusions:
+                        fusions['donor'] = dict()
+                    fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['start']
+                elif ori:
+                    if 'donor' not in fusions:
+                        fusions['donor'] = dict()
+                    fusions['donor'][gene['id']+"\t"+gene['bnd']] = gene['end']
+            elif gene['bnd']=="2":
+                ori=bnd2_ori
+                if not ori:
+                    if 'acceptor' not in fusions:
+                        fusions['acceptor'] = dict()
+                    fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['start']
+                elif ori:
+                    if 'acceptor' not in fusions:
+                        fusions['acceptor'] = dict()
+                    fusions['acceptor'][gene['id']+"\t"+gene['bnd']] = gene['end']
     return( fusions )
 
 ########################################   Obtain all reads from the bam file that support a breakpoint, excluding reference or non-overlapping reads   ########################################

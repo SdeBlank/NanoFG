@@ -23,6 +23,7 @@ parser.add_argument('-ov', '--original_vcf', type=str, help='Original vcf file',
 parser.add_argument('-fo', '--fusion_output', type=str, help='Fusion gene info output file', required=True)
 parser.add_argument('-o', '--output', type=str, help='Fusion gene annotated vcf file', required=True)
 parser.add_argument('-p', '--pdf', type=str, help='Fusion gene pdf file', required=True)
+parser.add_argument('-nc', '--non_coding', action='store_true', help='True lets NanoFG detect fusions with non-coding genes (Not fully tested yet)')
 
 args = parser.parse_args()
 ########################################   Read in the vcf and perform all fusion check steps for each record in the vcf   ########################################
@@ -244,6 +245,8 @@ def ensembl_annotation(CHROM, POS):
         ensembl_info["Flags"]=[]
 
         if gene_info["biotype"]!="protein_coding":
+            if not args.non_coding:
+                continue
             ensembl_info["Flags"].append("Non_protein_coding")
 
         if "description" in gene_info:
@@ -422,17 +425,6 @@ def breakend_annotation(CHROM, POS, orientation, Info):
                 #     BND_INFO["Breakpoint_location"]="3'UTR"
                 # else:
                 BND_INFO["Breakpoint_location"]="CDS"
-<<<<<<< HEAD
-=======
-            elif POS>gene["Transcript_end"]:
-                BND_INFO["Breakpoint_location"]="before_transcript"
-                BND_INFO["Distance from transcript start"]=abs(POS-gene["Transcript_end"])
-                BND_INFO["Type"]="before_transcript"
-                if BND_INFO["Order"]=="5'":
-                    BND_INFO["TSS_retained"]=False
-                else:
-                    BND_INFO["TSS_retained"]=True
->>>>>>> 1f7203ddeaa3935a835d58388c54be7d0d60f71f
             elif POS>gene["CDS_start"]:
                 BND_INFO["Breakpoint_location"]="5'UTR"
             else:

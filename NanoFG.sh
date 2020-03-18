@@ -22,6 +22,7 @@ GENERAL
     -e|--venv                                                          Path to virtual environment[${VENV}]
 
 SELECTION AND FILTERING
+    -nc|--non_coding                                                   Also include non-coding fusions in the results (Not fully tested yet)
     -s|--selection                                                     Select genes or areas to check for fusion genes.
                                                                        Insert a list of genes or areas, separated by a comma
                                                              e.g. 'BRAF,TP53' or 'ENSG00000157764,ENSG00000141510' or '17:7565097-7590856'
@@ -81,7 +82,7 @@ VENV=${NANOFG_DIR}/venv/bin/activate
 
 THREADS=1
 
-COMPLEX_FUSION=false
+NON_CODING=false
 CONSENSUS_CALLING=false
 DONT_CLEAN=false
 DONT_FILTER=false
@@ -172,6 +173,10 @@ do
     THREADS="$2"
     shift # past argument
     shift # past value
+    ;;
+    -nc|--non_coding)
+    NON_CODING=true
+    shift # past argument
     ;;
     -s|--selection)
     SELECTION="$2"
@@ -470,10 +475,18 @@ fi
 ##################################################  EXTRACTION OF READS THAT SUPPORT POSSIBLE FUSION-GENERATING SVS, BASED ON ORIENTATION AND STRAND COMBINATION
 echo -e "`date` \t Extracting reads that support candidate fusion genes..."
 
-python $FUSION_READ_EXTRACTION_SCRIPT \
-  -b $BAM \
-  -v $VCF_FILTERED \
-  -o $CANDIDATE_DIR
+if [ $NON_CODING = true ];then
+  python $FUSION_READ_EXTRACTION_SCRIPT \
+    -b $BAM \
+    -v $VCF_FILTERED \
+    -o $CANDIDATE_DIR \
+    -nc $NON_CODING
+else
+  python $FUSION_READ_EXTRACTION_SCRIPT \
+    -b $BAM \
+    -v $VCF_FILTERED \
+    -o $CANDIDATE_DIR
+fi
 
 if ! [ $? -eq 0 ]; then
   echo "!!! FUSION READ EXTRACTION NOT CORRECTLY COMPLETED... exiting"
@@ -591,12 +604,22 @@ grep -v "^#" $VCF_COMPLEX >> $SV_CALLING_OUT_FILTERED
 ################################################### CHECKING THE CANDIDATE FUSION GENES FOR ADDITIONAL INFORMATION (FRAME, SIMILARITY, GENE OVERLAP, ETC.)
 echo -e "`date` \t Checking fusion candidates..."
 
-python $FUSION_CHECK_SCRIPT \
-  -v $SV_CALLING_OUT_FILTERED \
-  -ov $VCF \
-  -o $FUSION_CHECK_VCF_OUTPUT \
-  -fo $FUSION_CHECK_INFO_OUTPUT \
-  -p $FUSION_CHECK_PDF_OUTPUT
+if [ $NON_CODING = true ];then
+  python $FUSION_CHECK_SCRIPT \
+    -v $SV_CALLING_OUT_FILTERED \
+    -ov $VCF \
+    -o $FUSION_CHECK_VCF_OUTPUT \
+    -fo $FUSION_CHECK_INFO_OUTPUT \
+    -p $FUSION_CHECK_PDF_OUTPUT \
+    -nc
+else
+  python $FUSION_CHECK_SCRIPT \
+    -v $SV_CALLING_OUT_FILTERED \
+    -ov $VCF \
+    -o $FUSION_CHECK_VCF_OUTPUT \
+    -fo $FUSION_CHECK_INFO_OUTPUT \
+    -p $FUSION_CHECK_PDF_OUTPUT
+fi
 
 if ! [ $? -eq 0 ]; then
   echo "!!! FUSION CHECK NOT CORRECTLY COMPLETED... exiting"
