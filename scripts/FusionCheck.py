@@ -297,7 +297,12 @@ def ensembl_annotation(CHROM, POS):
                     exon_info["Contains_start_CDS"]=False
                     exon_info["Contains_end_CDS"]=False
 
-                    if CDS:
+                    if "Non_protein_coding" in ensembl_info["Flags"]:
+                        exon_info["CDS"]=False
+                        exon_info["Start_phase"]="-1"
+                        exon_info["End_phase"]="-1"
+                        exon_info["CDS_length"]=0
+                    elif CDS:
                         if ensembl_info["CDS_end"]>=CHRON_START and ensembl_info["CDS_end"]<=CHRON_END:
                             exon_info["Contains_end_CDS"]=True
                             exon_info["CDS"]=True
@@ -311,26 +316,26 @@ def ensembl_annotation(CHROM, POS):
                             exon_info["Start_phase"]=phase
                             exon_info["End_phase"]=(abs(exon_info["End"]-exon_info["Start"])+1+phase)%3
                             exon_info["CDS_length"]=abs(exon_info["End"]-exon_info["Start"])+1
-                    elif "Translation" in transcript:
-                        if ensembl_info["CDS_start"]>=CHRON_START and ensembl_info["CDS_start"]<=CHRON_END:
-                            exon_info["Contains_start_CDS"]=True
-                            exon_info["CDS"]=True
-                            #exon_info["Start_phase"]=-1
-                            exon_info["Start_phase"]=0
-                            if ensembl_info["CDS_end"]>=CHRON_START and ensembl_info["CDS_end"]<=CHRON_END:
-                                exon_info["Contains_end_CDS"]=True
-                                exon_info["End_phase"]=0
-                                exon_info["CDS_length"]=abs(ensembl_info["CDS_end"]-ensembl_info["CDS_start"])+1
-                            else:
-                                exon_info["End_phase"]=(abs(exon_info["End"]-ensembl_info["CDS_start"])+1)%3
-                                exon_info["CDS_length"]=abs(exon_info["End"]-ensembl_info["CDS_start"])+1
-                            CDS=True
+                    elif ensembl_info["CDS_start"]>=CHRON_START and ensembl_info["CDS_start"]<=CHRON_END:
+                        exon_info["Contains_start_CDS"]=True
+                        exon_info["CDS"]=True
+                        #exon_info["Start_phase"]=-1
+                        exon_info["Start_phase"]=0
+                        if ensembl_info["CDS_end"]>=CHRON_START and ensembl_info["CDS_end"]<=CHRON_END:
+                            exon_info["Contains_end_CDS"]=True
+                            exon_info["End_phase"]=0
+                            exon_info["CDS_length"]=abs(ensembl_info["CDS_end"]-ensembl_info["CDS_start"])+1
+                        else:
+                            exon_info["End_phase"]=(abs(exon_info["End"]-ensembl_info["CDS_start"])+1)%3
+                            exon_info["CDS_length"]=abs(exon_info["End"]-ensembl_info["CDS_start"])+1
+                        CDS=True
 
                     else:
                         exon_info["CDS"]=False
                         exon_info["Start_phase"]="-1"
                         exon_info["End_phase"]="-1"
                         exon_info["CDS_length"]=0
+                    print(args.non_coding, gene_info["biotype"], )
                     phase=exon_info["End_phase"]
                     cds_length+=exon_info["CDS_length"]
                     ensembl_info["Exons"].append(exon_info)
