@@ -44,8 +44,9 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
         for original_record in original_vcf_reader:
             if original_vcf_type=="NanoSV":
+
                 ### Use set() to get only unique reads. It is expected that the same read does not support the same breakpoint twice, but it does in WGA data
-                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"]+original_record.INFO["REF_READ_IDS_2"])), original_record.FILTER)
+                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"].remove("NA")+original_record.INFO["REF_READ_IDS_2"].remove("NA"))), original_record.FILTER)
             elif original_vcf_type=="Sniffles":
                 supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
 
@@ -566,6 +567,18 @@ def fusion_check(Annotation1, Annotation2):
         else:
             sys.exit("Unknown error in fusion check - 3")
 
+    elif ((Annotation1["Breakpoint_location"]=="before_transcript" or Annotation2["Breakpoint_location"]=="before_transcript") or
+            (Annotation1["Breakpoint_location"]=="before_transcript" or Annotation2["Breakpoint_location"]=="5'UTR") or
+            (Annotation1["Breakpoint_location"]=="5'UTR" or Annotation2["Breakpoint_location"]=="before_transcript") and
+            Annotation1["TSS_retained"]==True and Annotation2["TSS_retained"]==True):
+        Fusion_type="Possible promoter fusion"
+        if Annotation1["Order"]=="5'":
+            Annotation1_CDS_length=0
+            Annotation2_CDS_length=Annotation2["Original_CDS_length"]
+        else:
+            Annotation1_CDS_length=Annotation2["Original_CDS_length"]
+            Annotation2_CDS_length=0
+
     elif Annotation1["Breakpoint_location"]=="5'UTR":
         if Annotation1["Type"]==Annotation2["Type"]:
             Fusion_type="5'UTR fusion"
@@ -592,18 +605,6 @@ def fusion_check(Annotation1, Annotation2):
         else:
             Annotation1_CDS_length=0
             Annotation2_CDS_length=Annotation2["Original_CDS_length"]
-
-    elif ((Annotation1["Breakpoint_location"]=="before_transcript" or Annotation2["Breakpoint_location"]=="before_transcript") or
-            (Annotation1["Breakpoint_location"]=="before_transcript" or Annotation2["Breakpoint_location"]=="5'UTR") or
-            (Annotation1["Breakpoint_location"]=="5'UTR" or Annotation2["Breakpoint_location"]=="before_transcript") and
-            Annotation1["TSS_retained"]==True and Annotation2["TSS_retained"]==True):
-        Fusion_type="Possible promoter fusion"
-        if Annotation1["Order"]=="5'":
-            Annotation1_CDS_length=0
-            Annotation2_CDS_length=Annotation2["Original_CDS_length"]
-        else:
-            Annotation1_CDS_length=Annotation2["Original_CDS_length"]
-            Annotation2_CDS_length=0
     else:
         sys.exit("Unknown fusion in vcf")
 
