@@ -44,9 +44,11 @@ def parse_vcf(vcf, vcf_output, info_output, pdf, full_vcf):
 
         for original_record in original_vcf_reader:
             if original_vcf_type=="NanoSV":
-
+                try:
+                    original_record.INFO["REF_READ_IDS_1"].remove("NA")
+                    original_record.INFO["REF_READ_IDS_2"].remove("NA")
                 ### Use set() to get only unique reads. It is expected that the same read does not support the same breakpoint twice, but it does in WGA data
-                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"].remove("NA")+original_record.INFO["REF_READ_IDS_2"].remove("NA"))), original_record.FILTER)
+                supporting_reads[original_record.ID]=(len(set(original_record.INFO["ALT_READ_IDS"])), len(set(original_record.INFO["REF_READ_IDS_1"]+original_record.INFO["REF_READ_IDS_2"])), original_record.FILTER)
             elif original_vcf_type=="Sniffles":
                 supporting_reads[original_record.ID]=(int(original_record.samples[0].data.DV), int(original_record.samples[0].data.DR), original_record.FILTER)
 
