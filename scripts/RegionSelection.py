@@ -37,7 +37,7 @@ with open(bed, "w") as bed:
             else:
                 endpoint="/lookup/symbol/homo_sapiens/"+item
 
-            headers={"Content-Type" : "application/json"}
+            headers={ "Content-Type" : "application/json", "Accept" : "application/json"}
             params={"expand": "1"}
 
             ensembl_request=EnsemblRestClient.perform_rest_action(server, endpoint, headers, params)

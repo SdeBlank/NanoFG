@@ -42,9 +42,8 @@ class EnsemblRestClient(object):
             self.req_times.append(time.time())
             request = requests.get(server + endpoint, headers=hdrs, params=parameters)
             request.raise_for_status()
-            response = request.text
+            response = request.json()
             if response:
-                data = json.loads(response)
             self.req_count += 1
 
         except requests.exceptions.ConnectionError as error:
