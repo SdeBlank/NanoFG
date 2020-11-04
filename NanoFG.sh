@@ -20,6 +20,7 @@ GENERAL
     -v|--vcf		                                                       Path to vcf file
     -t|--threads                                                       Number of threads
     -e|--venv                                                          Path to virtual environment[${VENV}]
+    -wl|--without_last                                                 Do not remap fusion candidates with LAST
 
 SELECTION AND FILTERING
     -nc|--non_coding                                                   Also include non-coding fusions in the results (Not fully tested yet)
@@ -86,6 +87,7 @@ NON_CODING=false
 CONSENSUS_CALLING=false
 DONT_CLEAN=false
 DONT_FILTER=false
+USE_LAST=true
 
 OUTPUTDIR=$(realpath ./)
 
@@ -220,6 +222,11 @@ do
     ;;
     -e|--venv)
     VENV="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -wl|--without_last)
+    USE_LAST=false
     shift # past argument
     shift # past value
     ;;
@@ -517,13 +524,24 @@ done
 echo -e "`date` \t Mapping candidate fusion genes..."
 
 if [[ $SV_CALLER == *"nanosv"* ]] || [[ $SV_CALLER == *"NanoSV"* ]]; then
-  MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $REFGENOME -rd $REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
-  for FA in $CANDIDATE_DIR/*.fa; do
-    echo $FA;
-  done | \
-  xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
+  if [ $USE_LAST = true ]; then
+    echo -e "`date` \t Using LAST for remapping"
+    MAPPING_ARGS="-t $LAST_MAPPING_THREADS -r $REFGENOME -rd $REFDICT -l $LAST_DIR -ls '$LAST_MAPPING_SETTINGS' -s $SAMTOOLS"
+    for FA in $CANDIDATE_DIR/*.fa; do
+      echo $FA;
+    done | \
+    xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/last_mapping.sh -f {} $MAPPING_ARGS; exit 1;"
+  else
+    echo -e "`date` \t Using minimap2 for remapping"
+    MAPPING_ARGS="-mm2 $MINIMAP2 -oc -mm2s '$MINIMAP2_SETTINGS' -r $REFFASTA -t $LAST_MAPPING_THREADS -s $SAMTOOLS"
+    for FA in $CANDIDATE_DIR/*.fa; do
+      echo ${FA/.fa/};
+    done | \
+    xargs -I{} --max-procs $THREADS bash -c "bash $PIPELINE_DIR/minimap2_mapping.sh -f {}.fa -o {}.sorted.bam $MAPPING_ARGS; exit 1;"
+  fi
 
 elif [[ $SV_CALLER == *"sniffles"* ]] || [[ $SV_CALLER == *"Sniffles"* ]]; then
+  echo -e "`date` \t Using minimap2 for remapping"
   MAPPING_ARGS="-mm2 $MINIMAP2 -oc -mm2s '$MINIMAP2_SETTINGS' -r $REFFASTA -t $LAST_MAPPING_THREADS -s $SAMTOOLS"
   for FA in $CANDIDATE_DIR/*.fa; do
     echo ${FA/.fa/};
@@ -541,8 +559,8 @@ if [[ NUMBER_OF_BAMS -gt 1 ]];then
     $SAMTOOLS index $BAM_MERGE_OUT
   fi
 elif [[ NUMBER_OF_BAMS -eq 1 ]];then
-  cp $CANDIDATE_DIR/*.last.sorted.bam $BAM_MERGE_OUT
-  cp $CANDIDATE_DIR/*.last.sorted.bam.bai ${BAM_MERGE_OUT}.bai
+  cp $CANDIDATE_DIR/*.sorted.bam $BAM_MERGE_OUT
+  cp $CANDIDATE_DIR/*.sorted.bam.bai ${BAM_MERGE_OUT}.bai
 else
   echo "NO CANDIDATE FUSION GENES FOUND"
   exit
