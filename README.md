@@ -43,3 +43,6 @@ _Cretu Stancu, M. et al. Mapping and phasing of structural variation in patient 
 
 ###### Wtdbg2 (2.2) - https://github.com/ruanjue/wtdbg2 
 _Ruan, J. and Li, H. (2019) Fast and accurate long-read assembly with wtdbg2. Nat Methods_
+
+###### Primer3 - https://github.com/primer3-org/primer3
+_Untergasser, A. et al. Primer3–new capabilities and interfaces. Nucleic Acids Res. 40, e115 (2012)._
