@@ -20,7 +20,7 @@ GENERAL
     -v|--vcf		                                                       Path to vcf file
     -t|--threads                                                       Number of threads
     -e|--venv                                                          Path to virtual environment[${VENV}]
-    -wl|--without_last                                                 Do not remap fusion candidates with LAST
+    -wl|--without_last                                                 Do not remap fusion candidates with LAST, but use minimap2
 
 SELECTION AND FILTERING
     -nc|--non_coding                                                   Also include non-coding fusions in the results (Not fully tested yet)
@@ -63,9 +63,8 @@ MAPPING
 PRIMER DESIGN
     -pdf|--primer_design_flank                                         Flanking distance around to breakpoint to extract [$PRIMER_DESIGN_FLANK]
     -pdd|--primer_design_dir                                           Path to primer3 directory [$PRIMER_DESIGN_DIR]
-    -pdpt|--primer_design_pcr_type                                     PCR type [$PRIMER_DESIGN_PCR_TYPE]
-    -pdtp|--primer_design_tilling_params                               Tilling params [$PRIMER_DESIGN_TILLING_PARAMS]
     -pdp|--primer_design_psr                                           PSR [$PRIMER_DESIGN_PSR]
+    -pdmtf|--primer_Desing_minimal_target_flank                        Minimal bases flanking breakpoint that has to be included in primer product [$PRIMER_DESIGN_MINIMAL_TARGET_FLANK]
 "
 }
 
@@ -129,14 +128,10 @@ LAST_MAPPING_THREADS=1
 #PRIMER DESIGN DEFAULTS
 PRIMER_DESIGN_GETSEQ_SCRIPT=$SCRIPT_DIR/PrimerFlankDesign.py
 PRIMER_DESIGN_DIR=$PATH_PRIMER_DESIGN_DIR
-PRIMER_DESIGN_BINDIR=$PRIMER_DESIGN_DIR/primers
-PRIMER_DESIGN_GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
 PRIMER_DESIGN_PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
-PRIMER_DESIGN_MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
-PRIMER_DESIGN_PCR_TYPE='single'
-PRIMER_DESIGN_TILLING_PARAMS=''
 PRIMER_DESIGN_PSR='100-200'
 PRIMER_DESIGN_FLANK='200'
+PRIMER_DESIGN_MINIMAL_TARGET_FLANK='10'
 
 
 while [[ $# -gt 0 ]]
@@ -310,17 +305,13 @@ do
     shift # past argument
     shift # past value
     ;;
-    -pdpt|--primer_design_pcr_type)
-    PRIMER_DESIGN_PCR_TYPE="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -pdtp|--primer_design_tilling_params)
-    PRIMER_DESIGN_TILLING_PARAMS="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -pdp|--primer_design_psr)
+    PRIMER_DESIGN_PSR="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -pdmtf|--primer_Desing_minimal_target_flank)
+    PRIMER_DESIGN_MINIMAL_TARGET_FLANK="$2"
     PRIMER_DESIGN_PSR="$2"
     shift # past argument
     shift # past value
@@ -656,42 +647,16 @@ if ! [ $? -eq 0 ]; then
  exit
 fi
 
-mkdir -p $PRIMER_DIR/tmp
-if [ ! -d $PRIMER_DIR/tmp ]; then
- exit
-fi
-
 if [ -d $PRIMER_DESIGN_DIR ];then
-  cd $PRIMER_DIR/tmp
+  echo -e "FUSION_ID\tFORWARD_PRIMER_ID\tFORWARD_PRIMER_SEQ\tREVERSE_PRIMER_ID\tREVERSE_PRIMER_SEQ\tPRODUCT_SIZE" > $OUTPUTDIR/${SAMPLE}_FusionGenes.primers
   for FUSION_FASTA in $PRIMER_DIR/*.fasta; do
-    if [ -z $PRIMER_DESIGN_TILLING_PARAMS ]; then
-      bash $PIPELINE_DIR/primer_design.sh \
-       -f $FUSION_FASTA \
-       -o ${FUSION_FASTA/.fasta/.primers} \
-       -pdb $PRIMER_DESIGN_BINDIR \
-       -pdpt $PRIMER_DESIGN_PCR_TYPE \
-       -psr $PRIMER_DESIGN_PSR \
-       -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
-       -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
-       -pdm $PRIMER_DESIGN_MISPRIMING
-    else
-      bash $PIPELINE_DIR/primer_design.sh \
-       -f $FUSION_FASTA \
-       -o ${FUSION_FASTA/.fasta/.primers} \
-       -pdb $PRIMER_DESIGN_BINDIR \
-       -pdpt $PRIMER_DESIGN_PCR_TYPE \
-       -pdtp $PRIMER_DESIGN_TILLING_PARAMS \
-       -psr $PRIMER_DESIGN_PSR \
-       -pdgp $PRIMER_DESIGN_GUIX_PROFILE \
-       -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
-       -pdm $PRIMER_DESIGN_MISPRIMING
-    fi
-
-    mv $PRIMER_DIR/tmp/primer3.out ${FUSION_FASTA/.fasta/_primerinfo.txt}
-    rm $PRIMER_DIR/tmp/*
+    bash $PIPELINE_DIR/primer_design.sh \
+     -f $FUSION_FASTA \
+     -o $OUTPUTDIR/${SAMPLE}_FusionGenes.primers \
+     -psr $PRIMER_DESIGN_PSR \
+     -pdpc $PRIMER_DESIGN_PRIMER3_CORE \
+     -mtf $PRIMER_DESIGN_MINIMAL_TARGET_FLANK
   done
-  rmdir $PRIMER_DIR/tmp/
-  cat $PRIMER_DIR/*.primers > $OUTPUTDIR/${SAMPLE}_FusionGenes.primers
   cd $OUTPUTDIR
 else
   echo "Path to primer3 does not exist. Giving only breakpoint sequences"
@@ -709,8 +674,8 @@ if [ $DONT_CLEAN = false ];then
   rm $BAM_MERGE_OUT.bai
   rm $SV_CALLING_OUT
   rm $SV_CALLING_OUT_FILTERED
-  rm $PRIMER_DIR/*
-  rmdir $PRIMER_DIR
+  # rm $PRIMER_DIR/*
+  # rmdir $PRIMER_DIR
 fi
 
 deactivate

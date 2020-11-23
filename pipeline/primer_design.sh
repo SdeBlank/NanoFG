@@ -8,14 +8,9 @@ Required parameters:
 
 Optional parameters:
     -h|--help     Shows help
-    -pdb|--bindir		Bindir [$BINDIR]
-    -pdpt|--pcr_type   PCR type [$PCR_TYPE]
-    -pdtp|--tilling_params Tilling parameters [$TILLING_PARAMS]
     -psr|--psr  PSR [$PSR]
-    -pdgp|--guix_profile   GUIX profile [$GUIX_PROFILE]
     -pdpc|--primer3_core   Primer3 core [$PRIMER3_CORE]
-    -pdm|--mispriming     Mispriming [$MISPRIMING]
-    -pde|--primer_design_error
+    -mtf|--minimal_target_flank Minimal flank around breakpoint that has to be included in PCR product [$MIN_TARGET_FLANK]
 "
 }
 
@@ -25,14 +20,11 @@ NANOFG_DIR=$(realpath $(dirname $(dirname ${BASH_SOURCE[0]})))
 source ${NANOFG_DIR}/paths.ini
 
 PRIMER_DESIGN_DIR=${PATH_PRIMER_DESIGN_DIR}
+
 # DEFAULTS
-BINDIR=$PRIMER_DESIGN_DIR/primers
-PCR_TYPE='single'
-TILLING_PARAMS=' '
 PSR='60-200'
-GUIX_PROFILE=$PRIMER_DESIGN_DIR/emboss/.guix-profile
-PRIMER3_CORE=$PRIMER_DESIGN_DIR/primer3/src/primer3_core
-MISPRIMING=$PRIMER_DESIGN_DIR/repbase/current/empty.ref
+MIN_TARGET_FLANK=10
+PRIMER3_CORE=$PRIMER_DESIGN_DIR/src/primer3_core
 
 while [[ $# -gt 0 ]]
 do
@@ -53,43 +45,13 @@ do
     shift # past argument
     shift # past value
     ;;
-    -pdb|--bindir)
-    BINDIR="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -pdpt|--pcr_type)
-    PCR_TYPE="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -pdtp|--tilling_params)
-    TILLING_PARAMS="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -psr|--psr)
     PSR="$2"
     shift # past argument
     shift # past value
     ;;
-    -pdgp|--guix_profile)
-    GUIX_PROFILE="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -pdpc|--primer3_core)
-    PRIMER3_CORE="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -pdm|--mispriming)
-    MISPRIMING="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -pde|--primer_design_error)
-    PRIMER_DESIGN_ERR="$2"
+    -mtf|--minimal_target_flank)
+    MIN_TARGET_FLANK="$2"
     shift # past argument
     shift # past value
     ;;
@@ -108,13 +70,37 @@ fi
 
 #echo `date`: Running on `uname -n`
 
-guixr load-profile $GUIX_PROFILE --<<EOF
-export EMBOSS_PRIMER3_CORE=$PRIMER3_CORE
-$BINDIR/primerBATCH1 $MISPRIMING $PCR_TYPE $PSR $TILLING_PARAMS <$FASTA
+FASTA_ID=$(grep ">" $FASTA)
+FASTA_ID=${FASTA_ID//\>}
+FASTA_SEQUENCE=$(grep -v ">" $FASTA)
+
+bp_index() {
+  x="${1%%[]*}"
+  [[ "$x" = "$1" ]] && echo -1 || echo "${#x}"
+}
+
+SEQUENCE_TARGET=$(($(bp_index $FASTA_SEQUENCE)-$MIN_TARGET_FLANK+1))
+SEQUENCE_TARGET_LENGTH=$(($MIN_TARGET_FLANK*2))
+FASTA_SEQUENCE=${FASTA_SEQUENCE//[]}
+
+PRIMER_OUTPUT=${FASTA//.fasta}.primers
+
+$PRIMER3_CORE <<EOF > $PRIMER_OUTPUT
+SEQUENCE_ID=$FASTA_ID
+SEQUENCE_TEMPLATE=$FASTA_SEQUENCE
+PRIMER_PRODUCT_SIZE_RANGE=$PSR
+SEQUENCE_TARGET=$SEQUENCE_TARGET,$SEQUENCE_TARGET_LENGTH
+PRIMER_NUM_RETURN=1
+=
 EOF
 
-grep -v "FAILED" ./primers.txt > ${OUTPUT}.tmp
-paste <(cat ${OUTPUT}.tmp) <(grep "PRODUCT SIZE" ./primer3.out | grep -oP "\d+$") > $OUTPUT
-rm ${OUTPUT}.tmp
+FORWARD_PRIMER_ID="$FASTA_ID-$(sed -n -e 's/^PRIMER_LEFT_0=//p' $PRIMER_OUTPUT)"
+FORWARD_PRIMER_ID=${FORWARD_PRIMER_ID//,*}F
+FORWARD_PRIMER_SEQ=$(sed -n -e 's/^PRIMER_LEFT_0_SEQUENCE=//p' $PRIMER_OUTPUT)
+REVERSE_PRIMER_ID="$FASTA_ID-$(sed -n -e 's/^PRIMER_RIGHT_0=//p' $PRIMER_OUTPUT)"
+REVERSE_PRIMER_ID=${REVERSE_PRIMER_ID//,*}R
+REVERSE_PRIMER_SEQ=$(sed -n -e 's/^PRIMER_RIGHT_0_SEQUENCE=//p' $PRIMER_OUTPUT)
+PRODUCT_SIZE=$(sed -n -e 's/^PRIMER_PAIR_0_PRODUCT_SIZE=//p' $PRIMER_OUTPUT)
+echo -e "$FASTA_ID\t$FORWARD_PRIMER_ID\t$FORWARD_PRIMER_SEQ\t$REVERSE_PRIMER_ID\t$REVERSE_PRIMER_SEQ\t$PRODUCT_SIZE" >> $OUTPUT
 
 #echo `date`: Done

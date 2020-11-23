@@ -20,7 +20,7 @@ directory = args.directory
 offset = args.offset
 flank = args.flank
 mask = args.mask
-
+print(directory)
 #############################################   Mask common variation locations in the sequence  #############################################
 def mask_seq( chr, start, end, strand, seq ):
     ext = "/overlap/region/human/"+str(chr)+":"+str(start)+"-"+str(end)+":"+str(strand)+"?feature=variation"
@@ -132,7 +132,6 @@ def alt_convert( record ):
 #############################################   RUNNING CODE   #############################################
 EnsemblRestClient=EnsemblRestClient()
 server = "http://grch37.rest.ensembl.org"
-
 with open(vcf, "r") as fusion_vcf:
     vcf_reader = pyvcf.Reader(fusion_vcf)
 
@@ -143,7 +142,6 @@ with open(vcf, "r") as fusion_vcf:
     elif "cmdline" in vcf_reader.metadata:
         if "nanosv" in vcf_reader.metadata["cmdline"][0].lower():
             vcf_type="NanoSV"
-
     for record in vcf_reader:
         if "FUSION" in record.INFO:
             ### GATHER THE SEQUENCE AROUND BREAKPOINTS THAT PRODUCE A VALID FUSION GENE
@@ -176,7 +174,6 @@ with open(vcf, "r") as fusion_vcf:
                 seq2 = get_seq(record.ALT[0].chr, record.ALT[0].pos-offset-flank, record.ALT[0].pos-offset, -1)
             if not seq2:
                 continue
-
             with open(directory+"/"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+".fasta", "w") as primer_output:
                 primer_output.write(">"+record.ID+"."+record.INFO["FUSION"][0].replace("-","_")+"\n")
                 primer_output.write(seq1+"[]"+seq2+"\n")
