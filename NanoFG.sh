@@ -104,6 +104,7 @@ REFDICT=$PATH_HOMO_SAPIENS_REFDICT
 
 #SV CALLING DEFAULTS
 NANOSV_MINIMAP2_CONFIG=$FILES_DIR/nanosv_minimap2_config.ini
+NANOSV_MINIMAP2_CONSENSUS_CONFIG=$FILES_DIR/nanosv_minimap2_consensus_config.ini
 NANOSV_LAST_NOCONSENSUS_CONFIG=$FILES_DIR/nanosv_last_config.ini
 NANOSV_LAST_CONSENSUS_CONFIG=$FILES_DIR/nanosv_last_consensus_config.ini
 
@@ -223,7 +224,6 @@ do
     -wl|--without_last)
     USE_LAST=false
     shift # past argument
-    shift # past value
     ;;
     -sa|--samtools)
     SAMTOOLS="$2"
@@ -506,7 +506,7 @@ for FASTA in $CANDIDATE_DIR/*.fasta; do
   fi
 
   if ! [ -s ${FASTA/.fasta/_wtdbg2.ctg.fa} ] && [ $CONSENSUS_CALLING = false ];then
-    ln -s $FASTA ${FASTA/.fasta/.no_ctg.fa}
+    ln -s $(realpath $FASTA) ${FASTA/.fasta/.no_ctg.fa}
   fi
 done
 
@@ -560,10 +560,18 @@ fi
 echo -e "`date` \t Calling SVs..."
 if [ -z $NANOSV_LAST_CONFIG ]; then
   if [ $CONSENSUS_CALLING = true ];then
-    NANOSV_LAST_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
+    if [ $USE_LAST = true ]; then
+      NANOSV_CONFIG=$NANOSV_LAST_CONSENSUS_CONFIG
+    else
+      NANOSV_CONFIG=$NANOSV_MINIMAP2_CONSENSUS_CONFIG
+    fi
     SNIFFLES_SETTINGS='-s 1 -n -1 --genotype'
   else
-    NANOSV_LAST_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
+    if [ $USE_LAST = true ]; then
+      NANOSV_CONFIG=$NANOSV_LAST_NOCONSENSUS_CONFIG
+    else
+      NANOSV_CONFIG=$NANOSV_MINIMAP2_CONFIG
+    fi
     SNIFFLES_SETTINGS='-s 2 -n -1 --genotype'
   fi
 fi
@@ -574,7 +582,7 @@ bash $PIPELINE_DIR/sv_calling.sh \
   -t $THREADS \
   -s $SAMTOOLS \
   -v $VENV \
-  -c $NANOSV_LAST_CONFIG \
+  -c $NANOSV_CONFIG \
   -ss "$SNIFFLES_SETTINGS" \
   -o $SV_CALLING_OUT
 

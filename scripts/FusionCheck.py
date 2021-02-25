@@ -340,7 +340,7 @@ def ensembl_annotation(CHROM, POS):
                         exon_info["Start_phase"]="-1"
                         exon_info["End_phase"]="-1"
                         exon_info["CDS_length"]=0
-                    print(args.non_coding, gene_info["biotype"], )
+                    # print(args.non_coding, gene_info["biotype"], )
                     phase=exon_info["End_phase"]
                     cds_length+=exon_info["CDS_length"]
                     ensembl_info["Exons"].append(exon_info)
