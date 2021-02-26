@@ -27,7 +27,7 @@ https://github.com/SdeBlank/NanoFG/wiki
 ```
 
 ## Citation
-Please see and cite: https://www.biorxiv.org/content/10.1101/807545v2
+Please see and cite: https://www.nature.com/articles/s41467-020-16641-7
 
 #### Additionally, NanoFG integrates different existing tools:
 ###### Samtools (1.7) - http://samtools.sourceforge.net/
