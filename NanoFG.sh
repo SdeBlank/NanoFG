@@ -330,6 +330,8 @@ if [ -z $BAM ] && [ -z $FASTQDIR ]; then
     exit
 fi
 
+OUTPUTDIR=$(realpath ${OUTPUTDIR})
+
 echo -e "`date` \t Running on `uname -n`"
 
 if [ -z $SAMPLE ];then
@@ -370,13 +372,13 @@ SV_CALLING_OUT=$OUTPUTDIR/candidate_fusion_genes.vcf
 
 
 if [ -d "$CANDIDATE_DIR" ]; then
-  rm $CANDIDATE_DIR/*
+  rm -f $CANDIDATE_DIR/*
 else
   mkdir -p $CANDIDATE_DIR
 fi
 
 if [ -d "$PRIMER_DIR" ]; then
-  rm $PRIMER_DIR/*
+  rm -f $PRIMER_DIR/*
 else
   mkdir -p $PRIMER_DIR
 fi
@@ -393,9 +395,9 @@ if [ ! -z $BAM ];then
 else
   echo -e "`date` \t Mapping all reads using minimap2..."
 
-  FASTQ=${SAMPLE}.merged.fastq
+  FASTQ=${OUTPUTDIR}/${SAMPLE}.merged.fastq
   cat $FASTQDIR/*.fastq > $FASTQ
-  BAM=${SAMPLE}.bam
+  BAM=${OUTPUTDIR}/${SAMPLE}.bam
 
   bash $PIPELINE_DIR/minimap2_mapping.sh \
     -f $FASTQ \
@@ -607,7 +609,7 @@ fi
 
 ################################################### COMBINING SVS ON THE SAME READ FOR THE DETECTION OF COMPLEX FUSIONS
 echo -e "`date` \t Linking and combining SVs for complex fusion detection"
-VCF_COMPLEX=./complex.vcf
+VCF_COMPLEX=${OUTPUTDIR}/complex.vcf
 
 python $SCRIPT_DIR/CombineSVs.py \
 -v $SV_CALLING_OUT_FILTERED \
@@ -674,14 +676,16 @@ fi
 ################################################### IF -DC IS NOT SPECIFIED, ALL FILES EXCEPT THE OUTPUT FILES ARE DELETED TO PROVIDE A CLEAN OUTPUT
 
 if [ $DONT_CLEAN = false ];then
-  rm $OUTPUTDIR/reads.tmp
-  rm $VCF_FILTERED
-  rm $CANDIDATE_DIR/*
-  rmdir $CANDIDATE_DIR
-  rm $BAM_MERGE_OUT
-  rm $BAM_MERGE_OUT.bai
-  rm $SV_CALLING_OUT
-  rm $SV_CALLING_OUT_FILTERED
+  if [ -f $OUTPUTDIR/reads.tmp ];then
+    rm $OUTPUTDIR/reads.tmp
+  fi
+  rm -f $VCF_FILTERED
+  rm -f $CANDIDATE_DIR/*
+  rmdir -f $CANDIDATE_DIR
+  rm -f $BAM_MERGE_OUT
+  rm -f $BAM_MERGE_OUT.bai
+  rm -f $SV_CALLING_OUT
+  rm -f $SV_CALLING_OUT_FILTERED
   # rm $PRIMER_DIR/*
   # rmdir $PRIMER_DIR
 fi
