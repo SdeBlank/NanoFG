@@ -97,6 +97,6 @@ $MINIMAP2 -t $THREADS $MINIMAP2_SETTINGS $REFFASTA $FASTQ\
 | $SAMTOOLS view -h -S -b -@ $THREADS /dev/stdin \
 | $SAMTOOLS sort /dev/stdin -o ${OUTPUT} -@ $THREADS
 
-$SAMTOOLS index ${OUTPUT} -@ $THREADS
+$SAMTOOLS index -@ $THREADS ${OUTPUT}
 
 #echo `date`: Done
