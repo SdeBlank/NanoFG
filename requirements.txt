@@ -5,6 +5,6 @@ nltk==3.6.6
 numpy==1.22.0
 pysam==0.15.2
 PyVCF==0.6.8
-requests==2.22.0
+requests==2.31.0
 pybiomart==0.2.0
 #NanoSV==1.2.4
